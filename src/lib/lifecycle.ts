@@ -60,7 +60,7 @@ function normalizeEvent(event: PullRequestEvent): PullRequestEvent {
 }
 
 function refreshPreviewUrl(env: Environment): Environment {
-  if (!env.url) return env;
+  if (!env.url || !env.url.includes(".preview.local")) return env;
   const next = previewUrl(env.repository, env.prNumber);
   if (env.url === next) return env;
   const previous = env.url;
@@ -111,9 +111,10 @@ export async function getOverview(): Promise<Overview> {
       maxConcurrent: config.maxConcurrent,
       ttlHours: config.ttlHours,
       idleHours: config.idleHours,
+      sleepSeconds: config.sleepSeconds,
       reaperIntervalMs: config.reaperIntervalMs,
       previewBaseUrl: config.previewBaseUrl,
-      deployer: "fake",
+      deployer: config.deployer,
       webhookVerification: config.webhookSecret ? "signed" : "open-in-development",
     },
     summary: {

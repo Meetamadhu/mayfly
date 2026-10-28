@@ -385,8 +385,10 @@ export function Dashboard() {
       </div>
 
       <p className="footer">
-        The deployer is fake and writes <span className="mono">data/deployments.json</span>. Destroy removes that
-        record. The reaper also runs every {config ? Math.round(config.reaperIntervalMs / 1000) : 60}s. Webhook
+        {config?.deployer === "fake"
+          ? "The deployer records a preview in a local file. Destroy removes that record."
+          : `Each preview listens on its own port. The app sleeps after ${config?.sleepSeconds ?? 20}s without a request and wakes on the next visit. Destroy stops the port.`}{" "}
+        The reaper also runs every {config ? Math.round(config.reaperIntervalMs / 1000) : 60}s. Webhook
         signatures are {config?.webhookVerification === "signed" ? "required" : "open in development until GITHUB_WEBHOOK_SECRET is set"}.
         This control plane has no authentication yet, so keep it on a private network.
       </p>
