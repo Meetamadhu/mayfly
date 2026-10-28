@@ -21,8 +21,13 @@ export interface State {
   environments: import("./types").Environment[];
 }
 
+export function dataDir() {
+  if (process.env.VERCEL) return path.join("/tmp", "orchestrator-data");
+  return path.join(process.cwd(), "data");
+}
+
 function stateFile() {
-  return path.join(process.cwd(), "data", "state.json");
+  return path.join(dataDir(), "state.json");
 }
 
 export async function readJson<T>(file: string, fallback: T): Promise<T> {

@@ -4,7 +4,7 @@ import "./globals.css";
 
 const sans = IBM_Plex_Sans({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700"],
   variable: "--font-sans",
 });
 
@@ -15,8 +15,8 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Orchestrator",
-  description: "Ephemeral pull request environments that shut themselves down.",
+  title: "Mayfly",
+  description: "Ephemeral pull request previews that live briefly, then disappear.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

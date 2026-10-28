@@ -15,6 +15,13 @@ export interface OrchestratorConfig {
   previewBaseUrl: string;
 }
 
+function previewBase() {
+  const configured = process.env.PREVIEW_BASE_URL?.replace(/\/$/, "");
+  if (configured) return configured;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return "http://localhost:3000";
+}
+
 function positiveNumber(name: string, fallback: number): number {
   const raw = process.env[name];
   if (!raw) return fallback;
@@ -40,9 +47,9 @@ export function getConfig(): OrchestratorConfig {
     fakeDelayMs: positiveNumber("PREVIEW_FAKE_DELAY_MS", 700),
     sleepSeconds,
     sleepMs: sleepSeconds * 1000,
-    deployer: process.env.DEPLOYER === "fake" ? "fake" : "process",
+    deployer: process.env.VERCEL || process.env.DEPLOYER === "fake" ? "fake" : "process",
     webhookSecret: process.env.GITHUB_WEBHOOK_SECRET ?? "",
     githubToken: process.env.GITHUB_TOKEN ?? "",
-    previewBaseUrl: (process.env.PREVIEW_BASE_URL || "http://localhost:3000").replace(/\/$/, ""),
+    previewBaseUrl: previewBase(),
   };
 }

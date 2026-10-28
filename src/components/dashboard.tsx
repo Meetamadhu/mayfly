@@ -5,6 +5,81 @@ import type { Environment, EnvironmentStatus, Overview } from "@/lib/types";
 
 const TRANSITIONAL = new Set<EnvironmentStatus>(["provisioning", "updating", "destroying"]);
 
+function EnvironmentCard({
+  env,
+  busy,
+  copied,
+  onCopy,
+  onIdle,
+  onDestroy,
+}: {
+  env: Environment;
+  busy: boolean;
+  copied: boolean;
+  onCopy: () => void;
+  onIdle: () => void;
+  onDestroy: () => void;
+}) {
+  const actionable = env.status === "ready" || env.status === "updating" || env.status === "provisioning";
+  return (
+    <article className={env.status === "ready" ? "env featured" : "env"} data-status={env.status}>
+      <header>
+        <div>
+          <h3>
+            {env.repository}
+            <span>#{env.prNumber}</span>
+          </h3>
+          <p className="meta">
+            <span className="chip mono">{env.sha.slice(0, 12)}</span>
+            <span className="chip">{env.branch}</span>
+            <span className="chip">active {formatDelta(env.lastActiveAt)}</span>
+            <span className="chip">
+              {env.status === "destroyed"
+                ? `removed ${formatDelta(env.destroyedAt ?? env.updatedAt)}`
+                : `expires ${formatDelta(env.expiresAt)}`}
+            </span>
+            {env.destroyReason ? <span className="chip">reason {env.destroyReason}</span> : null}
+          </p>
+        </div>
+        <span className="status" data-status={env.status}>
+          {env.status}
+        </span>
+      </header>
+      {env.url ? (
+        <p className="url">
+          <a href={env.url} target="_blank" rel="noreferrer">
+            {env.url}
+          </a>
+        </p>
+      ) : null}
+      {env.error ? <p className="error">{env.error}</p> : null}
+      {env.comments.at(-1) ? <p className="comment">{env.comments.at(-1)?.body.split("\n")[0]}</p> : null}
+      {actionable ? (
+        <div className="row-actions">
+          {env.url ? (
+            <a className="open-link" href={env.url} target="_blank" rel="noreferrer">
+              Open preview
+            </a>
+          ) : null}
+          {env.status === "ready" ? (
+            <button type="button" className="secondary" disabled={busy} onClick={onIdle}>
+              Mark idle
+            </button>
+          ) : null}
+          <button type="button" className="secondary" disabled={busy} onClick={onDestroy}>
+            Destroy
+          </button>
+          {env.url ? (
+            <button type="button" className="secondary" onClick={onCopy}>
+              {copied ? "Copied" : "Copy URL"}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
 function randomSha() {
   const bytes = new Uint8Array(8);
   crypto.getRandomValues(bytes);
@@ -42,6 +117,8 @@ export function Dashboard() {
   const [branch, setBranch] = useState("feat/preview-lifetime");
   const [sha, setSha] = useState("a1b2c3d4e5f67890");
   const [ttlMinutes, setTtlMinutes] = useState("480");
+  const [showRemoved, setShowRemoved] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     const response = await fetch("/api/environments", { cache: "no-store" });
@@ -159,7 +236,22 @@ export function Dashboard() {
   }
 
   const config = overview?.config;
+  const current = overview?.environments.filter((env) => env.status !== "destroyed") ?? [];
+  const removed = overview?.environments.filter((env) => env.status === "destroyed") ?? [];
+  const liveCount = overview?.summary.live ?? 0;
+  const capacity = config?.maxConcurrent ?? 0;
+  const capacityRatio = capacity > 0 ? Math.min(1, liveCount / capacity) : 0;
   const focused = overview?.environments.find((env) => env.id === focusId) ?? null;
+
+  async function copyUrl(id: string, url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedId(id);
+      window.setTimeout(() => setCopiedId((currentId) => (currentId === id ? null : currentId)), 1500);
+    } catch {
+      setError("Could not copy the preview URL.");
+    }
+  }
   const statusLine =
     notice ??
     (focused
@@ -170,27 +262,42 @@ export function Dashboard() {
 
   return (
     <main className="shell">
-      <header className="top">
-        <div>
-          <p className="eyebrow">Preview control</p>
-          <h1>Ephemeral environments</h1>
+      <header className="mast">
+        <div className="mast-copy">
+          <div className="mast-title">
+            <h1>Mayfly</h1>
+            <p className="subtitle">Ephemeral environments</p>
+          </div>
           <p className="lede">
             A pull request gets a test deployment. Close it, leave it idle, or let the clock run out, and the
             deployment is deleted so staging stops billing.
           </p>
         </div>
+        {config ? (
+          <div className="pills">
+            <span className="pill">
+              {config.webhookVerification === "signed" ? "Signatures required" : "Signatures open"}
+            </span>
+            <span className="pill">
+              {config.deployer === "fake" ? "Recorded previews" : `Sleeps after ${config.sleepSeconds}s`}
+            </span>
+          </div>
+        ) : null}
       </header>
 
       <dl className="stats">
         <div>
           <dt>Live</dt>
           <dd>
-            {overview?.summary.live ?? "–"}
-            <span>/{config?.maxConcurrent ?? "–"}</span>
+            {overview ? liveCount : "–"}
+            <span>/{capacity || "–"}</span>
           </dd>
+          <div className="meter" aria-hidden="true">
+            <span data-hot={capacityRatio >= 0.8 ? "true" : "false"} style={{ width: `${capacityRatio * 100}%` }} />
+          </div>
         </div>
         <div>
-          <dt>Destroyed</dt>
+          <dt>Removed</dt>
           <dd>{overview?.summary.destroyed ?? "–"}</dd>
         </div>
         <div>
@@ -209,11 +316,100 @@ export function Dashboard() {
         </div>
       </dl>
 
-      <div className="layout">
-        <section className="panel">
-          <h2>Pull request</h2>
+      <div className="board">
+        <section>
+          <div className="ledger-head">
+            <div>
+              <h2>Live</h2>
+              <p className="help">Previews that are still running.</p>
+            </div>
+            <button type="button" className="secondary" disabled={busy} onClick={() => void runReaper()}>
+              Run reaper
+            </button>
+          </div>
+
+          {loadError ? <p className="error" role="alert">{loadError}</p> : null}
+          {!overview && !loadError ? <p className="empty">Loading the ledger…</p> : null}
+
+          <div className="stack">
+            {overview && current.length === 0 ? (
+              <p className="empty">No live previews. Open a pull request and it will show up here.</p>
+            ) : null}
+            {current.map((env) => (
+              <EnvironmentCard
+                key={env.id}
+                env={env}
+                busy={busy}
+                copied={copiedId === env.id}
+                onCopy={() => void copyUrl(env.id, env.url ?? "")}
+                onIdle={() => void act(env.id, "idle")}
+                onDestroy={() => void act(env.id, "destroy")}
+              />
+            ))}
+          </div>
+
+          <div className="ledger-head running-head">
+            <div>
+              <h2>Ports</h2>
+              <p className="help">Processes still listening.</p>
+            </div>
+          </div>
+          <div className="stack">
+            {overview && overview.deployments.length === 0 ? (
+              <p className="empty">Nothing is listening. Closed, idle, and expired previews are gone.</p>
+            ) : null}
+            {overview?.deployments.map((deployment) => (
+              <article className="deployment" key={deployment.deploymentId}>
+                <div>
+                  <strong>
+                    {deployment.repository}
+                    <span>#{deployment.prNumber}</span>
+                  </strong>
+                  <p className="meta">
+                    <span className="chip mono">{deployment.sha.slice(0, 12)}</span>
+                    {deployment.port ? <span className="chip">port {deployment.port}</span> : null}
+                  </p>
+                </div>
+                <a className="open-link" href={deployment.url} target="_blank" rel="noreferrer">
+                  Open
+                </a>
+              </article>
+            ))}
+          </div>
+
+          {overview ? (
+            <button
+              type="button"
+              className="history-toggle secondary"
+              aria-expanded={showRemoved}
+              onClick={() => setShowRemoved((open) => !open)}
+            >
+              {showRemoved ? "Hide removed" : "Show removed"}
+              <span>{removed.length}</span>
+            </button>
+          ) : null}
+          {showRemoved ? (
+            <div className="stack">
+              {removed.length === 0 ? <p className="empty">No removed previews.</p> : null}
+              {removed.map((env) => (
+                <EnvironmentCard
+                  key={env.id}
+                  env={env}
+                  busy={busy}
+                  copied={copiedId === env.id}
+                  onCopy={() => void copyUrl(env.id, env.url ?? "")}
+                  onIdle={() => void act(env.id, "idle")}
+                  onDestroy={() => void act(env.id, "destroy")}
+                />
+              ))}
+            </div>
+          ) : null}
+        </section>
+
+        <details className="panel simulator">
+          <summary>Simulate a pull request</summary>
           <p className="help">
-            This talks to the orchestrator directly. GitHub can send the same actions to <span className="mono">/api/webhooks/github</span>.
+            This talks to Mayfly directly. GitHub can send the same actions to <span className="mono">/api/webhooks/github</span>.
           </p>
           <form
             onSubmit={(event) => {
@@ -291,106 +487,14 @@ export function Dashboard() {
             </p>
           ) : null}
           {error ? <p className="error" role="alert">{error}</p> : null}
-        </section>
-
-        <section>
-          <div className="ledger-head">
-            <h2>Ledger</h2>
-            <button type="button" className="secondary" disabled={busy} onClick={() => void runReaper()}>
-              Run reaper
-            </button>
-          </div>
-
-          {loadError ? <p className="error" role="alert">{loadError}</p> : null}
-          {!overview && !loadError ? <p className="empty">Loading the ledger…</p> : null}
-
-          <div className="stack">
-            {overview?.environments.length === 0 ? (
-              <p className="empty">No previews yet. Open a pull request and it will show up here until the reaper removes it.</p>
-            ) : null}
-            {overview?.environments.map((env) => (
-              <article className="env" key={env.id}>
-                <header>
-                  <div>
-                    <h3>
-                      {env.repository}#{env.prNumber}
-                    </h3>
-                    <p className="meta">
-                      <span className="mono">{env.sha.slice(0, 12)}</span>
-                      <span>{env.branch}</span>
-                      <span>active {formatDelta(env.lastActiveAt)}</span>
-                      <span>{env.status === "destroyed" ? `removed ${formatDelta(env.destroyedAt ?? env.updatedAt)}` : `expires ${formatDelta(env.expiresAt)}`}</span>
-                      {env.destroyReason ? <span>reason {env.destroyReason}</span> : null}
-                    </p>
-                  </div>
-                  <span className="status" data-status={env.status}>{env.status}</span>
-                </header>
-                {env.url ? (
-                  <p className="url">
-                    <a href={env.url} target="_blank" rel="noreferrer">{env.url}</a>
-                  </p>
-                ) : null}
-                {env.error ? <p className="error">{env.error}</p> : null}
-                {env.comments.at(-1) ? <p className="comment">{env.comments.at(-1)?.body.split("\n")[0]}</p> : null}
-                {env.status === "ready" || env.status === "updating" || env.status === "provisioning" ? (
-                  <div className="row-actions">
-                    {env.status === "ready" ? (
-                      <button type="button" className="secondary" disabled={busy} onClick={() => void act(env.id, "idle")}>
-                        Mark idle
-                      </button>
-                    ) : null}
-                    <button type="button" className="secondary" disabled={busy} onClick={() => void act(env.id, "destroy")}>
-                      Destroy
-                    </button>
-                    {env.url ? (
-                      <button
-                        type="button"
-                        className="secondary"
-                        onClick={() => void navigator.clipboard.writeText(env.url ?? "")}
-                      >
-                        Copy URL
-                      </button>
-                    ) : null}
-                  </div>
-                ) : null}
-              </article>
-            ))}
-          </div>
-
-          <div className="ledger-head" style={{ marginTop: "1.25rem" }}>
-            <h2>Still deployed</h2>
-          </div>
-          <div className="stack">
-            {overview && overview.deployments.length === 0 ? (
-              <p className="empty">Nothing is running. Closed, idle, and expired previews are not billing.</p>
-            ) : null}
-            {overview?.deployments.map((deployment) => (
-              <article className="deployment" key={deployment.deploymentId}>
-                <div>
-                  <strong>
-                    {deployment.repository}#{deployment.prNumber}
-                  </strong>
-                  <p className="meta">
-                    <span className="mono">{deployment.deploymentId}</span>
-                    <span className="mono">{deployment.sha.slice(0, 12)}</span>
-                  </p>
-                  <p className="url">
-                    <a href={deployment.url} target="_blank" rel="noreferrer">{deployment.url}</a>
-                  </p>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
+        </details>
       </div>
 
       <p className="footer">
         {config?.deployer === "fake"
-          ? "The deployer records a preview in a local file. Destroy removes that record."
-          : `Each preview listens on its own port. The app sleeps after ${config?.sleepSeconds ?? 20}s without a request and wakes on the next visit. Destroy stops the port.`}{" "}
-        The reaper also runs every {config ? Math.round(config.reaperIntervalMs / 1000) : 60}s. Webhook
-        signatures are {config?.webhookVerification === "signed" ? "required" : "open in development until GITHUB_WEBHOOK_SECRET is set"}.
-        This control plane has no authentication yet, so keep it on a private network.
+          ? "Destroy removes the preview record."
+          : `Each preview listens on its own port, sleeps after ${config?.sleepSeconds ?? 20}s without a request, and wakes on the next visit.`}{" "}
+        The reaper runs every {config ? Math.round(config.reaperIntervalMs / 1000) : 60}s. This board has no login of its own.
       </p>
     </main>
   );

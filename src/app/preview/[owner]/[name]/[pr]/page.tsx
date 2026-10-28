@@ -26,13 +26,21 @@ export default async function PreviewPage({ params }: RouteContext) {
         <>
           <VisitPing id={environment.id} />
           <p className="meta">
-            <span>{deployment?.branch}</span>
-            <span className="mono">{deployment?.sha}</span>
+            <span className="status" data-status={environment.status}>{environment.status}</span>
+            <span className="chip">{deployment?.branch}</span>
+            <span className="chip mono">{deployment?.sha.slice(0, 12)}</span>
           </p>
           <p>
-            This preview is running. It stays up while the pull request is open and in use, then the orchestrator
+            This preview is running. It stays up while the pull request is open and in use, then Mayfly
             deletes it.
           </p>
+          {deployment?.url ? (
+            <p>
+              <a className="open-link" href={deployment.url} target="_blank" rel="noreferrer">
+                Open preview
+              </a>
+            </p>
+          ) : null}
         </>
       ) : environment ? (
         <p>This preview was removed{environment.destroyReason ? ` (${environment.destroyReason})` : ""}.</p>

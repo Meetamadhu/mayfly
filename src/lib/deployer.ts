@@ -2,7 +2,7 @@ import { execFile, spawn } from "node:child_process";
 import net from "node:net";
 import path from "node:path";
 import { getConfig } from "./config";
-import { createExclusive, readJson, writeJson } from "./store";
+import { createExclusive, dataDir, readJson, writeJson } from "./store";
 import type { DeploymentRecord } from "./types";
 
 /**
@@ -37,7 +37,7 @@ interface DeployFile {
 const exclusive = createExclusive("__previewDeployLock");
 
 function deployFile() {
-  return path.join(process.cwd(), "data", "deployments.json");
+  return path.join(dataDir(), "deployments.json");
 }
 
 export function previewUrl(repository: string, prNumber: number) {
