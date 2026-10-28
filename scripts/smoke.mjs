@@ -1,14 +1,35 @@
+import { createHmac } from "node:crypto";
+import { readFileSync } from "node:fs";
+
 const base = "http://localhost:3000";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+function webhookSecret() {
+  try {
+    const raw = readFileSync(new URL("../.env.local", import.meta.url), "utf8");
+    const line = raw.split(/\r?\n/).find((item) => item.startsWith("GITHUB_WEBHOOK_SECRET="));
+    return line ? line.slice("GITHUB_WEBHOOK_SECRET=".length).trim() : "";
+  } catch {
+    return "";
+  }
+}
+
 async function request(path, { method = "GET", body, headers } = {}) {
+  const payload = body === undefined ? undefined : JSON.stringify(body);
+  const signatureHeaders = {};
+  if (payload && path.startsWith("/api/webhooks/github")) {
+    const secret = webhookSecret();
+    if (secret) {
+      signatureHeaders["x-hub-signature-256"] = `sha256=${createHmac("sha256", secret).update(payload).digest("hex")}`;
+    }
+  }
   const response = await fetch(base + path, {
     method,
-    headers: { "Content-Type": "application/json", ...headers },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    headers: { "Content-Type": "application/json", ...signatureHeaders, ...headers },
+    body: payload,
   });
   const text = await response.text();
   const parsed = text ? JSON.parse(text) : null;
@@ -32,7 +53,10 @@ const opened = await request("/api/events", {
 });
 assert(opened.status === 200, `open failed ${opened.status} ${JSON.stringify(opened.body)}`);
 assert(opened.body.environment.status === "ready", "open did not become ready");
-assert(opened.body.environment.url === "http://localhost:3000/preview/smoke/app/42", opened.body.environment.url);
+assert(/^http:\/\/127\.0\.0\.1:\d+$/.test(opened.body.environment.url), opened.body.environment.url);
+const previewPage = await fetch(opened.body.environment.url);
+assert(previewPage.status === 200, `preview process status ${previewPage.status}`);
+assert((await previewPage.text()).includes(sha1), "preview process did not serve the opened commit");
 
 const listed = await request("/api/environments");
 assert(listed.body.summary.live === 1, `expected 1 live, got ${listed.body.summary.live}`);
@@ -52,6 +76,8 @@ const updated = await request("/api/events", {
 assert(updated.status === 200, `update failed ${JSON.stringify(updated.body)}`);
 assert(updated.body.environment.sha === sha2, "sha did not change");
 assert(updated.body.environment.status === "ready", "update did not return to ready");
+const updatedPage = await fetch(updated.body.environment.url);
+assert((await updatedPage.text()).includes(sha2), "preview process did not serve the updated commit");
 
 const afterUpdate = await request("/api/environments");
 assert(afterUpdate.body.deployments[0].sha === sha2, "deployed sha was not updated");
@@ -76,6 +102,13 @@ assert(closed.body.environment.destroyReason === "merged", closed.body.environme
 const afterClose = await request("/api/environments");
 assert(afterClose.body.deployments.length === 0, "deployment still billed after merge");
 assert(afterClose.body.summary.live === 0, "live count after merge");
+let mergedGone = false;
+try {
+  await fetch(opened.body.environment.url);
+} catch {
+  mergedGone = true;
+}
+assert(mergedGone, "preview process still listening after merge");
 
 const expired = await request("/api/events", {
   method: "POST",
@@ -122,7 +155,7 @@ const invalid = await request("/api/events", {
 });
 assert(invalid.status === 400, `expected 400, got ${invalid.status}`);
 
-for (let number = 1; number <= 5; number += 1) {
+for (let number = 1; number <= 10; number += 1) {
   const created = await request("/api/events", {
     method: "POST",
     body: {
@@ -136,19 +169,19 @@ for (let number = 1; number <= 5; number += 1) {
   });
   assert(created.status === 200, `cap seed ${number} failed ${JSON.stringify(created.body)}`);
 }
-const sixth = await request("/api/events", {
+const eleventh = await request("/api/events", {
   method: "POST",
   body: {
     action: "opened",
     repository: "smoke/cap",
-    prNumber: 6,
+    prNumber: 11,
     sha: sha1,
     branch: "feat/cap",
     wait: true,
   },
 });
-assert(sixth.status === 409, `expected cap 409, got ${sixth.status} ${JSON.stringify(sixth.body)}`);
-assert(sixth.body.code === "cap", sixth.body.code);
+assert(eleventh.status === 409, `expected cap 409, got ${eleventh.status} ${JSON.stringify(eleventh.body)}`);
+assert(eleventh.body.code === "cap", eleventh.body.code);
 
 const webhook = await request("/api/webhooks/github", {
   method: "POST",

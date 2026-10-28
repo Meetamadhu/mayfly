@@ -50,6 +50,8 @@ export interface DeploymentRecord {
   url: string;
   createdAt: string;
   updatedAt: string;
+  pid?: number;
+  port?: number;
 }
 
 export interface PullRequestEvent {
@@ -66,9 +68,10 @@ export interface OrchestratorConfigView {
   maxConcurrent: number;
   ttlHours: number;
   idleHours: number;
+  sleepSeconds: number;
   reaperIntervalMs: number;
   previewBaseUrl: string;
-  deployer: "fake";
+  deployer: "process" | "fake";
   webhookVerification: "signed" | "open-in-development";
 }
 

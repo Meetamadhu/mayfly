@@ -7,6 +7,9 @@ export interface OrchestratorConfig {
   stuckMs: number;
   reaperIntervalMs: number;
   fakeDelayMs: number;
+  sleepMs: number;
+  sleepSeconds: number;
+  deployer: "process" | "fake";
   webhookSecret: string;
   githubToken: string;
   previewBaseUrl: string;
@@ -23,7 +26,8 @@ function positiveNumber(name: string, fallback: number): number {
 export function getConfig(): OrchestratorConfig {
   const ttlHours = positiveNumber("PREVIEW_TTL_HOURS", 8) || 8;
   const idleHours = positiveNumber("PREVIEW_IDLE_HOURS", 4) || 4;
-  const maxConcurrent = positiveNumber("MAX_CONCURRENT_ENVIRONMENTS", 5) || 5;
+  const maxConcurrent = positiveNumber("MAX_CONCURRENT_ENVIRONMENTS", 10) || 10;
+  const sleepSeconds = positiveNumber("PREVIEW_SLEEP_SECONDS", 20) || 20;
 
   return {
     maxConcurrent,
@@ -34,6 +38,9 @@ export function getConfig(): OrchestratorConfig {
     stuckMs: (positiveNumber("PREVIEW_STUCK_MINUTES", 10) || 10) * 60 * 1000,
     reaperIntervalMs: positiveNumber("REAPER_INTERVAL_MS", 60_000) || 60_000,
     fakeDelayMs: positiveNumber("PREVIEW_FAKE_DELAY_MS", 700),
+    sleepSeconds,
+    sleepMs: sleepSeconds * 1000,
+    deployer: process.env.DEPLOYER === "fake" ? "fake" : "process",
     webhookSecret: process.env.GITHUB_WEBHOOK_SECRET ?? "",
     githubToken: process.env.GITHUB_TOKEN ?? "",
     previewBaseUrl: (process.env.PREVIEW_BASE_URL || "http://localhost:3000").replace(/\/$/, ""),
