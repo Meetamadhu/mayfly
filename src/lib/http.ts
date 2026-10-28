@@ -30,7 +30,7 @@ export async function publishPullRequestComment(repository: string, prNumber: nu
       Authorization: `Bearer ${token}`,
       Accept: "application/vnd.github+json",
       "Content-Type": "application/json",
-      "User-Agent": "preview-orchestrator",
+      "User-Agent": "mayfly",
       "X-GitHub-Api-Version": "2022-11-28",
     },
     body: JSON.stringify({ body }),
