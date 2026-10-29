@@ -12,18 +12,28 @@ function EnvironmentCard({
   env,
   busy,
   copied,
+  port,
+  sleepSeconds,
+  demo,
   onCopy,
-  onIdle,
+  onSleep,
   onDestroy,
 }: {
   env: Environment;
   busy: boolean;
   copied: boolean;
+  port?: number;
+  sleepSeconds: number;
+  demo: boolean;
   onCopy: () => void;
-  onIdle: () => void;
+  onSleep: () => void;
   onDestroy: () => void;
 }) {
   const actionable = env.status === "ready" || env.status === "updating" || env.status === "provisioning";
+  const pill = pillFor(env);
+  const note = explainer(env, sleepSeconds);
+  const path = env.url ? previewPath(env.url) : null;
+  const comment = env.comments.at(-1)?.body.split("\n")[0];
   return (
     <article className={env.status === "ready" ? "env featured" : "env"} data-status={env.status}>
       <header>
@@ -31,10 +41,12 @@ function EnvironmentCard({
           <h3>
             {env.repository}
             <span>#{env.prNumber}</span>
+            {demo ? <span className="chip demo-chip">Demo</span> : null}
           </h3>
           <p className="meta">
             <span className="chip mono">{env.sha.slice(0, 12)}</span>
             <span className="chip">{env.branch}</span>
+            {port ? <span className="chip">port {port}</span> : null}
             <span className="chip">active {formatDelta(env.lastActiveAt)}</span>
             <span className="chip">
               {env.status === "destroyed"
@@ -45,53 +57,64 @@ function EnvironmentCard({
           </p>
         </div>
         <div className="badges">
-          {isLive(env.status) && env.sleep && env.sleep !== "unknown" ? (
-            <span className="sleep" data-sleep={env.sleep}>
-              {env.sleep === "awake" ? "Awake" : "Asleep"}
-            </span>
-          ) : null}
-          <span className="status" data-status={env.status}>
-            {env.status}
+          <span className="state-pill" data-state={pill.state}>
+            {pill.label}
           </span>
         </div>
       </header>
-      {env.url ? (
+      {note ? <p className="explainer">{note}</p> : null}
+      {path && env.url ? (
         <p className="url">
-          <a href={env.url} target="_blank" rel="noreferrer">
-            {env.url}
-          </a>
+          <a href={env.url}>{path}</a>
+          <button type="button" className="secondary" onClick={onCopy}>
+            {copied ? "Copied" : "Copy"}
+          </button>
         </p>
       ) : null}
       {env.error ? <p className="error">{env.error}</p> : null}
-      {env.comments.at(-1) ? <p className="comment">{env.comments.at(-1)?.body.split("\n")[0]}</p> : null}
+      {comment && !comment.startsWith("Preview ready:") ? <p className="comment">{comment}</p> : null}
       {actionable ? (
         <div className="row-actions">
-          {env.url ? (
-            <a className="open-link" href={env.url} target="_blank" rel="noreferrer">
-              Open preview
-            </a>
-          ) : null}
           {env.status === "ready" ? (
-            <button type="button" className="secondary" disabled={busy} onClick={onIdle}>
-              Mark idle
+            <button type="button" className="secondary" disabled={busy} onClick={onSleep}>
+              Sleep now
             </button>
           ) : null}
           <button type="button" className="secondary" disabled={busy} onClick={onDestroy}>
             Destroy
           </button>
-          {env.url ? (
-            <button type="button" className="secondary" onClick={onCopy}>
-              {copied ? "Copied" : "Copy URL"}
-            </button>
-          ) : null}
         </div>
       ) : null}
     </article>
   );
 }
 
-function isLive(status: EnvironmentStatus) {
-  return LIVE.has(status);
+function pillFor(env: Environment) {
+  if (env.status === "provisioning") return { label: "Provisioning", state: "provisioning" };
+  if (env.status === "updating") return { label: "Updating", state: "updating" };
+  if (env.status === "destroying") return { label: "Destroying", state: "destroying" };
+  if (env.status === "failed") return { label: "Failed", state: "failed" };
+  if (env.status === "destroyed") return { label: "Removed", state: "destroyed" };
+  if (env.sleep === "awake") return { label: "Awake", state: "awake" };
+  if (env.sleep === "waking") return { label: "Waking", state: "waking" };
+  if (env.sleep === "asleep") return { label: "Asleep", state: "asleep" };
+  return { label: "Ready", state: "ready" };
+}
+
+function explainer(env: Environment, sleepSeconds: number) {
+  if (env.status !== "ready") return null;
+  if (env.sleep === "awake") return `Sleeps after ${sleepSeconds}s without visits.`;
+  if (env.sleep === "asleep") return "Using no memory. Wakes on the next visit.";
+  if (env.sleep === "waking") return "Starting up…";
+  return null;
+}
+
+function previewPath(url: string) {
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return url;
+  }
 }
 
 function randomSha() {
@@ -103,12 +126,31 @@ function randomSha() {
 function formatDelta(iso: string) {
   const delta = Date.parse(iso) - Date.now();
   if (Number.isNaN(delta)) return iso;
-  const minutes = Math.round(Math.abs(delta) / 60000);
+  const abs = Math.abs(delta);
+  const minutes = Math.round(abs / 60000);
   if (minutes < 1) return delta >= 0 ? "now" : "just now";
-  const hours = Math.floor(minutes / 60);
+  const hours = Math.floor(abs / 3600000);
   const rest = minutes % 60;
-  const text = hours > 0 ? `${hours}h ${rest}m` : `${minutes}m`;
+  const text =
+    hours >= 48
+      ? `${Math.floor(hours / 24)} d ${hours % 24} h`
+      : hours > 0
+        ? `${hours}h ${rest}m`
+        : `${minutes}m`;
   return delta >= 0 ? `in ${text}` : `${text} ago`;
+}
+
+function formatSleep(seconds: number) {
+  if (seconds >= 60) return `${Math.round(seconds / 60)} min`;
+  return `${seconds} s`;
+}
+
+function formatLifetime(hours: number) {
+  if (hours >= 48) {
+    const days = Math.round(hours / 24);
+    return days === 1 ? "1 day" : `${days} days`;
+  }
+  return `${hours} h`;
 }
 
 // The admin token lives only in this browser tab. It is never rendered into the page or sent anywhere but Mayfly's own API.
@@ -155,6 +197,7 @@ export function Dashboard() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [adminToken, setAdminToken] = useState("");
   const [tokenDraft, setTokenDraft] = useState("");
+  const [adminOpen, setAdminOpen] = useState(false);
   const canWrite = adminToken.length > 0;
 
   useEffect(() => {
@@ -204,7 +247,10 @@ export function Dashboard() {
       try {
         const body = await reload();
         if (cancelled) return;
-        if (body.environments.some((env) => TRANSITIONAL.has(env.status))) {
+        const fast = body.environments.some(
+          (env) => TRANSITIONAL.has(env.status) || (LIVE.has(env.status) && (env.sleep === "asleep" || env.sleep === "waking")),
+        );
+        if (fast) {
           timer = window.setTimeout(() => void tick(), FAST_POLL_MS);
         } else if (body.environments.some((env) => LIVE.has(env.status))) {
           timer = window.setTimeout(() => void tick(), LIVE_POLL_MS);
@@ -255,7 +301,7 @@ export function Dashboard() {
     }
   }
 
-  async function act(id: string, action: "destroy" | "idle") {
+  async function act(id: string, action: "destroy" | "sleep") {
     setBusy(true);
     setError(null);
     setNotice(null);
@@ -264,7 +310,7 @@ export function Dashboard() {
       const body = (await readJson(response)) as { environment?: Environment };
       const env = body.environment;
       setFocusId(env?.id ?? null);
-      setNotice(action === "idle" ? "Marked idle. Run the reaper to delete it." : null);
+      setNotice(action === "sleep" ? "The preview app is asleep. The next visit wakes it." : null);
       await reload();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Request failed.");
@@ -324,13 +370,26 @@ export function Dashboard() {
   const statusLine =
     notice ??
     (focused
-      ? focused.status === "ready" && focused.url
+      ? focused.status === "ready" && focused.url && config?.deployer !== "fake"
         ? focused.url
-        : `${focused.repository}#${focused.prNumber} is ${focused.status}${focused.destroyReason ? ` (${focused.destroyReason})` : ""}.`
+        : focused.status === "ready" && config?.deployer === "fake"
+          ? `${focused.repository}#${focused.prNumber} is recorded. Open the preview on the computer where Mayfly is running.`
+          : `${focused.repository}#${focused.prNumber} is ${focused.status}${focused.destroyReason ? ` (${focused.destroyReason})` : ""}.`
       : null);
 
   return (
     <main className="shell">
+      {config?.deployer === "fake" ? (
+        <p className="notice" role="status">
+          Simulation mode: previews are recorded, not run.
+          {process.env.NEXT_PUBLIC_LIVE_DEMO_URL ? (
+            <>
+              {" "}
+              <a href={process.env.NEXT_PUBLIC_LIVE_DEMO_URL}>Open the live demo</a>
+            </>
+          ) : null}
+        </p>
+      ) : null}
       <header className="mast">
         <div className="mast-copy">
           <div className="mast-title">
@@ -338,8 +397,8 @@ export function Dashboard() {
             <p className="subtitle">Ephemeral environments</p>
           </div>
           <p className="lede">
-            A pull request gets a test deployment. Close it, leave it idle, or let the clock run out, and the
-            deployment is deleted so staging stops billing.
+            Each pull request gets a preview. It sleeps when nobody&apos;s using it, wakes on the next visit, and is
+            deleted when the PR closes or after its lifetime.
           </p>
         </div>
         {config ? (
@@ -352,7 +411,44 @@ export function Dashboard() {
             </span>
           </div>
         ) : null}
+        <button type="button" className="secondary admin-toggle" onClick={() => setAdminOpen((open) => !open)}>
+          {canWrite ? "Admin: on" : "Admin"}
+        </button>
       </header>
+      {adminOpen ? (
+        <section className="panel admin" aria-label="Admin access">
+          {canWrite ? (
+            <div className="admin-row">
+              <p className="help">This tab can change previews.</p>
+              <button type="button" className="secondary" onClick={forgetToken}>
+                Forget token
+              </button>
+            </div>
+          ) : (
+            <form
+              className="admin-row"
+              onSubmit={(event) => {
+                event.preventDefault();
+                applyToken();
+              }}
+            >
+              <label>
+                Admin token
+                <input
+                  type="password"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={tokenDraft}
+                  onChange={(event) => setTokenDraft(event.target.value)}
+                />
+              </label>
+              <button type="submit" disabled={!tokenDraft.trim()}>
+                Use token
+              </button>
+            </form>
+          )}
+        </section>
+      ) : null}
 
       <dl className="stats">
         <div>
@@ -378,57 +474,17 @@ export function Dashboard() {
           <dd>{overview?.summary.destroyed ?? "–"}</dd>
         </div>
         <div>
-          <dt>Idle window</dt>
-          <dd>
-            {config?.idleHours ?? "–"}
-            <span>h</span>
-          </dd>
+          <dt>Sleeps after</dt>
+          <dd>{config ? formatSleep(config.sleepSeconds) : "–"}</dd>
         </div>
         <div>
           <dt>Max lifetime</dt>
-          <dd>
-            {config?.ttlHours ?? "–"}
-            <span>h</span>
-          </dd>
+          <dd>{config ? formatLifetime(config.ttlHours) : "–"}</dd>
         </div>
       </dl>
 
-      <section className="panel admin" aria-label="Admin access">
-        {canWrite ? (
-          <div className="admin-row">
-            <p className="help">Admin token set for this tab. Open, Merge, Destroy and Run reaper are enabled.</p>
-            <button type="button" className="secondary" onClick={forgetToken}>
-              Forget token
-            </button>
-          </div>
-        ) : (
-          <form
-            className="admin-row"
-            onSubmit={(event) => {
-              event.preventDefault();
-              applyToken();
-            }}
-          >
-            <label>
-              Admin token
-              <input
-                type="password"
-                autoComplete="off"
-                spellCheck={false}
-                value={tokenDraft}
-                onChange={(event) => setTokenDraft(event.target.value)}
-              />
-            </label>
-            <button type="submit" disabled={!tokenDraft.trim()}>
-              Use token
-            </button>
-            <p className="help">Read-only until you enter the server's MAYFLY_ADMIN_TOKEN. It is kept in this tab only.</p>
-          </form>
-        )}
-      </section>
-
-      <div className="board">
-        <section>
+      <div className="workspace">
+        <section className="live-column">
           <div className="ledger-head">
             <div>
               <h2>Live</h2>
@@ -452,19 +508,18 @@ export function Dashboard() {
                 env={env}
                 busy={busy || !canWrite}
                 copied={copiedId === env.id}
+                port={overview?.deployments.find((item) => item.deploymentId === env.deploymentId)?.port}
+                sleepSeconds={config?.sleepSeconds ?? 20}
+                demo={config?.demo === `${env.repository}#${env.prNumber}`}
                 onCopy={() => void copyUrl(env.id, env.url ?? "")}
-                onIdle={() => void act(env.id, "idle")}
+                onSleep={() => void act(env.id, "sleep")}
                 onDestroy={() => void act(env.id, "destroy")}
               />
             ))}
           </div>
 
-          <div className="ledger-head running-head">
-            <div>
-              <h2>Ports</h2>
-              <p className="help">Processes still listening.</p>
-            </div>
-          </div>
+          <details className="advanced">
+            <summary>Advanced: processes</summary>
           <div className="stack">
             {overview && overview.deployments.length === 0 ? (
               <p className="empty">Nothing is listening. Closed, idle, and expired previews are gone.</p>
@@ -481,12 +536,15 @@ export function Dashboard() {
                     {deployment.port ? <span className="chip">port {deployment.port}</span> : null}
                   </p>
                 </div>
-                <a className="open-link" href={deployment.url} target="_blank" rel="noreferrer">
-                  Open
-                </a>
+                {config?.deployer === "fake" ? null : (
+                  <a className="open-link" href={deployment.url} target="_blank" rel="noreferrer">
+                    Open
+                  </a>
+                )}
               </article>
             ))}
           </div>
+          </details>
 
           {overview ? (
             <button
@@ -508,8 +566,11 @@ export function Dashboard() {
                   env={env}
                   busy={busy || !canWrite}
                   copied={copiedId === env.id}
+                  port={overview?.deployments.find((item) => item.deploymentId === env.deploymentId)?.port}
+                  sleepSeconds={config?.sleepSeconds ?? 20}
+                  demo={config?.demo === `${env.repository}#${env.prNumber}`}
                   onCopy={() => void copyUrl(env.id, env.url ?? "")}
-                  onIdle={() => void act(env.id, "idle")}
+                  onSleep={() => void act(env.id, "sleep")}
                   onDestroy={() => void act(env.id, "destroy")}
                 />
               ))}
@@ -517,7 +578,9 @@ export function Dashboard() {
           ) : null}
         </section>
 
-        <details className="panel simulator">
+        <div className="sim-column">
+          {!canWrite ? <p className="readonly">Read-only. Changes need the admin token.</p> : null}
+        <details className="panel simulator" open>
           <summary>Simulate a pull request</summary>
           <p className="help">
             This talks to Mayfly directly. GitHub can send the same actions to <span className="mono">/api/webhooks/github</span>.
@@ -562,7 +625,7 @@ export function Dashboard() {
             </label>
             <p className="help">Use 0 to expire as soon as the preview is ready, then run the reaper.</p>
             <div className="actions">
-              <button type="submit" disabled={busy || !canWrite}>Open</button>
+              <button type="submit" disabled={busy || !canWrite}>Open PR</button>
               <button
                 type="button"
                 className="secondary"
@@ -576,7 +639,7 @@ export function Dashboard() {
                 Push commit
               </button>
               <button type="button" className="secondary" disabled={busy || !canWrite} onClick={() => void send("closed")}>
-                Close
+                Close PR
               </button>
               <button
                 type="button"
@@ -584,7 +647,7 @@ export function Dashboard() {
                 disabled={busy || !canWrite}
                 onClick={() => void send("closed", { merged: true })}
               >
-                Merge
+                Merge PR
               </button>
             </div>
           </form>
@@ -599,11 +662,12 @@ export function Dashboard() {
           ) : null}
           {error ? <p className="error" role="alert">{error}</p> : null}
         </details>
+        </div>
       </div>
 
       <p className="footer">
         {config?.deployer === "fake"
-          ? "Destroy removes the preview record."
+          ? "This site keeps the record. The preview itself runs on the computer where Mayfly is running."
           : `Each preview listens on its own port, sleeps after ${config?.sleepSeconds ?? 20}s without a request, and wakes on the next visit.`}{" "}
         The reaper runs every {config ? Math.round(config.reaperIntervalMs / 1000) : 60}s. Changes need the admin token; without it the board is read-only.
       </p>

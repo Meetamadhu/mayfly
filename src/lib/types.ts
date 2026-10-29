@@ -14,14 +14,15 @@ export type LifecycleAction =
   | "destroyed"
   | "unchanged"
   | "idle-marked"
-  | "activity";
+  | "activity"
+  | "slept";
 
 export interface PreviewComment {
   at: string;
   body: string;
 }
 
-export type SleepState = "awake" | "asleep" | "unknown";
+export type SleepState = "awake" | "waking" | "asleep" | "unknown";
 
 export interface Environment {
   id: string;
@@ -77,6 +78,7 @@ export interface OrchestratorConfigView {
   previewBaseUrl: string;
   deployer: "process" | "fake";
   webhookVerification: "signed" | "open-in-development";
+  demo: string | null;
 }
 
 export interface Overview {
@@ -88,6 +90,7 @@ export interface Overview {
     destroyed: number;
     failed: number;
     awake: number;
+    waking: number;
     asleep: number;
   };
 }

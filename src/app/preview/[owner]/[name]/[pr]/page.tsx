@@ -43,7 +43,10 @@ export default async function PreviewPage({ params }: RouteContext) {
       ) : environment ? (
         <p>This preview was removed{environment.destroyReason ? ` (${environment.destroyReason})` : ""}.</p>
       ) : (
-        <p>No preview is deployed for this pull request.</p>
+        <p>
+          No preview is deployed for this pull request. This site keeps the record. Open the preview on the
+          computer where Mayfly is running.
+        </p>
       )}
       <p>
         <Link href="/">Back to the board</Link>

@@ -213,9 +213,66 @@ h1 {
 
 .meter span[data-hot="true"] { background: var(--work); }
 
-.board { display: grid; gap: 0.4rem; }
+.workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
 
-.simulator { margin-top: 1.25rem; }
+.live-column,
+.sim-column { min-width: 0; }
+
+.sim-column { order: -1; }
+
+.readonly { margin: 0; color: var(--muted); }
+
+.simulator { margin-top: 0; }
+
+.admin-toggle { align-self: flex-start; }
+
+.url { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+
+.state-pill {
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  background: var(--dead-bg);
+  color: var(--dead);
+}
+
+.state-pill[data-state="awake"] { background: var(--awake-bg); color: var(--awake); }
+.state-pill[data-state="asleep"] { background: var(--asleep-bg); color: var(--asleep); }
+.state-pill[data-state="waking"] {
+  background: #f8e7c2;
+  color: #6b4200;
+  border: 1px dashed #8a5a12;
+}
+.state-pill[data-state="provisioning"],
+.state-pill[data-state="updating"],
+.state-pill[data-state="destroying"] { background: var(--work-bg); color: var(--work); }
+.state-pill[data-state="failed"] { background: var(--failed-bg); color: var(--failed); }
+.state-pill[data-state="ready"] { background: var(--ready-bg); color: var(--ready); }
+
+.explainer { margin: 0.45rem 0 0; }
+
+.demo-chip { margin-left: 0.45rem; }
+
+.advanced { margin-top: 1rem; }
+.advanced summary { cursor: pointer; font-weight: 600; }
+
+@media (min-width: 960px) {
+  .workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);
+    align-items: start;
+  }
+  .live-column { grid-column: 1; grid-row: 1; }
+  .sim-column { grid-column: 2; grid-row: 1; order: 0; }
+}
 
 .simulator summary {
   cursor: pointer;
