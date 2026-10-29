@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { getPreview } from "@/lib/lifecycle";
-import { VisitPing } from "./visit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,7 +23,6 @@ export default async function PreviewPage({ params }: RouteContext) {
       </h1>
       {running && environment ? (
         <>
-          <VisitPing id={environment.id} />
           <p className="meta">
             <span className="status" data-status={environment.status}>{environment.status}</span>
             <span className="chip">{deployment?.branch}</span>

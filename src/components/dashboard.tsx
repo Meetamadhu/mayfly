@@ -111,6 +111,26 @@ function formatDelta(iso: string) {
   return delta >= 0 ? `in ${text}` : `${text} ago`;
 }
 
+// The admin token lives only in this browser tab. It is never rendered into the page or sent anywhere but Mayfly's own API.
+const TOKEN_KEY = "mayfly-admin-token";
+
+function readStoredToken() {
+  try {
+    return window.sessionStorage.getItem(TOKEN_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function storeToken(token: string) {
+  try {
+    if (token) window.sessionStorage.setItem(TOKEN_KEY, token);
+    else window.sessionStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // Storage blocked: the token still works until the page reloads.
+  }
+}
+
 async function readJson(response: Response) {
   const body = (await response.json()) as { error?: string; ok?: boolean };
   if (!response.ok) {
@@ -133,6 +153,39 @@ export function Dashboard() {
   const [ttlMinutes, setTtlMinutes] = useState("480");
   const [showRemoved, setShowRemoved] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [adminToken, setAdminToken] = useState("");
+  const [tokenDraft, setTokenDraft] = useState("");
+  const canWrite = adminToken.length > 0;
+
+  useEffect(() => {
+    setAdminToken(readStoredToken());
+  }, []);
+
+  function applyToken() {
+    const token = tokenDraft.trim();
+    if (!token) return;
+    storeToken(token);
+    setAdminToken(token);
+    setTokenDraft("");
+    setError(null);
+  }
+
+  function forgetToken() {
+    storeToken("");
+    setAdminToken("");
+  }
+
+  /** Every write goes through here so it carries the token, and a rejected token turns the board read-only again. */
+  async function adminFetch(url: string, init: RequestInit = {}) {
+    const headers = new Headers(init.headers);
+    headers.set("Authorization", `Bearer ${adminToken}`);
+    const response = await fetch(url, { ...init, headers });
+    if (response.status === 401) {
+      forgetToken();
+      throw new Error("The admin token was not accepted. Enter it again.");
+    }
+    return response;
+  }
 
   const reload = useCallback(async () => {
     const response = await fetch("/api/environments", { cache: "no-store" });
@@ -178,7 +231,7 @@ export function Dashboard() {
     setError(null);
     setNotice(null);
     try {
-      const response = await fetch("/api/events", {
+      const response = await adminFetch("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -207,7 +260,7 @@ export function Dashboard() {
     setError(null);
     setNotice(null);
     try {
-      const response = await fetch(`/api/environments/${id}?action=${action}`, { method: "POST" });
+      const response = await adminFetch(`/api/environments/${id}?action=${action}`, { method: "POST" });
       const body = (await readJson(response)) as { environment?: Environment };
       const env = body.environment;
       setFocusId(env?.id ?? null);
@@ -227,7 +280,7 @@ export function Dashboard() {
     setNotice(null);
     setFocusId(null);
     try {
-      const response = await fetch("/api/reaper", { method: "POST" });
+      const response = await adminFetch("/api/reaper", { method: "POST" });
       const body = (await readJson(response)) as { destroyed: Environment[]; failed: { error: string }[] };
       const fresh = await reload();
       const recent = fresh.environments.filter(
@@ -340,6 +393,40 @@ export function Dashboard() {
         </div>
       </dl>
 
+      <section className="panel admin" aria-label="Admin access">
+        {canWrite ? (
+          <div className="admin-row">
+            <p className="help">Admin token set for this tab. Open, Merge, Destroy and Run reaper are enabled.</p>
+            <button type="button" className="secondary" onClick={forgetToken}>
+              Forget token
+            </button>
+          </div>
+        ) : (
+          <form
+            className="admin-row"
+            onSubmit={(event) => {
+              event.preventDefault();
+              applyToken();
+            }}
+          >
+            <label>
+              Admin token
+              <input
+                type="password"
+                autoComplete="off"
+                spellCheck={false}
+                value={tokenDraft}
+                onChange={(event) => setTokenDraft(event.target.value)}
+              />
+            </label>
+            <button type="submit" disabled={!tokenDraft.trim()}>
+              Use token
+            </button>
+            <p className="help">Read-only until you enter the server's MAYFLY_ADMIN_TOKEN. It is kept in this tab only.</p>
+          </form>
+        )}
+      </section>
+
       <div className="board">
         <section>
           <div className="ledger-head">
@@ -347,7 +434,7 @@ export function Dashboard() {
               <h2>Live</h2>
               <p className="help">Previews that are still running.</p>
             </div>
-            <button type="button" className="secondary" disabled={busy} onClick={() => void runReaper()}>
+            <button type="button" className="secondary" disabled={busy || !canWrite} onClick={() => void runReaper()}>
               Run reaper
             </button>
           </div>
@@ -363,7 +450,7 @@ export function Dashboard() {
               <EnvironmentCard
                 key={env.id}
                 env={env}
-                busy={busy}
+                busy={busy || !canWrite}
                 copied={copiedId === env.id}
                 onCopy={() => void copyUrl(env.id, env.url ?? "")}
                 onIdle={() => void act(env.id, "idle")}
@@ -419,7 +506,7 @@ export function Dashboard() {
                 <EnvironmentCard
                   key={env.id}
                   env={env}
-                  busy={busy}
+                  busy={busy || !canWrite}
                   copied={copiedId === env.id}
                   onCopy={() => void copyUrl(env.id, env.url ?? "")}
                   onIdle={() => void act(env.id, "idle")}
@@ -475,11 +562,11 @@ export function Dashboard() {
             </label>
             <p className="help">Use 0 to expire as soon as the preview is ready, then run the reaper.</p>
             <div className="actions">
-              <button type="submit" disabled={busy}>Open</button>
+              <button type="submit" disabled={busy || !canWrite}>Open</button>
               <button
                 type="button"
                 className="secondary"
-                disabled={busy}
+                disabled={busy || !canWrite}
                 onClick={() => {
                   const next = randomSha();
                   setSha(next);
@@ -488,13 +575,13 @@ export function Dashboard() {
               >
                 Push commit
               </button>
-              <button type="button" className="secondary" disabled={busy} onClick={() => void send("closed")}>
+              <button type="button" className="secondary" disabled={busy || !canWrite} onClick={() => void send("closed")}>
                 Close
               </button>
               <button
                 type="button"
                 className="secondary"
-                disabled={busy}
+                disabled={busy || !canWrite}
                 onClick={() => void send("closed", { merged: true })}
               >
                 Merge
@@ -518,7 +605,7 @@ export function Dashboard() {
         {config?.deployer === "fake"
           ? "Destroy removes the preview record."
           : `Each preview listens on its own port, sleeps after ${config?.sleepSeconds ?? 20}s without a request, and wakes on the next visit.`}{" "}
-        The reaper runs every {config ? Math.round(config.reaperIntervalMs / 1000) : 60}s. This board has no login of its own.
+        The reaper runs every {config ? Math.round(config.reaperIntervalMs / 1000) : 60}s. Changes need the admin token; without it the board is read-only.
       </p>
     </main>
   );
