@@ -212,13 +212,35 @@ async function claimPort(preferred?: number) {
   throw new Error("No free preview port.");
 }
 
+/**
+ * The only server variables a preview process may see: PATH, NODE_ENV and PREVIEW_*.
+ * Everything else (GITHUB_TOKEN, GITHUB_WEBHOOK_SECRET, MAYFLY_ADMIN_TOKEN, ...) stays out of previews.
+ * On Windows a few system variables are also passed, because Node's networking fails in a child without them.
+ */
+const PASS_THROUGH = ["PATH", "NODE_ENV"];
+const WINDOWS_PASS_THROUGH = ["SystemRoot", "windir", "TEMP", "TMP", "ComSpec", "PATHEXT"];
+
+function previewBaseEnv(): NodeJS.ProcessEnv {
+  // Built up from the allow-list below; NODE_ENV is copied when the server has it.
+  const env = {} as NodeJS.ProcessEnv;
+  const names = process.platform === "win32" ? [...PASS_THROUGH, ...WINDOWS_PASS_THROUGH] : PASS_THROUGH;
+  for (const name of names) {
+    const value = process.env[name];
+    if (value !== undefined) env[name] = value;
+  }
+  for (const [name, value] of Object.entries(process.env)) {
+    if (name.startsWith("PREVIEW_") && value !== undefined) env[name] = value;
+  }
+  return env;
+}
+
 function startPreview(port: number, input: DeployRequest) {
   const child = spawn(process.execPath, [path.join(process.cwd(), "scripts", "preview-gate.mjs")], {
     detached: true,
     windowsHide: true,
     stdio: "ignore",
     env: {
-      ...process.env,
+      ...previewBaseEnv(),
       PORT: String(port),
       APP_PORT: String(port + 1000),
       PREVIEW_SLEEP_MS: String(getConfig().sleepMs),

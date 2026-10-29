@@ -75,6 +75,23 @@ function waitForApp() {
   });
 }
 
+// The app sees only PATH, NODE_ENV and PREVIEW_* (plus Windows system variables Node needs), never Mayfly's secrets.
+// Mayfly already filters what this gate receives; filtering again here keeps the app safe if the gate is started some other way.
+const PASS_THROUGH = ["PATH", "NODE_ENV"];
+const WINDOWS_PASS_THROUGH = ["SystemRoot", "windir", "TEMP", "TMP", "ComSpec", "PATHEXT"];
+
+function appEnv() {
+  const env = {};
+  const names = process.platform === "win32" ? [...PASS_THROUGH, ...WINDOWS_PASS_THROUGH] : PASS_THROUGH;
+  for (const name of names) {
+    if (process.env[name] !== undefined) env[name] = process.env[name];
+  }
+  for (const [name, value] of Object.entries(process.env)) {
+    if (name.startsWith("PREVIEW_") && value !== undefined) env[name] = value;
+  }
+  return env;
+}
+
 function boot() {
   if (booting) return booting;
   if (alive() && listening) return Promise.resolve();
@@ -88,7 +105,7 @@ function boot() {
         detached: process.platform !== "win32",
         windowsHide: true,
         stdio: "ignore",
-        env: { ...process.env, PORT: String(appPort) },
+        env: { ...appEnv(), PORT: String(appPort) },
       });
       child = spawned;
       spawned.on("exit", () => {

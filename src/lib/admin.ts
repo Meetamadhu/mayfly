@@ -1,10 +1,11 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { json } from "./http";
 
+/** Compare as fixed-length digests so neither the token's length nor its content leaks through timing. */
 function sameToken(given: string, expected: string) {
-  const a = Buffer.from(given);
-  const b = Buffer.from(expected);
-  return a.length === b.length && timingSafeEqual(a, b);
+  const a = createHash("sha256").update(given).digest();
+  const b = createHash("sha256").update(expected).digest();
+  return timingSafeEqual(a, b);
 }
 
 function presentedToken(request: Request) {
@@ -14,29 +15,19 @@ function presentedToken(request: Request) {
   return request.headers.get("x-mayfly-admin")?.trim() ?? "";
 }
 
-function loopbackHost(request: Request) {
-  const raw = (request.headers.get("host") ?? "").trim().toLowerCase();
-  // Strip the port. IPv6 literals are not accepted, so a bare colon split is enough.
-  const host = raw.startsWith("[") ? raw : raw.split(":")[0];
-  return host === "localhost" || host === "127.0.0.1";
-}
-
 /**
  * Guard for routes that change or destroy things.
- * - MAYFLY_ADMIN_TOKEN set: the request must present it as `Authorization: Bearer <token>` or `x-mayfly-admin`.
- * - MAYFLY_ADMIN_TOKEN unset: only requests whose Host is localhost or 127.0.0.1 are allowed.
+ * The request must present MAYFLY_ADMIN_TOKEN as `Authorization: Bearer <token>` or `x-mayfly-admin`.
+ * There is no exception for "local" requests: the Host header is chosen by the sender, so it proves nothing.
+ * When MAYFLY_ADMIN_TOKEN is unset, every guarded request is refused.
  * Returns a 401 Response to send, or null when the request may continue. The token is never echoed.
  */
 export function requireAdmin(request: Request): Response | null {
   const expected = (process.env.MAYFLY_ADMIN_TOKEN ?? "").trim();
-  if (expected) {
-    const given = presentedToken(request);
-    if (given && sameToken(given, expected)) return null;
-    return json({ ok: false, code: "unauthorized", error: "Admin token required." }, 401);
+  if (!expected) {
+    return json({ ok: false, code: "unauthorized", error: "MAYFLY_ADMIN_TOKEN is not configured." }, 401);
   }
-  if (loopbackHost(request)) return null;
-  return json(
-    { ok: false, code: "unauthorized", error: "Set MAYFLY_ADMIN_TOKEN to use this endpoint from a non-local host." },
-    401,
-  );
+  const given = presentedToken(request);
+  if (given && sameToken(given, expected)) return null;
+  return json({ ok: false, code: "unauthorized", error: "Admin token required." }, 401);
 }

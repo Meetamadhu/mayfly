@@ -7,28 +7,38 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-function webhookSecret() {
+// Reads a key from the environment first, then from .env.local, so the smoke test uses the server's values.
+function setting(name) {
+  if (process.env[name]) return process.env[name].trim();
   try {
     const raw = readFileSync(new URL("../.env.local", import.meta.url), "utf8");
-    const line = raw.split(/\r?\n/).find((item) => item.startsWith("GITHUB_WEBHOOK_SECRET="));
-    return line ? line.slice("GITHUB_WEBHOOK_SECRET=".length).trim() : "";
+    const line = raw.split(/\r?\n/).find((item) => item.startsWith(`${name}=`));
+    return line ? line.slice(name.length + 1).trim() : "";
   } catch {
     return "";
   }
 }
 
+const adminToken = setting("MAYFLY_ADMIN_TOKEN");
+assert(adminToken, "Set MAYFLY_ADMIN_TOKEN in .env.local (or the environment) before running the smoke test.");
+
 async function request(path, { method = "GET", body, headers } = {}) {
   const payload = body === undefined ? undefined : JSON.stringify(body);
   const signatureHeaders = {};
   if (payload && path.startsWith("/api/webhooks/github")) {
-    const secret = webhookSecret();
+    const secret = setting("GITHUB_WEBHOOK_SECRET");
     if (secret) {
       signatureHeaders["x-hub-signature-256"] = `sha256=${createHmac("sha256", secret).update(payload).digest("hex")}`;
     }
   }
   const response = await fetch(base + path, {
     method,
-    headers: { "Content-Type": "application/json", ...signatureHeaders, ...headers },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${adminToken}`,
+      ...signatureHeaders,
+      ...headers,
+    },
     body: payload,
   });
   const text = await response.text();
@@ -38,6 +48,11 @@ async function request(path, { method = "GET", body, headers } = {}) {
 
 const sha1 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const sha2 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+const unauthenticated = await fetch(`${base}/api/reaper`, { method: "POST" });
+assert(unauthenticated.status === 401, `reaper without a token returned ${unauthenticated.status}`);
+const wrongToken = await fetch(`${base}/api/reaper`, { method: "POST", headers: { Authorization: "Bearer wrong-token" } });
+assert(wrongToken.status === 401, `reaper with a wrong token returned ${wrongToken.status}`);
 
 const opened = await request("/api/events", {
   method: "POST",
