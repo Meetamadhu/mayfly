@@ -69,6 +69,12 @@ export async function proxyPreview(request: Request, params: PreviewParams): Pro
   if (!target) return text(404, "No live preview for this pull request.");
 
   const { path, search } = upstreamTarget(request.url);
+  const method = request.method.toUpperCase();
+  // The gate's sleep control is not part of the public preview. Callers who can reach the
+  // proxy must not be able to stop the app; Mayfly talks to 127.0.0.1 itself.
+  if (path.startsWith("/__preview_") && !(method === "GET" && path === "/__preview_status")) {
+    return text(404, "Not found.");
+  }
   const isStatus = path === "/__preview_status";
   const isProbe = request.headers.has("x-mayfly-probe");
 
@@ -86,7 +92,6 @@ export async function proxyPreview(request: Request, params: PreviewParams): Pro
   if (originalHost) headers["x-forwarded-host"] = originalHost;
   headers["x-forwarded-proto"] = new URL(request.url).protocol.replace(":", "");
 
-  const method = request.method.toUpperCase();
   const hasBody = method !== "GET" && method !== "HEAD" && request.body !== null;
 
   const upstreamResponse = await new Promise<Response>((resolve) => {

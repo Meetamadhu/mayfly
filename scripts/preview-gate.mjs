@@ -92,6 +92,12 @@ function appEnv() {
   return env;
 }
 
+function gateState() {
+  if (booting) return "waking";
+  if (alive() && listening) return "awake";
+  return "asleep";
+}
+
 function boot() {
   if (booting) return booting;
   if (alive() && listening) return Promise.resolve();
@@ -240,7 +246,13 @@ const server = createServer((req, res) => {
   // Status must stay non-waking and must not count as activity.
   if (pathOnly === "/__preview_status") {
     res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
-    res.end(JSON.stringify({ state: alive() ? "awake" : "asleep", sleepSeconds: idleMs / 1000 }));
+    res.end(JSON.stringify({ state: gateState(), sleepSeconds: idleMs / 1000 }));
+    return;
+  }
+  if (req.method === "POST" && pathOnly === "/__preview_sleep") {
+    stopApp();
+    res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+    res.end(JSON.stringify({ state: "asleep" }));
     return;
   }
   // Probes report state only: they never boot and never count as activity.

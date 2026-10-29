@@ -113,7 +113,7 @@ async function readSleep(env: Environment, deployments: DeploymentRecord[]): Pro
     });
     if (!response.ok) return "unknown";
     const body = (await response.json()) as { state?: unknown };
-    return body.state === "awake" || body.state === "asleep" ? body.state : "unknown";
+    return body.state === "awake" || body.state === "waking" || body.state === "asleep" ? body.state : "unknown";
   } catch {
     return "unknown";
   }
@@ -174,12 +174,14 @@ export async function getOverview(): Promise<Overview> {
       previewBaseUrl: config.previewBaseUrl,
       deployer: config.deployer,
       webhookVerification: config.webhookSecret ? "signed" : "open-in-development",
+      demo: config.demo ? `${config.demo.repository}#${config.demo.prNumber}` : null,
     },
     summary: {
       live: environments.filter((env) => isLiveStatus(env.status)).length,
       destroyed: environments.filter((env) => env.status === "destroyed").length,
       failed: environments.filter((env) => env.status === "failed").length,
       awake: environments.filter((env) => isLiveStatus(env.status) && env.sleep === "awake").length,
+      waking: environments.filter((env) => isLiveStatus(env.status) && env.sleep === "waking").length,
       asleep: environments.filter((env) => isLiveStatus(env.status) && env.sleep === "asleep").length,
     },
   };
@@ -480,29 +482,73 @@ export async function destroyEnvironment(
   return reserved;
 }
 
-export async function markIdle(id: string): Promise<LifecycleResult> {
-  return exclusive(async () => {
+function isDemo(env: Environment) {
+  const demo = getConfig().demo;
+  return Boolean(demo && env.repository === demo.repository && env.prNumber === demo.prNumber);
+}
+
+/** Ask the gate on this machine to stop the app. The public /p/ proxy is not used. */
+export async function sleepEnvironment(id: string): Promise<LifecycleResult> {
+  const located = await exclusive(async () => {
     const state = await loadState();
     const env = state.environments.find((item) => item.id === id);
-    if (!env) return { ok: false, code: "not_found", error: "No environment with that id." };
-    if (env.status !== "ready") {
+    if (!env) return { ok: false as const, code: "not_found" as const, error: "No environment with that id." };
+    if (env.status !== "ready" && env.status !== "updating") {
       return {
-        ok: false,
-        code: "conflict",
-        error: "Only a ready preview can be marked idle.",
+        ok: false as const,
+        code: "conflict" as const,
+        error: "Only a live preview can be put to sleep.",
         environment: clone(env),
       };
     }
-    const config = getConfig();
-    const now = Date.now();
-    env.lastActiveAt = iso(now - config.idleMs - 1000);
-    if (Date.parse(env.expiresAt) <= now) {
-      env.expiresAt = iso(now + config.ttlMs);
-    }
-    env.updatedAt = iso(now);
-    await saveState(state);
-    return { ok: true, action: "idle-marked", environment: clone(env) };
+    return { ok: true as const, environment: clone(env) };
   });
+  if (!located.ok) return located;
+
+  const deployments = await getDeployer().list();
+  const port = deployments.find((item) => item.deploymentId === located.environment.deploymentId)?.port;
+  if (!port) {
+    return {
+      ok: false,
+      code: "conflict",
+      error: "This preview has no process to sleep.",
+      environment: located.environment,
+    };
+  }
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/__preview_sleep`, { method: "POST", cache: "no-store" });
+    if (!response.ok) {
+      return { ok: false, code: "deploy_failed", error: "The preview did not sleep.", environment: located.environment };
+    }
+  } catch {
+    return { ok: false, code: "deploy_failed", error: "The preview did not sleep.", environment: located.environment };
+  }
+  return { ok: true, action: "slept", environment: located.environment };
+}
+
+async function ensureDemo() {
+  const demo = getConfig().demo;
+  if (!demo) return;
+  try {
+    const state = await loadState();
+    const live = state.environments.some(
+      (env) => env.repository === demo.repository && env.prNumber === demo.prNumber && isLiveStatus(env.status),
+    );
+    if (live) return;
+    await applyPullRequestEvent(
+    {
+      action: "opened",
+      repository: demo.repository,
+      prNumber: demo.prNumber,
+      sha: "d3m0d3m0",
+      branch: "demo",
+    },
+      { wait: true },
+    );
+  } catch (error) {
+    console.error("Demo preview was not created", error);
+  }
 }
 
 export async function recordActivity(id: string): Promise<LifecycleResult> {
@@ -541,6 +587,7 @@ export async function reap(): Promise<ReapResult> {
       if (env.status !== "ready") continue;
       // Idle previews are not destroyed here. The gate sleeps an unused app (the app process exits, the gate
       // stays up) and the next visit wakes it. Only the time limit ends a ready preview.
+      if (isDemo(env)) continue;
       if (now >= Date.parse(env.expiresAt)) targets.push({ id: env.id, reason: "expired" });
     }
     return targets;
@@ -553,5 +600,6 @@ export async function reap(): Promise<ReapResult> {
     if (result.ok && result.environment.status === "destroyed") destroyed.push(result.environment);
     else if (!result.ok) failed.push({ id: target.id, error: result.error });
   }
+  await ensureDemo();
   return { ok: true, destroyed, failed };
 }

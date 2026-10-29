@@ -13,6 +13,7 @@ export interface OrchestratorConfig {
   webhookSecret: string;
   githubToken: string;
   previewBaseUrl: string;
+  demo: { repository: string; prNumber: number } | null;
 }
 
 function previewBase() {
@@ -20,6 +21,15 @@ function previewBase() {
   if (configured) return configured;
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
   return "http://localhost:3000";
+}
+
+function demoPreview() {
+  const raw = process.env.DEMO_PREVIEW?.trim() ?? "";
+  const match = /^([\w.-]+\/[\w.-]+)#([1-9]\d*)$/.exec(raw);
+  if (!match) return null;
+  const prNumber = Number(match[2]);
+  if (!Number.isInteger(prNumber) || prNumber > 1_000_000) return null;
+  return { repository: match[1].toLowerCase(), prNumber };
 }
 
 function positiveNumber(name: string, fallback: number): number {
@@ -51,5 +61,6 @@ export function getConfig(): OrchestratorConfig {
     webhookSecret: process.env.GITHUB_WEBHOOK_SECRET ?? "",
     githubToken: process.env.GITHUB_TOKEN ?? "",
     previewBaseUrl: previewBase(),
+    demo: demoPreview(),
   };
 }

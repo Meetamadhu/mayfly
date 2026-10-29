@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 
-const base = "http://localhost:3000";
+const base = process.env.MAYFLY_URL || "http://localhost:3000";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -152,12 +152,12 @@ const idle = await request("/api/events", {
   },
 });
 const idleId = idle.body.environment.id;
-const marked = await request(`/api/environments/${idleId}?action=idle`, { method: "POST" });
-assert(marked.status === 200, `mark idle failed ${JSON.stringify(marked.body)}`);
+const slept = await request(`/api/environments/${idleId}?action=sleep`, { method: "POST" });
+assert(slept.status === 200, `sleep failed ${JSON.stringify(slept.body)}`);
 const idleReap = await request("/api/reaper", { method: "POST" });
-assert(!idleReap.body.destroyed.some((env) => env.id === idleId), `idle preview was deleted ${JSON.stringify(idleReap.body)}`);
+assert(!idleReap.body.destroyed.some((env) => env.id === idleId), `sleeping preview was deleted ${JSON.stringify(idleReap.body)}`);
 const afterIdle = await request(`/api/environments/${idleId}`);
-assert(afterIdle.body.environment.status === "ready", "idle preview was not left running");
+assert(afterIdle.body.environment.status === "ready", "sleeping preview was not left running");
 const idleStopped = await request(`/api/environments/${idleId}?action=destroy&wait=1`, { method: "POST" });
 assert(idleStopped.status === 200, `idle cleanup failed ${JSON.stringify(idleStopped.body)}`);
 

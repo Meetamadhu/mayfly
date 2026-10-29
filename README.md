@@ -35,7 +35,8 @@ Copy `.env.example` to `.env.local`. `.env.local` stays on this machine.
 | `PREVIEW_BASE_URL` | Origin used in preview links. Example: `http://localhost:3000`. |
 | `GITHUB_WEBHOOK_SECRET` | Required in production. In development, an empty value accepts unsigned deliveries. |
 | `GITHUB_TOKEN` | Optional. When set, preview comments are also posted on the pull request. |
-| `MAYFLY_ADMIN_TOKEN` | Required for every action that changes things. Send it as `Authorization: Bearer <token>` or `x-mayfly-admin: <token>`, or paste it into the board's **Admin token** field. When empty, those actions are always refused with 401. Generate one with `openssl rand -hex 32`. |
+| `MAYFLY_ADMIN_TOKEN` | Required for every action that changes things. Send it as `Authorization: Bearer <token>` or `x-mayfly-admin: <token>`, or paste it into the board's **Admin** field. When empty, those actions are always refused with 401. Generate one with `openssl rand -hex 32`. |
+| `DEMO_PREVIEW` | Optional. Keep one preview alive for visitors, for example `acme/web#1`. Empty turns it off. The branch is `demo` and the commit is `d3m0d3m0`. It is not deleted when its time limit passes. |
 
 ## Deploy temporarily
 
@@ -63,7 +64,7 @@ The route also accepts a form body with a `payload` field. In production a missi
 ## Demo
 
 1. `npm run dev`
-2. Open http://localhost:3000, paste your `MAYFLY_ADMIN_TOKEN` into **Admin token**, and expand **Simulate a pull request**. Without the token the board is read-only.
+2. Open http://localhost:3000, click **Admin**, paste your `MAYFLY_ADMIN_TOKEN`, and choose **Use token**. Without the token the board is read-only.
 3. Choose **Open**. The row shows **Awake**, and **Open preview** goes to `/p/...`.
 4. Wait `PREVIEW_SLEEP_SECONDS` (20 in `.env.example`) without opening the preview. The row shows **Asleep**. On Linux, `ps -ef | grep preview-server` no longer lists that app. The gate process is still there.
 5. Open the preview again. "Waking up this preview" shows at once, then the placeholder app loads.
@@ -73,7 +74,7 @@ To demo the time limit, set TTL minutes to `0`, choose **Open**, then choose **R
 
 ## Security
 
-`MAYFLY_ADMIN_TOKEN` protects `POST /api/environments/<id>?action=destroy`, `action=idle`, and `action=activity`, plus `POST /api/reaper` and `POST /api/events`. With no token configured those routes refuse every request; there is no exception for "local" requests, because the `Host` header is chosen by the sender. The board keeps the token in the browser tab's `sessionStorage` only and sends it as a Bearer header; it never appears in the page or the API. In production, webhook deliveries must be signed with `GITHUB_WEBHOOK_SECRET`.
+`MAYFLY_ADMIN_TOKEN` protects `POST /api/environments/<id>?action=destroy`, `action=sleep`, and `action=activity`, plus `POST /api/reaper` and `POST /api/events`. With no token configured those routes refuse every request; there is no exception for "local" requests, because the `Host` header is chosen by the sender. The board keeps the token in the browser tab's `sessionStorage` only and sends it as a Bearer header; it never appears in the page or the API. In production, webhook deliveries must be signed with `GITHUB_WEBHOOK_SECRET`.
 
 Preview processes receive only `PATH`, `NODE_ENV` and `PREVIEW_*` variables (plus the Windows system variables Node needs). `GITHUB_TOKEN`, `GITHUB_WEBHOOK_SECRET` and `MAYFLY_ADMIN_TOKEN` never reach them.
 
