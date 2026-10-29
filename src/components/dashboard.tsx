@@ -411,7 +411,13 @@ export function Dashboard() {
             </span>
           </div>
         ) : null}
-        <button type="button" className="secondary admin-toggle" onClick={() => setAdminOpen((open) => !open)}>
+        <button
+          type="button"
+          className="admin-toggle"
+          data-on={canWrite ? "true" : "false"}
+          aria-pressed={adminOpen}
+          onClick={() => setAdminOpen((open) => !open)}
+        >
           {canWrite ? "Admin: on" : "Admin"}
         </button>
       </header>

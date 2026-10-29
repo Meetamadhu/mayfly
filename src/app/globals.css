@@ -229,7 +229,24 @@ h1 {
 
 .simulator { margin-top: 0; }
 
-.admin-toggle { align-self: flex-start; }
+.mast .admin-toggle {
+  align-self: flex-end;
+  justify-self: start;
+  flex: none;
+  width: fit-content;
+  border-color: #f6e2b8;
+  background: #f6e2b8;
+  color: #6b4200;
+  font-weight: 700;
+  box-shadow: 0 0 0 3px rgba(246, 226, 184, 0.45);
+}
+
+.mast .admin-toggle[data-on="true"] {
+  border-color: #e4f3ea;
+  background: #e4f3ea;
+  color: #1d6b45;
+  box-shadow: 0 0 0 3px rgba(228, 243, 234, 0.45);
+}
 
 .url { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 
