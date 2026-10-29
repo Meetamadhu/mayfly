@@ -14,6 +14,11 @@
   --failed-bg: #f8e4e1;
   --dead: #5f594f;
   --dead-bg: #ece8df;
+  /* Contrast on the pill background: awake 7.2:1, asleep 6.8:1 */
+  --awake: #6b4200;
+  --awake-bg: #fbe8bf;
+  --asleep: #1d4e89;
+  --asleep-bg: #dce8f8;
 }
 
 * { box-sizing: border-box; }
@@ -147,7 +152,7 @@ h1 {
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 0;
   margin: 0 0 1.25rem;
   overflow: hidden;
@@ -385,6 +390,26 @@ a.url, .notice a, .url a {
 .status[data-status="destroying"] { background: var(--work-bg); color: var(--work); }
 .status[data-status="failed"] { background: var(--failed-bg); color: var(--failed); }
 
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.sleep {
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.sleep[data-sleep="awake"] { background: var(--awake-bg); color: var(--awake); }
+.sleep[data-sleep="asleep"] { background: var(--asleep-bg); color: var(--asleep); }
+
 .comment { margin: 0.7rem 0 0; }
 
 .open-link {
@@ -435,8 +460,9 @@ a.url, .notice a, .url a {
   .mast-title { flex-wrap: wrap; }
   .pills { justify-content: flex-start; }
   .stats { grid-template-columns: 1fr 1fr; }
-  .stats > div:nth-child(odd) { border-bottom: 1px solid var(--line); }
-  .stats > div:nth-child(2) { border-right: 0; }
+  .stats > div { border-bottom: 1px solid var(--line); }
+  .stats > div:nth-child(even) { border-right: 0; }
+  .stats > div:nth-last-child(-n + 2) { border-bottom: 0; }
   .simulator form { grid-template-columns: 1fr; }
   .shell { width: min(100% - 1.25rem, 1120px); }
 }
