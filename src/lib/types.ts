@@ -21,8 +21,12 @@ export interface PreviewComment {
   body: string;
 }
 
+export type SleepState = "awake" | "asleep" | "unknown";
+
 export interface Environment {
   id: string;
+  /** Whether the preview app is running. Read from the gate without waking it. */
+  sleep?: SleepState;
   repository: string;
   prNumber: number;
   sha: string;
@@ -83,6 +87,8 @@ export interface Overview {
     live: number;
     destroyed: number;
     failed: number;
+    awake: number;
+    asleep: number;
   };
 }
 

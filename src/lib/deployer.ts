@@ -46,6 +46,13 @@ export function previewUrl(repository: string, prNumber: number) {
   return `${base}/preview/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/${prNumber}`;
 }
 
+/** The link people open: served by Mayfly at /p/<owner>/<name>/<pr>, which forwards to the local gate. */
+export function publicPreviewUrl(repository: string, prNumber: number) {
+  const [owner, name] = repository.split("/");
+  const base = getConfig().previewBaseUrl;
+  return `${base}/p/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/${prNumber}`;
+}
+
 async function pause() {
   const delay = getConfig().fakeDelayMs;
   if (delay > 0) {
@@ -138,6 +145,7 @@ function deploymentIdFor(envId: string) {
   return `proc_${envId}`;
 }
 
+/** Where the gate listens. Only this machine can reach it; the board shows publicPreviewUrl instead. */
 function previewListenUrl(port: number) {
   return `http://127.0.0.1:${port}`;
 }
@@ -151,8 +159,33 @@ function processAlive(pid: number) {
   }
 }
 
-function killProcess(pid: number) {
-  return new Promise<void>((resolve) => {
+/** Signal the gate's process group (negative pid). Falls back to the bare pid if there is no such group. */
+function signalGroup(pid: number, signal: NodeJS.Signals) {
+  for (const target of [-pid, pid]) {
+    try {
+      process.kill(target, signal);
+      return true;
+    } catch {
+      // ESRCH or EPERM: try the next target
+    }
+  }
+  return false;
+}
+
+async function killProcess(pid: number) {
+  if (process.platform !== "win32") {
+    // startPreview() spawns the gate detached, so on Linux it leads its own process group.
+    // The gate cleans up its app group on SIGTERM; SIGKILL on the group is the backstop.
+    if (!signalGroup(pid, "SIGTERM")) return;
+    const deadline = Date.now() + 1_500;
+    while (Date.now() < deadline && processAlive(pid)) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    signalGroup(pid, "SIGKILL");
+    return;
+  }
+  // Windows has no process groups. taskkill /T walks the tree; wait for it before the caller reuses the ports.
+  await new Promise<void>((resolve) => {
     execFile("taskkill", ["/PID", String(pid), "/T", "/F"], { windowsHide: true }, () => resolve());
   });
 }
@@ -229,9 +262,10 @@ async function launch(input: DeployRequest, previous?: DeploymentRecord): Promis
   if (previous?.pid && processAlive(previous.pid)) await killProcess(previous.pid);
   const port = await claimPort(previous?.port);
   const pid = startPreview(port, input);
-  const url = previewListenUrl(port);
+  const listenUrl = previewListenUrl(port);
+  const url = publicPreviewUrl(input.repository, input.prNumber);
   try {
-    await waitUntilListening(url);
+    await waitUntilListening(listenUrl);
   } catch (error) {
     await killProcess(pid);
     throw error;

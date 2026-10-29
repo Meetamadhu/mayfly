@@ -4,6 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import type { Environment, EnvironmentStatus, Overview } from "@/lib/types";
 
 const TRANSITIONAL = new Set<EnvironmentStatus>(["provisioning", "updating", "destroying"]);
+const LIVE = new Set<EnvironmentStatus>(["provisioning", "ready", "updating", "destroying"]);
+const FAST_POLL_MS = 500;
+const LIVE_POLL_MS = 5000;
 
 function EnvironmentCard({
   env,
@@ -41,9 +44,16 @@ function EnvironmentCard({
             {env.destroyReason ? <span className="chip">reason {env.destroyReason}</span> : null}
           </p>
         </div>
-        <span className="status" data-status={env.status}>
-          {env.status}
-        </span>
+        <div className="badges">
+          {isLive(env.status) && env.sleep && env.sleep !== "unknown" ? (
+            <span className="sleep" data-sleep={env.sleep}>
+              {env.sleep === "awake" ? "Awake" : "Asleep"}
+            </span>
+          ) : null}
+          <span className="status" data-status={env.status}>
+            {env.status}
+          </span>
+        </div>
       </header>
       {env.url ? (
         <p className="url">
@@ -78,6 +88,10 @@ function EnvironmentCard({
       ) : null}
     </article>
   );
+}
+
+function isLive(status: EnvironmentStatus) {
+  return LIVE.has(status);
 }
 
 function randomSha() {
@@ -138,7 +152,9 @@ export function Dashboard() {
         const body = await reload();
         if (cancelled) return;
         if (body.environments.some((env) => TRANSITIONAL.has(env.status))) {
-          timer = window.setTimeout(() => void tick(), 500);
+          timer = window.setTimeout(() => void tick(), FAST_POLL_MS);
+        } else if (body.environments.some((env) => LIVE.has(env.status))) {
+          timer = window.setTimeout(() => void tick(), LIVE_POLL_MS);
         }
       } catch (caught) {
         if (!cancelled) {
@@ -295,6 +311,14 @@ export function Dashboard() {
           <div className="meter" aria-hidden="true">
             <span data-hot={capacityRatio >= 0.8 ? "true" : "false"} style={{ width: `${capacityRatio * 100}%` }} />
           </div>
+        </div>
+        <div>
+          <dt>Awake</dt>
+          <dd>{overview?.summary.awake ?? "–"}</dd>
+        </div>
+        <div>
+          <dt>Asleep</dt>
+          <dd>{overview?.summary.asleep ?? "–"}</dd>
         </div>
         <div>
           <dt>Removed</dt>

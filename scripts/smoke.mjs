@@ -53,7 +53,7 @@ const opened = await request("/api/events", {
 });
 assert(opened.status === 200, `open failed ${opened.status} ${JSON.stringify(opened.body)}`);
 assert(opened.body.environment.status === "ready", "open did not become ready");
-assert(/^http:\/\/127\.0\.0\.1:\d+$/.test(opened.body.environment.url), opened.body.environment.url);
+assert(opened.body.environment.url.endsWith("/p/smoke/app/42"), opened.body.environment.url);
 const previewPage = await fetch(opened.body.environment.url);
 assert(previewPage.status === 200, `preview process status ${previewPage.status}`);
 assert((await previewPage.text()).includes(sha1), "preview process did not serve the opened commit");
@@ -102,13 +102,8 @@ assert(closed.body.environment.destroyReason === "merged", closed.body.environme
 const afterClose = await request("/api/environments");
 assert(afterClose.body.deployments.length === 0, "deployment still billed after merge");
 assert(afterClose.body.summary.live === 0, "live count after merge");
-let mergedGone = false;
-try {
-  await fetch(opened.body.environment.url);
-} catch {
-  mergedGone = true;
-}
-assert(mergedGone, "preview process still listening after merge");
+const mergedPage = await fetch(opened.body.environment.url);
+assert(mergedPage.status === 404, `preview still served after merge (${mergedPage.status})`);
 
 const expired = await request("/api/events", {
   method: "POST",
@@ -145,9 +140,11 @@ const idleId = idle.body.environment.id;
 const marked = await request(`/api/environments/${idleId}?action=idle`, { method: "POST" });
 assert(marked.status === 200, `mark idle failed ${JSON.stringify(marked.body)}`);
 const idleReap = await request("/api/reaper", { method: "POST" });
-assert(idleReap.body.destroyed.some((env) => env.destroyReason === "idle"), JSON.stringify(idleReap.body));
-const afterIdle = await request("/api/environments");
-assert(afterIdle.body.deployments.length === 0, "idle deployment still running");
+assert(!idleReap.body.destroyed.some((env) => env.id === idleId), `idle preview was deleted ${JSON.stringify(idleReap.body)}`);
+const afterIdle = await request(`/api/environments/${idleId}`);
+assert(afterIdle.body.environment.status === "ready", "idle preview was not left running");
+const idleStopped = await request(`/api/environments/${idleId}?action=destroy&wait=1`, { method: "POST" });
+assert(idleStopped.status === 200, `idle cleanup failed ${JSON.stringify(idleStopped.body)}`);
 
 const invalid = await request("/api/events", {
   method: "POST",

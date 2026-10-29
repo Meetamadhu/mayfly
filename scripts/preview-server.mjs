@@ -36,4 +36,14 @@ const server = createServer((_req, res) => {
   res.end(page);
 });
 
-server.listen(port, "127.0.0.1");
+// Simulated start time for demos; not a real cold start.
+const bootDelayMs = Math.max(0, Number(process.env.PREVIEW_BOOT_DELAY_MS) || 0);
+setTimeout(() => server.listen(port, "127.0.0.1"), bootDelayMs);
+
+// Linux: if the gate is killed without a chance to clean up, this process is re-parented. Exit instead of leaking.
+if (process.platform !== "win32") {
+  const parent = process.ppid;
+  setInterval(() => {
+    if (process.ppid !== parent) process.exit(0);
+  }, 1000).unref();
+}

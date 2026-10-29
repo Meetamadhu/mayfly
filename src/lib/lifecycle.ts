@@ -1,16 +1,18 @@
 import { randomUUID } from "node:crypto";
 import { getConfig } from "./config";
-import { getDeployer, previewUrl, type Deployment } from "./deployer";
+import { getDeployer, previewUrl, publicPreviewUrl, type Deployment } from "./deployer";
 import { publishPullRequestComment } from "./http";
 import { exclusive, loadState, saveState } from "./store";
 import {
   isLiveStatus,
+  type DeploymentRecord,
   type DestroyReason,
   type Environment,
   type LifecycleResult,
   type Overview,
   type PullRequestEvent,
   type ReapResult,
+  type SleepState,
 } from "./types";
 
 function clone<T>(value: T): T {
@@ -35,7 +37,7 @@ function findLive(environments: Environment[], repository: string, prNumber: num
 
 function readyComment(env: Environment, refreshed: boolean) {
   const verb = refreshed ? "updated" : "ready";
-  return `Preview ${verb}: ${env.url}\nCommit \`${env.sha}\`. Expires ${env.expiresAt}. It is removed when the pull request closes, goes idle, or reaches its time limit.`;
+  return `Preview ${verb}: ${env.url}\nCommit \`${env.sha}\`. Expires ${env.expiresAt}. It is removed when the pull request closes or it reaches its time limit. When nobody is using it, the app sleeps and wakes on the next visit.`;
 }
 
 function destroyedComment(env: Environment) {
@@ -60,8 +62,11 @@ function normalizeEvent(event: PullRequestEvent): PullRequestEvent {
 }
 
 function refreshPreviewUrl(env: Environment): Environment {
-  if (!env.url || !env.url.includes(".preview.local")) return env;
-  const next = previewUrl(env.repository, env.prNumber);
+  if (!env.url) return env;
+  const stale = env.url.includes(".preview.local") || /^http:\/\/127\.0\.0\.1:\d+$/.test(env.url);
+  if (!stale) return env;
+  // Process previews used to expose the gate's loopback address; they are now reached through /p/...
+  const next = getConfig().deployer === "fake" ? previewUrl(env.repository, env.prNumber) : publicPreviewUrl(env.repository, env.prNumber);
   if (env.url === next) return env;
   const previous = env.url;
   return {
@@ -91,6 +96,56 @@ export async function getPreview(repository: string, prNumber: number) {
   };
 }
 
+/**
+ * Ask the preview gate whether its app is running. The gate answers this path itself
+ * and never boots the app or touches its idle clock, so polling does not wake a preview.
+ * The port comes from the deployment record, never from a request URL.
+ */
+async function readSleep(env: Environment, deployments: DeploymentRecord[]): Promise<SleepState> {
+  if (getConfig().deployer === "fake") return "unknown";
+  if (!isLiveStatus(env.status) || !env.deploymentId) return "unknown";
+  const port = deployments.find((item) => item.deploymentId === env.deploymentId)?.port;
+  if (!port) return "unknown";
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/__preview_status`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(500),
+    });
+    if (!response.ok) return "unknown";
+    const body = (await response.json()) as { state?: unknown };
+    return body.state === "awake" || body.state === "asleep" ? body.state : "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+/**
+ * Where the public preview path forwards to. The port comes only from the deployment record that matches
+ * a live environment for this repository and pull request; nothing from the request URL is used as a target.
+ */
+export async function findProxyTarget(
+  repository: string,
+  prNumber: number,
+): Promise<{ envId: string; port: number } | null> {
+  const normalized = repository.trim().toLowerCase();
+  const [state, deployments] = await Promise.all([
+    exclusive(async () => loadState()),
+    getDeployer().list(),
+  ]);
+  const env = state.environments.find(
+    (item) =>
+      item.repository === normalized &&
+      item.prNumber === prNumber &&
+      (item.status === "ready" || item.status === "updating") &&
+      item.deploymentId,
+  );
+  if (!env) return null;
+  const deployment = deployments.find((item) => item.deploymentId === env.deploymentId);
+  const port = deployment?.port;
+  if (!port || !Number.isInteger(port) || port < 1 || port > 65535) return null;
+  return { envId: env.id, port };
+}
+
 export async function getOverview(): Promise<Overview> {
   const config = getConfig();
   const [state, deployments] = await Promise.all([
@@ -98,11 +153,14 @@ export async function getOverview(): Promise<Overview> {
     getDeployer().list(),
   ]);
 
-  const environments = state.environments.map(refreshPreviewUrl).sort((a, b) => {
+  const sorted = state.environments.map(refreshPreviewUrl).sort((a, b) => {
     const liveRank = Number(isLiveStatus(b.status)) - Number(isLiveStatus(a.status));
     if (liveRank !== 0) return liveRank;
     return Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
   });
+  const environments: Environment[] = await Promise.all(
+    sorted.map(async (env) => ({ ...env, sleep: await readSleep(env, deployments) })),
+  );
 
   return {
     environments,
@@ -121,6 +179,8 @@ export async function getOverview(): Promise<Overview> {
       live: environments.filter((env) => isLiveStatus(env.status)).length,
       destroyed: environments.filter((env) => env.status === "destroyed").length,
       failed: environments.filter((env) => env.status === "failed").length,
+      awake: environments.filter((env) => isLiveStatus(env.status) && env.sleep === "awake").length,
+      asleep: environments.filter((env) => isLiveStatus(env.status) && env.sleep === "asleep").length,
     },
   };
 }
@@ -479,8 +539,9 @@ export async function reap(): Promise<ReapResult> {
         continue;
       }
       if (env.status !== "ready") continue;
+      // Idle previews are not destroyed here. The gate sleeps an unused app (the app process exits, the gate
+      // stays up) and the next visit wakes it. Only the time limit ends a ready preview.
       if (now >= Date.parse(env.expiresAt)) targets.push({ id: env.id, reason: "expired" });
-      else if (now - Date.parse(env.lastActiveAt) >= config.idleMs) targets.push({ id: env.id, reason: "idle" });
     }
     return targets;
   });
