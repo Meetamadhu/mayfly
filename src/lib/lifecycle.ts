@@ -61,13 +61,29 @@ function normalizeEvent(event: PullRequestEvent): PullRequestEvent {
   };
 }
 
+function expectedPreviewUrl(repository: string, prNumber: number) {
+  return getConfig().deployer === "fake" ? previewUrl(repository, prNumber) : publicPreviewUrl(repository, prNumber);
+}
+
+function previewUrlIsCurrent(current: string, next: string) {
+  try {
+    const left = new URL(current);
+    const right = new URL(next);
+    return left.origin === right.origin && left.pathname === right.pathname;
+  } catch {
+    return false;
+  }
+}
+
 function refreshPreviewUrl(env: Environment): Environment {
   if (!env.url) return env;
-  const stale = env.url.includes(".preview.local") || /^http:\/\/127\.0\.0\.1:\d+$/.test(env.url);
-  if (!stale) return env;
-  // Process previews used to expose the gate's loopback address; they are now reached through /p/...
-  const next = getConfig().deployer === "fake" ? previewUrl(env.repository, env.prNumber) : publicPreviewUrl(env.repository, env.prNumber);
-  if (env.url === next) return env;
+  const next = expectedPreviewUrl(env.repository, env.prNumber);
+  // A saved link from another port, such as a stopped test server, would not open on this machine.
+  const stale =
+    env.url.includes(".preview.local") ||
+    /^http:\/\/127\.0\.0\.1:\d+$/.test(env.url) ||
+    !previewUrlIsCurrent(env.url, next);
+  if (!stale || env.url === next) return env;
   const previous = env.url;
   return {
     ...env,
@@ -164,7 +180,10 @@ export async function getOverview(): Promise<Overview> {
 
   return {
     environments,
-    deployments,
+    deployments: deployments.map((item) => {
+      const next = expectedPreviewUrl(item.repository, item.prNumber);
+      return previewUrlIsCurrent(item.url, next) ? item : { ...item, url: next };
+    }),
     config: {
       maxConcurrent: config.maxConcurrent,
       ttlHours: config.ttlHours,
