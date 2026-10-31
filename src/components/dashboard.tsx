@@ -11,9 +11,10 @@ const LIVE_POLL_MS = 5000;
 function EnvironmentCard({
   env,
   busy,
+  canWrite,
   copied,
-  port,
   sleepSeconds,
+  now,
   demo,
   onCopy,
   onSleep,
@@ -21,92 +22,189 @@ function EnvironmentCard({
 }: {
   env: Environment;
   busy: boolean;
+  canWrite: boolean;
   copied: boolean;
-  port?: number;
   sleepSeconds: number;
+  now: number;
   demo: boolean;
   onCopy: () => void;
   onSleep: () => void;
   onDestroy: () => void;
 }) {
-  const actionable = env.status === "ready" || env.status === "updating" || env.status === "provisioning";
-  const pill = pillFor(env);
-  const note = explainer(env, sleepSeconds);
+  if (env.status === "destroyed") {
+    const reason = env.destroyReason ?? "removed";
+    return (
+      <div className="removed-row" data-status="destroyed">
+        <span className="chip removed-pill">Removed</span>
+        <strong>
+          {env.repository}
+          <span>#{env.prNumber}</span>
+        </strong>
+        <span>
+          {reason} · removed {formatDelta(env.destroyedAt ?? env.updatedAt)}
+        </span>
+      </div>
+    );
+  }
+
+  const view = cardView(env);
   const path = env.url ? previewPath(env.url) : null;
-  const comment = env.comments.at(-1)?.body.split("\n")[0];
+  const remain = secondsUntilSleep(env, sleepSeconds, now);
+  const note = view.tone === "awake" ? `Sleeps in ${remain} s if nobody visits.` : view.note;
+  const showOpen = env.status !== "failed" && env.status !== "destroying";
+  const openDisabled = env.status === "provisioning" || !env.url;
   return (
     <article className={env.status === "ready" ? "env featured" : "env"} data-status={env.status}>
-      <header>
+      <header className="state-band" data-state={view.tone}>
         <div>
-          <h3>
-            {env.repository}
-            <span>#{env.prNumber}</span>
-            {demo ? <span className="chip demo-chip">Demo</span> : null}
-          </h3>
-          <p className="meta">
-            <span className="chip mono">{env.sha.slice(0, 12)}</span>
-            <span className="chip">{env.branch}</span>
-            {port ? <span className="chip">port {port}</span> : null}
-            <span className="chip">active {formatDelta(env.lastActiveAt)}</span>
-            <span className="chip">
-              {env.status === "destroyed"
-                ? `removed ${formatDelta(env.destroyedAt ?? env.updatedAt)}`
-                : `expires ${formatDelta(env.expiresAt)}`}
-            </span>
-            {env.destroyReason ? <span className="chip">reason {env.destroyReason}</span> : null}
+          <p className="state-word">
+            <StateIcon name={view.icon} />
+            {view.word}
           </p>
-        </div>
-        <div className="badges">
-          <span className="state-pill" data-state={pill.state}>
-            {pill.label}
-          </span>
-        </div>
-      </header>
-      {note ? <p className="explainer">{note}</p> : null}
-      {path && env.url ? (
-        <p className="url">
-          <a href={env.url}>{path}</a>
-          <button type="button" className="secondary" onClick={onCopy}>
-            {copied ? "Copied" : "Copy"}
-          </button>
-        </p>
-      ) : null}
-      {env.error ? <p className="error">{env.error}</p> : null}
-      {comment && !comment.startsWith("Preview ready:") ? <p className="comment">{comment}</p> : null}
-      {actionable ? (
-        <div className="row-actions">
-          {env.status === "ready" ? (
-            <button type="button" className="secondary" disabled={busy} onClick={onSleep}>
-              Sleep now
-            </button>
+          <p className="explainer">{note}</p>
+          {env.status === "ready" && env.sleep === "awake" ? (
+            <div className="sleep-meter" aria-hidden="true">
+              <span style={{ width: `${sleepSeconds > 0 ? (remain / sleepSeconds) * 100 : 0}%` }} />
+            </div>
           ) : null}
-          <button type="button" className="secondary" disabled={busy} onClick={onDestroy}>
-            Destroy
-          </button>
         </div>
-      ) : null}
+        {demo ? <span className="chip demo-chip">Demo</span> : null}
+      </header>
+      <div className="card-body">
+        <h3>
+          {env.repository}
+          <span>#{env.prNumber}</span>
+        </h3>
+        <p className="meta">
+          <span className="chip">{env.branch}</span>
+          <span className="chip mono">{env.sha.slice(0, 8)}</span>
+          <span className="chip">Last visit {formatDelta(env.lastActiveAt)}</span>
+          {demo ? (
+            <span className="chip">Always on</span>
+          ) : (
+            <span className="chip">Removed {formatDelta(env.expiresAt)}</span>
+          )}
+        </p>
+        {path && env.url ? (
+          <p className="url">
+            <a href={env.url}>{path}</a>
+            <button type="button" className="secondary" onClick={onCopy}>
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </p>
+        ) : null}
+        {env.status === "failed" && env.error ? <pre className="fail-box">{env.error}</pre> : null}
+      </div>
+      <footer className="card-foot">
+        {showOpen ? (
+          openDisabled ? (
+            <button type="button" className="open-preview" disabled>
+              Open preview
+            </button>
+          ) : (
+            <a className="open-preview" href={env.url ?? undefined}>
+              Open preview
+            </a>
+          )
+        ) : (
+          <span />
+        )}
+        {canWrite ? (
+          <div className="row-actions">
+            {env.status === "ready" && env.sleep === "awake" ? (
+              <button type="button" className="secondary" disabled={busy} onClick={onSleep}>
+                Sleep now
+              </button>
+            ) : null}
+            {env.status !== "destroying" ? (
+              <button type="button" className="destroy" disabled={busy} onClick={onDestroy}>
+                Destroy
+              </button>
+            ) : null}
+          </div>
+        ) : (
+          <p className="need-admin">Admin token needed to change this</p>
+        )}
+      </footer>
     </article>
   );
 }
 
-function pillFor(env: Environment) {
-  if (env.status === "provisioning") return { label: "Provisioning", state: "provisioning" };
-  if (env.status === "updating") return { label: "Updating", state: "updating" };
-  if (env.status === "destroying") return { label: "Destroying", state: "destroying" };
-  if (env.status === "failed") return { label: "Failed", state: "failed" };
-  if (env.status === "destroyed") return { label: "Removed", state: "destroyed" };
-  if (env.sleep === "awake") return { label: "Awake", state: "awake" };
-  if (env.sleep === "waking") return { label: "Waking", state: "waking" };
-  if (env.sleep === "asleep") return { label: "Asleep", state: "asleep" };
-  return { label: "Ready", state: "ready" };
+function cardView(env: Environment) {
+  if (env.status === "provisioning" || env.status === "updating") {
+    return {
+      word: env.status === "updating" ? "Updating" : "Provisioning",
+      tone: env.status,
+      icon: "clock" as const,
+      note: "Setting up the preview for this commit. The link works once it is ready.",
+    };
+  }
+  if (env.status === "destroying") {
+    return { word: "Destroying", tone: "destroying", icon: "clock" as const, note: "Removing this preview." };
+  }
+  if (env.status === "failed") {
+    return {
+      word: "Failed",
+      tone: "failed",
+      icon: "alert" as const,
+      note: "The preview did not start. Destroy it, then push a new commit.",
+    };
+  }
+  if (env.sleep === "asleep") {
+    return { word: "Asleep", tone: "asleep", icon: "moon" as const, note: "App stopped. Wakes on the next visit." };
+  }
+  if (env.sleep === "waking") {
+    return { word: "Waking", tone: "waking", icon: "clock" as const, note: "Starting up…" };
+  }
+  return { word: "Awake", tone: "awake", icon: "sun" as const, note: "" };
 }
 
-function explainer(env: Environment, sleepSeconds: number) {
-  if (env.status !== "ready") return null;
-  if (env.sleep === "awake") return `Sleeps after ${sleepSeconds}s without visits.`;
-  if (env.sleep === "asleep") return "Using no memory. Wakes on the next visit.";
-  if (env.sleep === "waking") return "Starting up…";
-  return null;
+function secondsUntilSleep(env: Environment, sleepSeconds: number, now: number) {
+  const elapsed = Math.floor((now - Date.parse(env.lastActiveAt)) / 1000);
+  if (!Number.isFinite(elapsed)) return sleepSeconds;
+  return Math.max(0, sleepSeconds - elapsed);
+}
+
+function StateIcon({ name }: { name: "moon" | "sun" | "clock" | "alert" }) {
+  const props = {
+    width: 18,
+    height: 18,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true as const,
+  };
+  if (name === "moon") {
+    return (
+      <svg {...props}>
+        <path d="M21 14.5A8.5 8.5 0 1 1 9.5 3a7 7 0 0 0 11.5 11.5z" />
+      </svg>
+    );
+  }
+  if (name === "sun") {
+    return (
+      <svg {...props}>
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+      </svg>
+    );
+  }
+  if (name === "clock") {
+    return (
+      <svg {...props}>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v6l4 2" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...props}>
+      <path d="M12 3 2 21h20L12 3z" />
+    </svg>
+  );
 }
 
 function previewPath(url: string) {
@@ -198,7 +296,9 @@ export function Dashboard() {
   const [adminToken, setAdminToken] = useState("");
   const [tokenDraft, setTokenDraft] = useState("");
   const [adminOpen, setAdminOpen] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
   const canWrite = adminToken.length > 0;
+  const anyAwake = overview?.environments.some((env) => env.status === "ready" && env.sleep === "awake") ?? false;
 
   useEffect(() => {
     setAdminToken(readStoredToken());
@@ -268,6 +368,14 @@ export function Dashboard() {
       window.clearTimeout(timer);
     };
   }, [reload, overview?.summary.live, overview?.environments.map((env) => `${env.id}:${env.status}`).join("|")]);
+
+  useEffect(() => {
+    if (!anyAwake) return;
+    const update = () => setNow(Date.now());
+    update();
+    const tick = window.setInterval(update, 1000);
+    return () => window.clearInterval(tick);
+  }, [anyAwake]);
 
   async function send(
     action: "opened" | "synchronize" | "closed" | "reopened",
@@ -512,10 +620,11 @@ export function Dashboard() {
               <EnvironmentCard
                 key={env.id}
                 env={env}
-                busy={busy || !canWrite}
+                busy={busy}
+                canWrite={canWrite}
                 copied={copiedId === env.id}
-                port={overview?.deployments.find((item) => item.deploymentId === env.deploymentId)?.port}
                 sleepSeconds={config?.sleepSeconds ?? 20}
+                now={now}
                 demo={config?.demo === `${env.repository}#${env.prNumber}`}
                 onCopy={() => void copyUrl(env.id, env.url ?? "")}
                 onSleep={() => void act(env.id, "sleep")}
@@ -570,10 +679,11 @@ export function Dashboard() {
                 <EnvironmentCard
                   key={env.id}
                   env={env}
-                  busy={busy || !canWrite}
+                  busy={busy}
+                  canWrite={canWrite}
                   copied={copiedId === env.id}
-                  port={overview?.deployments.find((item) => item.deploymentId === env.deploymentId)?.port}
                   sleepSeconds={config?.sleepSeconds ?? 20}
+                  now={now}
                   demo={config?.demo === `${env.repository}#${env.prNumber}`}
                   onCopy={() => void copyUrl(env.id, env.url ?? "")}
                   onSleep={() => void act(env.id, "sleep")}

@@ -36,7 +36,7 @@ Copy `.env.example` to `.env.local`. `.env.local` stays on this machine.
 | `GITHUB_WEBHOOK_SECRET` | Required in production. In development, an empty value accepts unsigned deliveries. |
 | `GITHUB_TOKEN` | Optional. When set, preview comments are also posted on the pull request. |
 | `MAYFLY_ADMIN_TOKEN` | Required for every action that changes things. Send it as `Authorization: Bearer <token>` or `x-mayfly-admin: <token>`, or paste it into the board's **Admin** field. When empty, those actions are always refused with 401. Generate one with `openssl rand -hex 32`. |
-| `DEMO_PREVIEW` | Optional. Keep one preview alive for visitors, for example `acme/web#1`. Empty turns it off. The branch is `demo` and the commit is `d3m0d3m0`. It is not deleted when its time limit passes. |
+| `DEMO_PREVIEW` | Optional. Keep one preview alive for visitors. Quote it, because `#` starts a comment: `DEMO_PREVIEW="acme/web#1"`. Empty turns it off. The branch is `demo` and the commit is `d3m0d3m0`. It is not deleted when its time limit passes, and the card does not show an expiry. |
 
 ## Deploy temporarily
 
