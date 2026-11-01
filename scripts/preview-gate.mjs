@@ -180,29 +180,43 @@ const wakePage = `<!doctype html>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Waking up this preview</title>
     <style>
-      body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: system-ui, sans-serif; background: #f6f6f4; color: #1d1d1b; }
-      main { text-align: center; padding: 2rem; }
-      h1 { font-size: 1.5rem; margin: 0 0 0.5rem; }
-      .meta { color: #55554f; margin: 0.25rem 0; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #efece4; color: #1c1915; font-family: "Segoe UI", system-ui, sans-serif; }
+      .card { width: min(36rem, calc(100% - 2rem)); overflow: hidden; border: 1px solid #ddd6c8; border-radius: 14px; background: #f7f5ef; }
+      .band { padding: 0.9rem 1.1rem; background: #8a5a12; color: #fff; }
+      .band.failed { background: #8d2e2e; }
+      .word { margin: 0; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.06em; }
+      h1 { margin: 0.2rem 0 0; font-size: 1.15rem; font-weight: 600; }
+      .body { padding: 1.15rem 1.15rem 1.3rem; }
+      .meta { margin: 0; color: #6f685e; }
       .sha { font-family: ui-monospace, monospace; }
-      .spinner { width: 28px; height: 28px; margin: 1.25rem auto; border: 3px solid #d4d4cf; border-top-color: #1d1d1b; border-radius: 50%; animation: spin 0.9s linear infinite; }
-      a { color: inherit; }
+      .spinner { width: 28px; height: 28px; margin: 1rem 0; border: 3px solid #ddd6c8; border-top-color: #8a5a12; border-radius: 50%; animation: spin 0.9s linear infinite; }
+      a { color: #1c1915; }
       [hidden] { display: none; }
       @keyframes spin { to { transform: rotate(360deg); } }
     </style>
   </head>
   <body>
-    <main>
+    <main class="card">
       <div id="waking">
-        <h1>Waking up this preview</h1>
-        <p class="meta">${wakeLabel} <span class="sha">${wakeSha}</span></p>
-        <div class="spinner" aria-hidden="true"></div>
-        <p class="meta" role="status"><span id="elapsed">0</span>s</p>
+        <header class="band">
+          <p class="word">WAKING</p>
+          <h1>Waking up this preview</h1>
+        </header>
+        <div class="body">
+          <p class="meta">${wakeLabel} <span class="sha">${wakeSha}</span></p>
+          <div class="spinner" aria-hidden="true"></div>
+          <p class="meta" role="status"><span id="elapsed">0</span>s</p>
+        </div>
       </div>
       <div id="failed" hidden>
-        <h1>Couldn't wake this preview</h1>
-        <p class="meta">${wakeLabel} <span class="sha">${wakeSha}</span></p>
-        <p><a id="retry" href="">Retry</a></p>
+        <header class="band failed">
+          <p class="word">FAILED</p>
+          <h1>Couldn't wake this preview</h1>
+        </header>
+        <div class="body">
+          <p class="meta">${wakeLabel} <span class="sha">${wakeSha}</span></p>
+          <p><a id="retry" href="">Retry</a></p>
+        </div>
       </div>
     </main>
     <script>
