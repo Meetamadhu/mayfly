@@ -83,7 +83,7 @@ function EnvironmentCard({
         </p>
         {path && env.url ? (
           <p className="url">
-            <a href={env.url}>{path}</a>
+            <a href={path}>{path}</a>
             <button type="button" className="secondary" onClick={onCopy}>
               {copied ? "Copied" : "Copy"}
             </button>
@@ -98,7 +98,7 @@ function EnvironmentCard({
               Open preview
             </button>
           ) : (
-            <a className="open-preview" href={env.url ?? undefined}>
+            <a className="open-preview" href={path ?? undefined}>
               Open preview
             </a>
           )
@@ -303,7 +303,8 @@ export function Dashboard() {
 
   async function copyUrl(id: string, url: string) {
     try {
-      await navigator.clipboard.writeText(url);
+      const share = url.startsWith("/") ? `${window.location.origin}${url}` : url;
+      await navigator.clipboard.writeText(share);
       setCopiedId(id);
       window.setTimeout(() => setCopiedId((currentId) => (currentId === id ? null : currentId)), 1500);
     } catch {
@@ -330,21 +331,7 @@ export function Dashboard() {
             <h1>Mayfly</h1>
             <p className="subtitle">Ephemeral environments</p>
           </div>
-          <p className="lede">
-            Each pull request gets a preview. It sleeps when nobody&apos;s using it, wakes on the next visit, and is
-            deleted when the PR closes or after its lifetime.
-          </p>
         </div>
-        {config ? (
-          <div className="pills">
-            <span className="pill">
-              {config.webhookVerification === "signed" ? "Signed webhooks" : "Signatures open"}
-            </span>
-            <span className="pill">
-              {config.deployer === "fake" ? "Recorded previews" : `Sleeps after ${config.sleepSeconds}s`}
-            </span>
-          </div>
-        ) : null}
         <div className="mast-actions">
           <div className="theme-toggle" role="group" aria-label="Color theme">
             <button type="button" aria-pressed={theme === "light"} onClick={() => chooseTheme("light")}>
@@ -420,7 +407,7 @@ export function Dashboard() {
                 sleepSeconds={config?.sleepSeconds ?? 20}
                 now={now}
                 demo={config?.demo === `${env.repository}#${env.prNumber}`}
-                onCopy={() => void copyUrl(env.id, env.url ?? "")}
+                onCopy={() => void copyUrl(env.id, previewPath(env.url ?? ""))}
               />
             ))}
           </div>
@@ -444,7 +431,7 @@ export function Dashboard() {
                   </p>
                 </div>
                 {config?.deployer === "fake" ? null : (
-                  <a className="open-link" href={deployment.url} target="_blank" rel="noreferrer">
+                  <a className="open-link" href={previewPath(deployment.url)}>
                     Open
                   </a>
                 )}
@@ -475,7 +462,7 @@ export function Dashboard() {
                   sleepSeconds={config?.sleepSeconds ?? 20}
                   now={now}
                   demo={config?.demo === `${env.repository}#${env.prNumber}`}
-                  onCopy={() => void copyUrl(env.id, env.url ?? "")}
+                  onCopy={() => void copyUrl(env.id, previewPath(env.url ?? ""))}
                 />
               ))}
             </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { AdminHeader } from "@/components/admin-header";
 
 export default function AdminLoginPage() {
   const [token, setToken] = useState("");
@@ -30,7 +31,8 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <main className="shell">
+    <main className="shell admin-panel">
+      <AdminHeader />
       <section className="panel admin" aria-label="Admin sign in">
         <h1>Admin</h1>
         <form className="admin-row" onSubmit={(event) => void onSubmit(event)}>

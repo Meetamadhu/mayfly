@@ -1,8 +1,5 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import { AdminPanel } from "@/components/admin-panel";
-import { ADMIN_COOKIE, sessionIsValid } from "@/lib/admin";
+import { AdminScreen } from "./screen";
 
 export const metadata: Metadata = {
   title: "Admin · Mayfly",
@@ -11,10 +8,6 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminPage() {
-  const jar = await cookies();
-  const value = jar.get(ADMIN_COOKIE)?.value ?? "";
-  const token = (process.env["MAYFLY_ADMIN_TOKEN"] ?? "").trim();
-  if (!token || !sessionIsValid(value, token)) redirect("/admin/login");
-  return <AdminPanel />;
+export default function AdminPage() {
+  return <AdminScreen />;
 }

@@ -1,12 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { AdminHeader } from "@/components/admin-header";
 import type { Environment, EnvironmentStatus, Overview } from "@/lib/types";
 
 const TRANSITIONAL = new Set<EnvironmentStatus>(["provisioning", "updating", "destroying"]);
 const LIVE = new Set<EnvironmentStatus>(["provisioning", "ready", "updating", "destroying"]);
 const FAST_POLL_MS = 500;
 const LIVE_POLL_MS = 5000;
+
+function previewPath(url: string) {
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return url;
+  }
+}
 
 function randomSha() {
   const bytes = new Uint8Array(8);
@@ -98,22 +107,7 @@ export function AdminPanel() {
   const [branch, setBranch] = useState("feat/preview-lifetime");
   const [sha, setSha] = useState("a1b2c3d4e5f67890");
   const [ttlMinutes, setTtlMinutes] = useState("480");
-  const [theme, setTheme] = useState<"light" | "dark">("light");
   const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    setTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light");
-  }, []);
-
-  function chooseTheme(next: "light" | "dark") {
-    document.documentElement.dataset.theme = next;
-    try {
-      localStorage.setItem("mayfly-theme", next);
-    } catch {
-      // Storage can be blocked. The choice still applies to this page.
-    }
-    setTheme(next);
-  }
 
   const reload = useCallback(async () => {
     const response = await fetch("/api/environments", { cache: "no-store", credentials: "include" });
@@ -259,31 +253,7 @@ export function AdminPanel() {
 
   return (
     <main className="shell admin-panel">
-      <header className="mast">
-        <div className="mast-copy">
-          <div className="mast-title">
-            <h1>Admin</h1>
-            <p className="subtitle">Mayfly</p>
-          </div>
-          <p className="lede">Open, sleep, and remove previews. Visitors stay on the board.</p>
-        </div>
-        <div className="mast-actions">
-          <div className="theme-toggle" role="group" aria-label="Color theme">
-            <button type="button" aria-pressed={theme === "light"} onClick={() => chooseTheme("light")}>
-              Light
-            </button>
-            <button type="button" aria-pressed={theme === "dark"} onClick={() => chooseTheme("dark")}>
-              Dark
-            </button>
-          </div>
-          <a className="admin-link" href="/">
-            Board
-          </a>
-          <button type="button" className="secondary" onClick={() => void signOut()}>
-            Sign out
-          </button>
-        </div>
-      </header>
+      <AdminHeader onSignOut={() => void signOut()} />
 
       <section className="panel" aria-label="Previews">
         <div className="ledger-head">
@@ -328,7 +298,7 @@ export function AdminPanel() {
                       <td data-label="Actions">
                         <div className="row-actions">
                           {env.url ? (
-                            <a className="open-preview" href={env.url}>
+                            <a className="open-preview" href={previewPath(env.url)}>
                               Open
                             </a>
                           ) : (
