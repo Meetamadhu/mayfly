@@ -33,7 +33,20 @@ const page = `<!doctype html>
       .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.75rem 0 0; }
       .chip { border-radius: 999px; background: #e7e1d4; padding: 0.2rem 0.55rem; color: #1c1915; font-size: 0.84rem; }
       .mono { font-family: ui-monospace, monospace; }
+      .back { display: inline-flex; align-items: center; min-height: 44px; margin-top: 1rem; padding: 0 0.9rem; border-radius: 6px; background: #1c1915; color: #f7f5ef; font-weight: 600; text-decoration: none; }
+      html[data-theme="dark"] body { background: #141311; color: #f6f3ec; }
+      html[data-theme="dark"] .card { background: #221f1a; border-color: #3d362e; }
+      html[data-theme="dark"] h1 span { color: #c9c0b4; }
+      html[data-theme="dark"] .chip { background: #2c2822; color: #f6f3ec; }
+      html[data-theme="dark"] a.back { background: #f6f3ec; color: #141311; }
     </style>
+    <script>
+      try {
+        var theme = localStorage.getItem("mayfly-theme");
+        if (theme !== "light" && theme !== "dark") theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        document.documentElement.dataset.theme = theme;
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <main class="card">
@@ -53,6 +66,7 @@ const page = `<!doctype html>
           <span class="chip">${escapeHtml(branch)}</span>
           <span class="chip mono">${escapeHtml(sha)}</span>
         </p>
+        <a class="back" href="/">Back</a>
       </div>
     </main>
   </body>

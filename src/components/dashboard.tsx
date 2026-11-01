@@ -38,7 +38,7 @@ function EnvironmentCard({
         <span className="chip removed-pill">Removed</span>
         <strong>
           {env.repository}
-          <span>#{env.prNumber}</span>
+          <span> #{env.prNumber}</span>
         </strong>
         <span>
           {reason} · removed {formatDelta(env.destroyedAt ?? env.updatedAt)}
@@ -73,11 +73,15 @@ function EnvironmentCard({
       <div className="card-body">
         <h3>
           {env.repository}
-          <span>#{env.prNumber}</span>
+          <span> #{env.prNumber}</span>
         </h3>
         <p className="meta">
           <span className="chip">{env.branch}</span>
-          <span className="chip mono">{env.sha.slice(0, 8)}</span>
+          {env.sha.startsWith("d3m0") ? (
+            <span className="chip">demo build</span>
+          ) : (
+            <span className="chip mono">{env.sha.slice(0, 8)}</span>
+          )}
           <span className="chip">Last visit {formatDelta(env.lastActiveAt)}</span>
           {demo ? (
             <span className="chip">Always on</span>
@@ -296,13 +300,25 @@ export function Dashboard() {
   const [adminToken, setAdminToken] = useState("");
   const [tokenDraft, setTokenDraft] = useState("");
   const [adminOpen, setAdminOpen] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
   const [now, setNow] = useState(() => Date.now());
+  const [polledAt, setPolledAt] = useState<number | null>(null);
   const canWrite = adminToken.length > 0;
-  const anyAwake = overview?.environments.some((env) => env.status === "ready" && env.sleep === "awake") ?? false;
 
   useEffect(() => {
     setAdminToken(readStoredToken());
+    setTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light");
   }, []);
+
+  function chooseTheme(next: "light" | "dark") {
+    document.documentElement.dataset.theme = next;
+    try {
+      localStorage.setItem("mayfly-theme", next);
+    } catch {
+      // Storage can be blocked. The choice still applies to this page.
+    }
+    setTheme(next);
+  }
 
   function applyToken() {
     const token = tokenDraft.trim();
@@ -336,6 +352,7 @@ export function Dashboard() {
     if (!response.ok) throw new Error(body.error || "Could not load environments.");
     setOverview(body);
     setLoadError(null);
+    setPolledAt(Date.now());
     return body;
   }, []);
 
@@ -370,12 +387,9 @@ export function Dashboard() {
   }, [reload, overview?.summary.live, overview?.environments.map((env) => `${env.id}:${env.status}`).join("|")]);
 
   useEffect(() => {
-    if (!anyAwake) return;
-    const update = () => setNow(Date.now());
-    update();
-    const tick = window.setInterval(update, 1000);
+    const tick = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(tick);
-  }, [anyAwake]);
+  }, []);
 
   async function send(
     action: "opened" | "synchronize" | "closed" | "reopened",
@@ -512,22 +526,32 @@ export function Dashboard() {
         {config ? (
           <div className="pills">
             <span className="pill">
-              {config.webhookVerification === "signed" ? "Signatures required" : "Signatures open"}
+              {config.webhookVerification === "signed" ? "Signed webhooks" : "Signatures open"}
             </span>
             <span className="pill">
               {config.deployer === "fake" ? "Recorded previews" : `Sleeps after ${config.sleepSeconds}s`}
             </span>
           </div>
         ) : null}
-        <button
-          type="button"
-          className="admin-toggle"
-          data-on={canWrite ? "true" : "false"}
-          aria-pressed={adminOpen}
-          onClick={() => setAdminOpen((open) => !open)}
-        >
-          {canWrite ? "Admin: on" : "Admin"}
-        </button>
+        <div className="mast-actions">
+          <div className="theme-toggle" role="group" aria-label="Color theme">
+            <button type="button" aria-pressed={theme === "light"} onClick={() => chooseTheme("light")}>
+              Light
+            </button>
+            <button type="button" aria-pressed={theme === "dark"} onClick={() => chooseTheme("dark")}>
+              Dark
+            </button>
+          </div>
+          <button
+            type="button"
+            className="admin-toggle"
+            data-on={canWrite ? "true" : "false"}
+            aria-pressed={adminOpen}
+            onClick={() => setAdminOpen((open) => !open)}
+          >
+            {canWrite ? "Admin: on" : "Admin"}
+          </button>
+        </div>
       </header>
       {adminOpen ? (
         <section className="panel admin" aria-label="Admin access">
@@ -596,6 +620,9 @@ export function Dashboard() {
           <dd>{config ? formatLifetime(config.ttlHours) : "–"}</dd>
         </div>
       </dl>
+      {polledAt != null ? (
+        <p className="updated">Updated {Math.max(0, Math.floor((now - polledAt) / 1000))} s ago</p>
+      ) : null}
 
       <div className="workspace">
         <section className="live-column">
@@ -604,9 +631,11 @@ export function Dashboard() {
               <h2>Live</h2>
               <p className="help">Previews that are still running.</p>
             </div>
-            <button type="button" className="secondary" disabled={busy || !canWrite} onClick={() => void runReaper()}>
-              Run reaper
-            </button>
+            {canWrite ? (
+              <button type="button" className="secondary" disabled={busy} onClick={() => void runReaper()}>
+                Run reaper
+              </button>
+            ) : null}
           </div>
 
           {loadError ? <p className="error" role="alert">{loadError}</p> : null}
@@ -661,7 +690,7 @@ export function Dashboard() {
           </div>
           </details>
 
-          {overview ? (
+          {overview && removed.length > 0 ? (
             <button
               type="button"
               className="history-toggle secondary"
@@ -672,7 +701,7 @@ export function Dashboard() {
               <span>{removed.length}</span>
             </button>
           ) : null}
-          {showRemoved ? (
+          {showRemoved && removed.length > 0 ? (
             <div className="stack">
               {removed.length === 0 ? <p className="empty">No removed previews.</p> : null}
               {removed.map((env) => (
@@ -696,6 +725,7 @@ export function Dashboard() {
 
         <div className="sim-column">
           {!canWrite ? <p className="readonly">Read-only. Changes need the admin token.</p> : null}
+        {canWrite ? (
         <details className="panel simulator" open>
           <summary>Simulate a pull request</summary>
           <p className="help">
@@ -778,6 +808,16 @@ export function Dashboard() {
           ) : null}
           {error ? <p className="error" role="alert">{error}</p> : null}
         </details>
+        ) : (
+          <section className="panel try-it">
+            <h2>Try it</h2>
+            <ol>
+              <li>Open the Demo preview.</li>
+              <li>You&apos;ll see &apos;Waking up&apos;, then the page.</li>
+              <li>Come back: it shows Awake, then Asleep after {config?.sleepSeconds ?? 20} s.</li>
+            </ol>
+          </section>
+        )}
         </div>
       </div>
 
