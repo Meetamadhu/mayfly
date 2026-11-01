@@ -434,11 +434,19 @@ button.secondary {
 
 .env {
   padding: 0;
-  border-left: 0;
+  border: 2px solid var(--line);
   overflow: hidden;
   min-width: 0;
   max-width: 100%;
 }
+
+.env:has(.state-band[data-state="awake"]) { border-color: var(--awake); }
+.env:has(.state-band[data-state="asleep"]) { border-color: var(--asleep); }
+.env:has(.state-band[data-state="waking"]),
+.env:has(.state-band[data-state="provisioning"]),
+.env:has(.state-band[data-state="updating"]),
+.env:has(.state-band[data-state="destroying"]) { border-color: var(--work); }
+.env:has(.state-band[data-state="failed"]) { border-color: var(--failed); }
 
 .env.featured { padding: 0; box-shadow: none; }
 

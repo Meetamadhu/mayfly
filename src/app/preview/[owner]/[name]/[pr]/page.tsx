@@ -49,7 +49,7 @@ export default async function PreviewPage({ params }: RouteContext) {
         </p>
       )}
       <p>
-        <Link href="/">Back to the board</Link>
+        <Link href="/board">Back to the board</Link>
       </p>
     </main>
   );
