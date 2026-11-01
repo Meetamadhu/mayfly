@@ -191,9 +191,23 @@ const wakePage = `<!doctype html>
       .sha { font-family: ui-monospace, monospace; }
       .spinner { width: 28px; height: 28px; margin: 1rem 0; border: 3px solid #ddd6c8; border-top-color: #8a5a12; border-radius: 50%; animation: spin 0.9s linear infinite; }
       a { color: #1c1915; }
+      a.back { display: inline-flex; align-items: center; min-height: 44px; margin-top: 1rem; padding: 0 0.9rem; border-radius: 6px; background: #1c1915; color: #f7f5ef; font-weight: 600; text-decoration: none; }
+      html[data-theme="dark"] body { background: #141311; color: #f6f3ec; }
+      html[data-theme="dark"] .card { background: #221f1a; border-color: #3d362e; }
+      html[data-theme="dark"] .meta { color: #c9c0b4; }
+      html[data-theme="dark"] a { color: #f6f3ec; }
+      html[data-theme="dark"] a.back { background: #f6f3ec; color: #141311; }
+      html[data-theme="dark"] .spinner { border-color: #3d362e; border-top-color: #f0c27a; }
       [hidden] { display: none; }
       @keyframes spin { to { transform: rotate(360deg); } }
     </style>
+    <script>
+      try {
+        var theme = localStorage.getItem("mayfly-theme");
+        if (theme !== "light" && theme !== "dark") theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        document.documentElement.dataset.theme = theme;
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <main class="card">
@@ -206,6 +220,7 @@ const wakePage = `<!doctype html>
           <p class="meta">${wakeLabel} <span class="sha">${wakeSha}</span></p>
           <div class="spinner" aria-hidden="true"></div>
           <p class="meta" role="status"><span id="elapsed">0</span>s</p>
+          <a class="back" href="/">Back</a>
         </div>
       </div>
       <div id="failed" hidden>
@@ -216,6 +231,7 @@ const wakePage = `<!doctype html>
         <div class="body">
           <p class="meta">${wakeLabel} <span class="sha">${wakeSha}</span></p>
           <p><a id="retry" href="">Retry</a></p>
+          <a class="back" href="/">Back</a>
         </div>
       </div>
     </main>
