@@ -19,6 +19,8 @@ export interface OrchestratorConfig {
 function previewBase() {
   const configured = process.env.PREVIEW_BASE_URL?.replace(/\/$/, "");
   if (configured) return configured;
+  const render = process.env.RENDER_EXTERNAL_URL?.replace(/\/$/, "");
+  if (render) return render;
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
   return "http://localhost:3000";
 }

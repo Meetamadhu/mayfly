@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: mayfly
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start -- -H 0.0.0.0
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: PREVIEW_TTL_HOURS
+        value: "168"
+      - key: PREVIEW_SLEEP_SECONDS
+        value: "20"
+      - key: MAX_CONCURRENT_ENVIRONMENTS
+        value: "3"
+      - key: ALLOW_SIMULATOR
+        value: "true"
+      - key: DEMO_PREVIEW
+        value: "meetamadhu/mayfly#1"
+      - key: MAYFLY_ADMIN_TOKEN
+        sync: false
+      - key: GITHUB_WEBHOOK_SECRET
+        sync: false
