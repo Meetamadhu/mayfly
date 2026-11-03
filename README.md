@@ -32,7 +32,7 @@ Open port 3000 and go to `/board`. The first build takes a few minutes. Preview 
 
 ### Build real pull requests
 
-With `PREVIEW_RUNTIME=docker`, set `PREVIEW_REPOS` (comma-separated `owner/name`) in `.env.local`. For a pull request on a listed repository, Mayfly clones it, checks out the exact commit, builds the repo-root `Dockerfile` as `mayfly-pr-<owner>-<name>-<pr>:<sha8>` (10 minute limit, last 20 log lines in the error), and runs that image in the same locked-down container. The app must listen on `$PORT` (3000) and run as user `node`. A new commit rebuilds and swaps the container; sleep and wake reuse the image; closing the pull request removes the container and the image. Other repositories fail with "Repository not allowed", a missing `Dockerfile` fails with "No Dockerfile at repo root", and fork pull requests are refused. `DEMO_PREVIEW` keeps the placeholder app. Process mode is unchanged.
+With `PREVIEW_RUNTIME=docker`, set `PREVIEW_REPOS` (comma-separated `owner/name`) in `.env.local`. For a pull request on a listed repository, Mayfly clones it, checks out the exact commit, builds the repo-root `Dockerfile` as `mayfly-pr-<owner>-<name>-<pr>:<sha8>` (10 minute limit, last 20 log lines in the error), and runs that image in the same locked-down container. The app must listen on `$PORT` (3000) and work as the unprivileged user `1000:1000` with a read-only filesystem where only `/tmp` is writable, so images on any base (Node, Python, nginx, Go) run as long as they do not need root. A new commit rebuilds and swaps the container; sleep and wake reuse the image; closing the pull request removes the container and the image. Other repositories fail with "Repository not allowed", a missing `Dockerfile` fails with "No Dockerfile at repo root", and fork pull requests are refused. `DEMO_PREVIEW` keeps the placeholder app. Process mode is unchanged.
 
 ### Connect GitHub webhooks
 
@@ -59,7 +59,7 @@ Copy `.env.example` to `.env.local`. `.env.local` stays on this machine.
 | `REAPER_INTERVAL_MS` | How often the in-process reaper checks for expired and stuck previews. Example: `60000`. |
 | `DEPLOYER` | `process` starts one preview per pull request. `fake` only writes a local record. |
 | `PREVIEW_RUNTIME` | `docker` runs the preview app in a container. `process` runs it as plain Node. This machine uses Docker. Render sets `process`. |
-| `PREVIEW_MEMORY`, `PREVIEW_CPUS` | Container limits for docker previews. Defaults `256m` (no swap) and `0.5` CPU, plus 100 processes, user `node`, all capabilities dropped, no new privileges, read-only filesystem, and a 16 MB `/tmp`. |
+| `PREVIEW_MEMORY`, `PREVIEW_CPUS` | Container limits for docker previews. Defaults `256m` (no swap) and `0.5` CPU, plus 100 processes, user `1000:1000`, all capabilities dropped, no new privileges, read-only filesystem, and a 16 MB `/tmp`. |
 | `PREVIEW_FAKE_DELAY_MS` | Artificial delay for the fake deployer. Example: `700`. |
 | `PREVIEW_BASE_URL` | Origin used in preview links. Example: `http://localhost:3000`. |
 | `GITHUB_WEBHOOK_SECRET` | Required in production. In development, an empty value accepts unsigned deliveries. |

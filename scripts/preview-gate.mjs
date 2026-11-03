@@ -173,7 +173,7 @@ function boot() {
               "--pids-limit",
               "100",
               "--user",
-              "node",
+              "1000:1000",
               "--cap-drop",
               "ALL",
               "--security-opt",
