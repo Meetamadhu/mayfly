@@ -1,7 +1,8 @@
 import { execFile, spawn } from "node:child_process";
 import net from "node:net";
 import path from "node:path";
-import { getConfig, previewRuntime } from "./config";
+import { buildImage, imageExists, imageTag, removeImage } from "./builder";
+import { buildsPullRequests, getConfig, previewRuntime, repositoryAllowed } from "./config";
 import { createExclusive, dataDir, readJson, writeJson } from "./store";
 import type { DeploymentRecord } from "./types";
 
@@ -263,13 +264,41 @@ function ensurePreviewImage() {
   return imageReady;
 }
 
+function isDemoRequest(input: DeployRequest) {
+  const demo = getConfig().demo;
+  return Boolean(demo && demo.repository === input.repository.toLowerCase() && demo.prNumber === input.prNumber);
+}
+
+/**
+ * The image a preview runs. Process mode needs none. In Docker mode the demo keeps the placeholder app, and
+ * every other pull request builds its own Dockerfile from an allow-listed repository. This runs before the
+ * deployer lock is taken, so a long build does not block the board.
+ */
+async function prepareImage(input: DeployRequest): Promise<string> {
+  if (previewRuntime() !== "docker") return PREVIEW_IMAGE;
+  if (!buildsPullRequests() || isDemoRequest(input)) {
+    await ensurePreviewImage();
+    return PREVIEW_IMAGE;
+  }
+  if (!repositoryAllowed(input.repository)) throw new Error("Repository not allowed");
+  const tag = imageTag(input.repository, input.prNumber, input.sha);
+  // The tag names the commit, so an image that already exists is this commit's code. Waking never rebuilds it.
+  if (await imageExists(tag)) return tag;
+  return buildImage({ envId: input.envId, repository: input.repository, prNumber: input.prNumber, sha: input.sha });
+}
+
+/** Built images are removed with their preview. The placeholder image is shared and stays. */
+function builtImage(image: string | undefined) {
+  return image && image !== PREVIEW_IMAGE ? image : undefined;
+}
+
 function removeContainer(appPort: number) {
   return new Promise<void>((resolve) => {
     execFile("docker", ["rm", "-f", `mayfly-app-${appPort}`], { windowsHide: true }, () => resolve());
   });
 }
 
-function startPreview(port: number, input: DeployRequest) {
+function startPreview(port: number, input: DeployRequest, image: string) {
   const appPort = port + 1000;
   const docker = previewRuntime() === "docker";
   const child = spawn(process.execPath, [path.join(process.cwd(), "scripts", "preview-gate.mjs")], {
@@ -288,7 +317,7 @@ function startPreview(port: number, input: DeployRequest) {
       PREVIEW_BRANCH: input.branch,
       PREVIEW_ENV_ID: input.envId,
       PREVIEW_RUNTIME: docker ? "docker" : "process",
-      PREVIEW_IMAGE,
+      PREVIEW_IMAGE: image,
       PREVIEW_CONTAINER: `mayfly-app-${appPort}`,
     },
   });
@@ -321,20 +350,26 @@ async function remember(record: DeploymentRecord) {
   await writeJson(deployFile(), file);
 }
 
-async function launch(input: DeployRequest, previous?: DeploymentRecord): Promise<Deployment> {
+async function launch(input: DeployRequest, previous: DeploymentRecord | undefined, image: string): Promise<Deployment> {
   const deploymentId = previous?.deploymentId || input.deploymentId || deploymentIdFor(input.envId);
-  if (previewRuntime() === "docker") await ensurePreviewImage();
+  const docker = previewRuntime() === "docker";
   if (previous?.pid && processAlive(previous.pid)) await killProcess(previous.pid);
-  if (previewRuntime() === "docker" && previous?.port) await removeContainer(previous.port + 1000);
+  if (docker && previous?.port) await removeContainer(previous.port + 1000);
+  // A new commit swaps the container; the old commit's image goes with it.
+  const old = builtImage(previous?.image);
+  if (docker && old && old !== image) await removeImage(old);
   const port = await claimPort(previous?.port);
-  const pid = startPreview(port, input);
+  const pid = startPreview(port, input, image);
   const listenUrl = previewListenUrl(port);
   const url = publicPreviewUrl(input.repository, input.prNumber);
   try {
     await waitUntilListening(listenUrl);
   } catch (error) {
     await killProcess(pid);
-    if (previewRuntime() === "docker") await removeContainer(port + 1000);
+    if (docker) {
+      await removeContainer(port + 1000);
+      if (builtImage(image) && image !== old) await removeImage(image);
+    }
     throw error;
   }
   const now = new Date().toISOString();
@@ -349,53 +384,79 @@ async function launch(input: DeployRequest, previous?: DeploymentRecord): Promis
     updatedAt: now,
     pid,
     port,
+    image: docker ? builtImage(image) : undefined,
   });
   return { deploymentId, url };
 }
 
+/** Stop the gate, remove its container and image, and forget the record. The caller holds the lock. */
+async function removeDeployment(deploymentId: string) {
+  const file = await loadDeployments();
+  const existing = file.deployments.find((item) => item.deploymentId === deploymentId);
+  if (existing?.pid && processAlive(existing.pid)) await killProcess(existing.pid);
+  if (previewRuntime() === "docker" && existing?.port) await removeContainer(existing.port + 1000);
+  const image = builtImage(existing?.image);
+  if (image) await removeImage(image);
+  file.deployments = file.deployments.filter((item) => item.deploymentId !== deploymentId);
+  await writeJson(deployFile(), file);
+}
+
+/** Build or find the image; if that fails, nothing of an earlier version is left running. */
+async function prepareOrTearDown(input: DeployRequest, deploymentId: string) {
+  try {
+    return await prepareImage(input);
+  } catch (error) {
+    await exclusive(() => removeDeployment(deploymentId)).catch(() => {});
+    throw error;
+  }
+}
+
 const processDeployer: Deployer = {
   async provision(input) {
+    const deploymentId = deploymentIdFor(input.envId);
+    const image = await prepareOrTearDown(input, deploymentId);
     return exclusive(async () => {
       const file = await loadDeployments();
-      const deploymentId = deploymentIdFor(input.envId);
       const existing = file.deployments.find((item) => item.deploymentId === deploymentId);
       if (existing?.pid && existing.sha === input.sha && processAlive(existing.pid)) {
         return { deploymentId: existing.deploymentId, url: existing.url };
       }
-      return launch(input, existing ? { ...existing, deploymentId } : { deploymentId } as DeploymentRecord);
+      return launch(input, existing ? { ...existing, deploymentId } : ({ deploymentId } as DeploymentRecord), image);
     });
   },
 
   async update(input) {
+    const deploymentId = input.deploymentId || deploymentIdFor(input.envId);
+    const image = await prepareOrTearDown(input, deploymentId);
     return exclusive(async () => {
       const file = await loadDeployments();
-      const deploymentId = input.deploymentId || deploymentIdFor(input.envId);
       const existing = file.deployments.find((item) => item.deploymentId === deploymentId);
-      return launch(input, existing ?? ({ deploymentId } as DeploymentRecord));
+      return launch(input, existing ?? ({ deploymentId } as DeploymentRecord), image);
     });
   },
 
   async revive(input) {
-    return exclusive(async () => {
+    const deploymentId = input.deploymentId || deploymentIdFor(input.envId);
+    const running = async () => {
       const file = await loadDeployments();
-      const deploymentId = input.deploymentId || deploymentIdFor(input.envId);
       const existing = file.deployments.find((item) => item.deploymentId === deploymentId);
-      if (existing?.pid && processAlive(existing.pid)) {
-        return { deploymentId: existing.deploymentId, url: existing.url };
-      }
-      return launch(input, existing ?? ({ deploymentId } as DeploymentRecord));
+      return existing?.pid && processAlive(existing.pid) ? existing : undefined;
+    };
+    const alive = await exclusive(running);
+    if (alive) return { deploymentId: alive.deploymentId, url: alive.url };
+    // Restarting uses the image that is already built. It is built again only if it was removed.
+    const image = await prepareImage(input);
+    return exclusive(async () => {
+      const again = await running();
+      if (again) return { deploymentId: again.deploymentId, url: again.url };
+      const file = await loadDeployments();
+      const existing = file.deployments.find((item) => item.deploymentId === deploymentId);
+      return launch(input, existing ?? ({ deploymentId } as DeploymentRecord), image);
     });
   },
 
   async destroy(input) {
-    await exclusive(async () => {
-      const file = await loadDeployments();
-      const existing = file.deployments.find((item) => item.deploymentId === input.deploymentId);
-      if (existing?.pid && processAlive(existing.pid)) await killProcess(existing.pid);
-      if (previewRuntime() === "docker" && existing?.port) await removeContainer(existing.port + 1000);
-      file.deployments = file.deployments.filter((item) => item.deploymentId !== input.deploymentId);
-      await writeJson(deployFile(), file);
-    });
+    await exclusive(() => removeDeployment(input.deploymentId));
   },
 
   async list() {

@@ -30,7 +30,7 @@ export function parseGithubWebhook(
     pull_request?: {
       number?: unknown;
       merged?: unknown;
-      head?: { sha?: unknown; ref?: unknown };
+      head?: { sha?: unknown; ref?: unknown; repo?: { full_name?: unknown } | null };
     };
   };
 
@@ -56,6 +56,9 @@ export function parseGithubWebhook(
       sha,
       branch,
       merged: body.pull_request?.merged === true,
+      // GitHub sends no head repo when the fork was deleted. An empty value counts as a fork.
+      headRepository:
+        typeof body.pull_request?.head?.repo?.full_name === "string" ? body.pull_request.head.repo.full_name : "",
     },
   };
 }
