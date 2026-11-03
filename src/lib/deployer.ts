@@ -1,4 +1,5 @@
 import { execFile, spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { buildImage, imageExists, imageTag, removeImage } from "./builder";
@@ -166,6 +167,20 @@ function processAlive(pid: number) {
   }
 }
 
+/**
+ * Whether a saved pid is still the preview gate. After a restart, a pid in the ledger can belong to some other
+ * process, and treating that as the gate would skip restoring the preview, or signal the wrong process.
+ */
+function gateAlive(pid: number) {
+  if (!processAlive(pid)) return false;
+  if (process.platform !== "linux") return true;
+  try {
+    return readFileSync(`/proc/${pid}/cmdline`, "utf8").includes("preview-gate.mjs");
+  } catch {
+    return false;
+  }
+}
+
 /** Signal the gate's process group (negative pid). Falls back to the bare pid if there is no such group. */
 function signalGroup(pid: number, signal: NodeJS.Signals) {
   for (const target of [-pid, pid]) {
@@ -224,7 +239,8 @@ async function claimPort(preferred?: number) {
  * Everything else (GITHUB_TOKEN, GITHUB_WEBHOOK_SECRET, MAYFLY_ADMIN_TOKEN, ...) stays out of previews.
  * On Windows a few system variables are also passed, because Node's networking fails in a child without them.
  */
-const PASS_THROUGH = ["PATH", "NODE_ENV"];
+// DOCKER_HOST is how the gate reaches a Docker socket proxy. It is not an app secret, and apps run in containers.
+const PASS_THROUGH = ["PATH", "NODE_ENV", "DOCKER_HOST"];
 const WINDOWS_PASS_THROUGH = ["SystemRoot", "windir", "TEMP", "TMP", "ComSpec", "PATHEXT"];
 
 function previewBaseEnv(): NodeJS.ProcessEnv {
@@ -245,7 +261,9 @@ const PREVIEW_IMAGE = "mayfly-preview:local";
 
 function run(command: string, args: string[]) {
   return new Promise<void>((resolve, reject) => {
-    execFile(command, args, { windowsHide: true, cwd: process.cwd() }, (error, _stdout, stderr) => {
+    // The classic builder works through a Docker socket proxy; BuildKit does not.
+    const env = { ...process.env, DOCKER_BUILDKIT: "0" };
+    execFile(command, args, { windowsHide: true, cwd: process.cwd(), env }, (error, _stdout, stderr) => {
       if (error) reject(new Error((stderr || error.message).toString().trim()));
       else resolve();
     });
@@ -353,7 +371,7 @@ async function remember(record: DeploymentRecord) {
 async function launch(input: DeployRequest, previous: DeploymentRecord | undefined, image: string): Promise<Deployment> {
   const deploymentId = previous?.deploymentId || input.deploymentId || deploymentIdFor(input.envId);
   const docker = previewRuntime() === "docker";
-  if (previous?.pid && processAlive(previous.pid)) await killProcess(previous.pid);
+  if (previous?.pid && gateAlive(previous.pid)) await killProcess(previous.pid);
   if (docker && previous?.port) await removeContainer(previous.port + 1000);
   // A new commit swaps the container; the old commit's image goes with it.
   const old = builtImage(previous?.image);
@@ -393,7 +411,7 @@ async function launch(input: DeployRequest, previous: DeploymentRecord | undefin
 async function removeDeployment(deploymentId: string) {
   const file = await loadDeployments();
   const existing = file.deployments.find((item) => item.deploymentId === deploymentId);
-  if (existing?.pid && processAlive(existing.pid)) await killProcess(existing.pid);
+  if (existing?.pid && gateAlive(existing.pid)) await killProcess(existing.pid);
   if (previewRuntime() === "docker" && existing?.port) await removeContainer(existing.port + 1000);
   const image = builtImage(existing?.image);
   if (image) await removeImage(image);
@@ -418,7 +436,7 @@ const processDeployer: Deployer = {
     return exclusive(async () => {
       const file = await loadDeployments();
       const existing = file.deployments.find((item) => item.deploymentId === deploymentId);
-      if (existing?.pid && existing.sha === input.sha && processAlive(existing.pid)) {
+      if (existing?.pid && existing.sha === input.sha && gateAlive(existing.pid)) {
         return { deploymentId: existing.deploymentId, url: existing.url };
       }
       return launch(input, existing ? { ...existing, deploymentId } : ({ deploymentId } as DeploymentRecord), image);
@@ -440,7 +458,7 @@ const processDeployer: Deployer = {
     const running = async () => {
       const file = await loadDeployments();
       const existing = file.deployments.find((item) => item.deploymentId === deploymentId);
-      return existing?.pid && processAlive(existing.pid) ? existing : undefined;
+      return existing?.pid && gateAlive(existing.pid) ? existing : undefined;
     };
     const alive = await exclusive(running);
     if (alive) return { deploymentId: alive.deploymentId, url: alive.url };
@@ -464,7 +482,7 @@ const processDeployer: Deployer = {
       const file = await loadDeployments();
       const live: DeploymentRecord[] = [];
       for (const item of file.deployments) {
-        if (item.pid && !processAlive(item.pid)) continue;
+        if (item.pid && !gateAlive(item.pid)) continue;
         live.push(item);
       }
       if (live.length !== file.deployments.length) {

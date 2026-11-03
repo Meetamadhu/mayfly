@@ -34,6 +34,14 @@ Open port 3000 and go to `/board`. The first build takes a few minutes. Preview 
 
 With `PREVIEW_RUNTIME=docker`, set `PREVIEW_REPOS` (comma-separated `owner/name`) in `.env.local`. For a pull request on a listed repository, Mayfly clones it, checks out the exact commit, builds the repo-root `Dockerfile` as `mayfly-pr-<owner>-<name>-<pr>:<sha8>` (10 minute limit, last 20 log lines in the error), and runs that image in the same locked-down container. The app must listen on `$PORT` (3000) and work as the unprivileged user `1000:1000` with a read-only filesystem where only `/tmp` is writable, so images on any base (Node, Python, nginx, Go) run as long as they do not need root. A new commit rebuilds and swaps the container; sleep and wake reuse the image; closing the pull request removes the container and the image. Other repositories fail with "Repository not allowed", a missing `Dockerfile` fails with "No Dockerfile at repo root", and fork pull requests are refused. `DEMO_PREVIEW` keeps the placeholder app. Process mode is unchanged.
 
+### Build limits and the Docker socket proxy
+
+Compose gives Mayfly no Docker socket. Only the `docker-proxy` service holds it, and Mayfly reaches Docker through it (`DOCKER_HOST=tcp://127.0.0.1:2375`, published on loopback only). The proxy allows containers, images and builds, and answers 403 to exec, volumes, networks, swarm, secrets, system, plugins and BuildKit sessions.
+
+Builds use Docker's classic builder, because BuildKit cannot pass through the proxy. Each build step gets `PREVIEW_BUILD_MEMORY` (swap included) and `PREVIEW_BUILD_CPUS`. `PREVIEW_MAX_BUILDS` builds run at once and the rest wait their turn, and the 10 minute limit counts from when a build starts. A clone plus build context over `PREVIEW_MAX_REPO_MB` and an image over `PREVIEW_MAX_IMAGE_MB` fail the preview and leave nothing behind. Dockerfiles that need BuildKit-only features (`RUN --mount`, heredocs) will not build.
+
+**What this does not protect.** The proxy filters by endpoint, not by request body, so it cannot stop a container created with `--privileged` or a bind mount of the host. Build steps still have network access, because they pull base images and packages. Anyone who can run code in Mayfly can still reach the host through Docker. For a public server, run Docker rootless or under Sysbox, or build on a separate host.
+
 ### Connect GitHub webhooks
 
 A webhook creates, updates, and removes previews when pull requests change, with no simulator. GitHub must be able to reach Mayfly, so make port 3000 public (in a Codespace, set the port visibility to Public) and use that address as `PREVIEW_BASE_URL`. Set `GITHUB_WEBHOOK_SECRET` in `.env.local`, then create the hook without printing the secret:

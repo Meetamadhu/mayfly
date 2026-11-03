@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { isBuilding } from "./builder";
 import { buildsPullRequests, getConfig, previewRuntime } from "./config";
 import { getDeployer, previewUrl, publicPreviewUrl, type Deployment } from "./deployer";
 import { publishPullRequestComment } from "./http";
@@ -667,7 +668,8 @@ export async function reap(): Promise<ReapResult> {
     for (const env of state.environments) {
       const age = now - Date.parse(env.updatedAt);
       if (env.status === "provisioning" || env.status === "updating" || env.status === "destroying") {
-        if (age > config.stuckMs) targets.push({ id: env.id, reason: "stuck" });
+        // A build has its own time limit. Waiting for a build slot is not being stuck.
+        if (age > config.stuckMs && !isBuilding(env.id)) targets.push({ id: env.id, reason: "stuck" });
         continue;
       }
       if (env.status !== "ready") continue;

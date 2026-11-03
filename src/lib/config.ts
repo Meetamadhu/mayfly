@@ -73,6 +73,43 @@ export function buildsPullRequests() {
 /** A build may take 10 minutes, so a preview is not stuck before that. */
 export const BUILD_LIMIT_MS = 10 * 60 * 1000;
 
+function limitInteger(name: string, fallback: number, min: number, max: number) {
+  const text = (process.env[name] ?? "").trim();
+  if (!/^\d+$/.test(text)) return fallback;
+  const value = Number(text);
+  return value >= min && value <= max ? value : fallback;
+}
+
+function limitMemory(name: string, fallback: string, minMb: number, maxMb: number) {
+  const match = /^(\d+)([mg])$/.exec((process.env[name] ?? "").trim().toLowerCase());
+  if (!match) return fallback;
+  const megabytes = Number(match[1]) * (match[2] === "g" ? 1024 : 1);
+  return megabytes >= minMb && megabytes <= maxMb ? `${match[1]}${match[2]}` : fallback;
+}
+
+function limitCpus(name: string, fallback: number, min: number, max: number) {
+  const text = (process.env[name] ?? "").trim();
+  if (!/^\d+(\.\d+)?$/.test(text)) return fallback;
+  const value = Number(text);
+  return value >= min && value <= max ? value : fallback;
+}
+
+/** Limits on building pull requests. A bad value falls back to the default. */
+export function buildLimits() {
+  return {
+    /** Builds that run at once. Others wait their turn. */
+    maxBuilds: limitInteger("PREVIEW_MAX_BUILDS", 1, 1, 8),
+    /** Memory (swap included) for each build step, 256m to 4g. */
+    memory: limitMemory("PREVIEW_BUILD_MEMORY", "1g", 256, 4096),
+    /** CPUs for each build step, 0.25 to 4. */
+    cpus: limitCpus("PREVIEW_BUILD_CPUS", 1, 0.25, 4),
+    /** The clone and the build context, in MB. */
+    maxRepoMb: limitInteger("PREVIEW_MAX_REPO_MB", 200, 10, 5000),
+    /** The built image, in MB. */
+    maxImageMb: limitInteger("PREVIEW_MAX_IMAGE_MB", 1024, 50, 10000),
+  };
+}
+
 export function getConfig(): OrchestratorConfig {
   const ttlHours = positiveNumber("PREVIEW_TTL_HOURS", 8) || 8;
   const idleHours = positiveNumber("PREVIEW_IDLE_HOURS", 4) || 4;
