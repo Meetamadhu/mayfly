@@ -1,0 +1,17 @@
+# Linux and GitHub Codespaces. Host networking lets the gate reach preview
+# containers that publish on 127.0.0.1. Render does not use this file.
+services:
+  mayfly:
+    build: .
+    network_mode: host
+    env_file:
+      - path: .env.local
+        required: false
+    environment:
+      PREVIEW_RUNTIME: docker
+      PREVIEW_BASE_URL: ${PREVIEW_BASE_URL:-}
+      CODESPACE_NAME: ${CODESPACE_NAME:-}
+      GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN: ${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-}
+    volumes:
+      - ./data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock

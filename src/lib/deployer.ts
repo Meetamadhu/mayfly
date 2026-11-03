@@ -26,6 +26,8 @@ export interface Deployment {
 export interface Deployer {
   provision(input: DeployRequest): Promise<Deployment>;
   update(input: DeployRequest): Promise<Deployment>;
+  /** Start the preview again when its process is gone. Leave a running one alone. */
+  revive(input: DeployRequest): Promise<Deployment>;
   destroy(input: { deploymentId: string }): Promise<void>;
   list(): Promise<DeploymentRecord[]>;
 }
@@ -87,6 +89,10 @@ const fakeDeployer: Deployer = {
       await writeJson(deployFile(), file);
       return { deploymentId: record.deploymentId, url: record.url };
     });
+  },
+
+  async revive(input) {
+    return this.update(input);
   },
 
   async update(input) {
@@ -363,6 +369,18 @@ const processDeployer: Deployer = {
       const file = await loadDeployments();
       const deploymentId = input.deploymentId || deploymentIdFor(input.envId);
       const existing = file.deployments.find((item) => item.deploymentId === deploymentId);
+      return launch(input, existing ?? ({ deploymentId } as DeploymentRecord));
+    });
+  },
+
+  async revive(input) {
+    return exclusive(async () => {
+      const file = await loadDeployments();
+      const deploymentId = input.deploymentId || deploymentIdFor(input.envId);
+      const existing = file.deployments.find((item) => item.deploymentId === deploymentId);
+      if (existing?.pid && processAlive(existing.pid)) {
+        return { deploymentId: existing.deploymentId, url: existing.url };
+      }
       return launch(input, existing ?? ({ deploymentId } as DeploymentRecord));
     });
   },

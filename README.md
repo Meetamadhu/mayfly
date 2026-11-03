@@ -19,6 +19,17 @@ npm run dev
 
 The same two commands run in PowerShell. The app listens at http://localhost:3000.
 
+## Run with Docker
+
+On Linux or a GitHub Codespace, with Docker running:
+
+```bash
+export PREVIEW_BASE_URL="https://${CODESPACE_NAME}-3000.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}"
+docker compose up -d --build
+```
+
+Open port 3000 and go to `/board`. The first build takes a few minutes. Preview apps still run in their own containers. If this Mayfly container restarts, live previews are started again. `.env.local` stays out of the image. Render does not run this compose file.
+
 Copy `.env.example` to `.env.local`. `.env.local` stays on this machine.
 
 | Key | What it does |
