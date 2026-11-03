@@ -10,6 +10,28 @@ const containerName = process.env.PREVIEW_CONTAINER || `mayfly-app-${appPort}`;
 const image = process.env.PREVIEW_IMAGE || "mayfly-preview:local";
 const envId = process.env.PREVIEW_ENV_ID || "";
 
+const DEFAULT_MEMORY = "256m";
+const DEFAULT_CPUS = "0.5";
+
+/** 128m to 2g, in m or g. Anything else falls back to the default. */
+function containerMemory(value) {
+  const match = /^(\d+)([mg])$/.exec((value ?? "").trim().toLowerCase());
+  if (!match) return DEFAULT_MEMORY;
+  const megabytes = Number(match[1]) * (match[2] === "g" ? 1024 : 1);
+  return megabytes >= 128 && megabytes <= 2048 ? `${match[1]}${match[2]}` : DEFAULT_MEMORY;
+}
+
+/** 0.1 to 4 CPUs. Anything else falls back to the default. */
+function containerCpus(value) {
+  const text = (value ?? "").trim();
+  if (!/^\d+(\.\d+)?$/.test(text)) return DEFAULT_CPUS;
+  const cpus = Number(text);
+  return cpus >= 0.1 && cpus <= 4 ? String(cpus) : DEFAULT_CPUS;
+}
+
+const memory = containerMemory(process.env.PREVIEW_MEMORY);
+const cpus = containerCpus(process.env.PREVIEW_CPUS);
+
 let child = null;
 let lastActive = 0;
 let booting = null;
@@ -142,6 +164,23 @@ function boot() {
               "mayfly.preview=1",
               "--label",
               `mayfly.env=${envId}`,
+              "--memory",
+              memory,
+              "--memory-swap",
+              memory,
+              "--cpus",
+              cpus,
+              "--pids-limit",
+              "100",
+              "--user",
+              "node",
+              "--cap-drop",
+              "ALL",
+              "--security-opt",
+              "no-new-privileges",
+              "--read-only",
+              "--tmpfs",
+              "/tmp:rw,size=16m",
               "-p",
               `127.0.0.1:${appPort}:3000`,
               "-e",

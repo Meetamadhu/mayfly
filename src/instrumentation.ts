@@ -16,10 +16,12 @@ function listenForShutdown() {
   if (marker.__mayflyShutdown) return;
   marker.__mayflyShutdown = true;
   const shutdown = () => {
-    try {
-      removePreviewContainers();
-    } catch (error) {
-      console.error("Could not remove preview containers", error instanceof Error ? error.message : error);
+    if (process.env.PREVIEW_RUNTIME === "docker") {
+      try {
+        removePreviewContainers();
+      } catch (error) {
+        console.error("Could not remove preview containers", error instanceof Error ? error.message : error);
+      }
     }
     process.exit(0);
   };

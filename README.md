@@ -43,6 +43,7 @@ Copy `.env.example` to `.env.local`. `.env.local` stays on this machine.
 | `REAPER_INTERVAL_MS` | How often the in-process reaper checks for expired and stuck previews. Example: `60000`. |
 | `DEPLOYER` | `process` starts one preview per pull request. `fake` only writes a local record. |
 | `PREVIEW_RUNTIME` | `docker` runs the preview app in a container. `process` runs it as plain Node. This machine uses Docker. Render sets `process`. |
+| `PREVIEW_MEMORY`, `PREVIEW_CPUS` | Container limits for docker previews. Defaults `256m` (no swap) and `0.5` CPU, plus 100 processes, user `node`, all capabilities dropped, no new privileges, read-only filesystem, and a 16 MB `/tmp`. |
 | `PREVIEW_FAKE_DELAY_MS` | Artificial delay for the fake deployer. Example: `700`. |
 | `PREVIEW_BASE_URL` | Origin used in preview links. Example: `http://localhost:3000`. |
 | `GITHUB_WEBHOOK_SECRET` | Required in production. In development, an empty value accepts unsigned deliveries. |
