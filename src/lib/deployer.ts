@@ -275,7 +275,7 @@ function startPreview(port: number, input: DeployRequest) {
   const child = spawn(process.execPath, [path.join(process.cwd(), "scripts", "preview-gate.mjs")], {
     detached: true,
     windowsHide: true,
-    stdio: "ignore",
+    stdio: ["ignore", "ignore", "pipe"],
     env: {
       ...previewBaseEnv(),
       PORT: String(port),
@@ -286,11 +286,13 @@ function startPreview(port: number, input: DeployRequest) {
       PREVIEW_PR: String(input.prNumber),
       PREVIEW_SHA: input.sha,
       PREVIEW_BRANCH: input.branch,
+      PREVIEW_ENV_ID: input.envId,
       PREVIEW_RUNTIME: docker ? "docker" : "process",
       PREVIEW_IMAGE,
       PREVIEW_CONTAINER: `mayfly-app-${appPort}`,
     },
   });
+  child.stderr?.on("data", (chunk) => console.error(String(chunk).trim()));
   child.unref();
   if (!child.pid) throw new Error("Preview process did not start.");
   return child.pid;

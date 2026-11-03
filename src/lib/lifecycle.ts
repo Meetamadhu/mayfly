@@ -1,5 +1,6 @@
+import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { getConfig } from "./config";
+import { getConfig, previewRuntime } from "./config";
 import { getDeployer, previewUrl, publicPreviewUrl, type Deployment } from "./deployer";
 import { publishPullRequestComment } from "./http";
 import { exclusive, loadState, saveState } from "./store";
@@ -589,6 +590,30 @@ export async function recordActivity(id: string): Promise<LifecycleResult> {
     await saveState(state);
     return { ok: true, action: "activity", environment: clone(env) };
   });
+}
+
+function docker(args: string[]) {
+  return new Promise<string>((resolve) => {
+    execFile("docker", args, { windowsHide: true, timeout: 4000 }, (error, stdout) => {
+      resolve(error ? "" : String(stdout ?? ""));
+    });
+  });
+}
+
+/** Drop preview containers whose environment is gone. Live ones are started again by restorePreviews. */
+export async function removeOrphanPreviewContainers() {
+  if (previewRuntime() !== "docker") return;
+  const listed = await docker(["ps", "-aq", "--filter", "label=mayfly.preview=1"]);
+  const ids = listed.split(/\s+/).filter(Boolean);
+  if (ids.length === 0) return;
+  const state = await loadState();
+  const live = new Set(state.environments.filter((env) => isLiveStatus(env.status)).map((env) => env.id));
+  const orphans: string[] = [];
+  for (const id of ids) {
+    const envId = (await docker(["inspect", "--format", '{{index .Config.Labels "mayfly.env"}}', id])).trim();
+    if (!live.has(envId)) orphans.push(id);
+  }
+  if (orphans.length > 0) await docker(["rm", "-f", ...orphans]);
 }
 
 /** After a restart the gate processes are gone. Start live previews again and leave ones that are still up. */

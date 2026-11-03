@@ -45,12 +45,9 @@ function positiveNumber(name: string, fallback: number): number {
   return value;
 }
 
-/** Local previews run in Docker. Render and Vercel have no Docker daemon, so they keep the Node app. */
+/** Plain Node unless PREVIEW_RUNTIME=docker. Compose sets docker. Render leaves this unset. */
 export function previewRuntime(): "docker" | "process" {
-  const explicit = (process.env.PREVIEW_RUNTIME ?? "").trim();
-  if (explicit === "docker" || explicit === "process") return explicit;
-  if (process.env.RENDER || process.env.VERCEL) return "process";
-  return "docker";
+  return (process.env.PREVIEW_RUNTIME ?? "").trim() === "docker" ? "docker" : "process";
 }
 
 export function getConfig(): OrchestratorConfig {

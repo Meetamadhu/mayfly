@@ -8,6 +8,7 @@ const script = process.env.PREVIEW_APP_SCRIPT;
 const useDocker = process.env.PREVIEW_RUNTIME === "docker";
 const containerName = process.env.PREVIEW_CONTAINER || `mayfly-app-${appPort}`;
 const image = process.env.PREVIEW_IMAGE || "mayfly-preview:local";
+const envId = process.env.PREVIEW_ENV_ID || "";
 
 let child = null;
 let lastActive = 0;
@@ -85,6 +86,7 @@ function waitForApp() {
           else setTimeout(tick, 50);
         },
       );
+      probe.on("timeout", () => probe.destroy());
       probe.on("error", () => {
         if (Date.now() > deadline) reject(new Error("Preview app did not wake."));
         else setTimeout(tick, 50);
@@ -136,6 +138,10 @@ function boot() {
               "--rm",
               "--name",
               containerName,
+              "--label",
+              "mayfly.preview=1",
+              "--label",
+              `mayfly.env=${envId}`,
               "-p",
               `127.0.0.1:${appPort}:3000`,
               "-e",
@@ -152,7 +158,7 @@ function boot() {
               `PREVIEW_BRANCH=${process.env.PREVIEW_BRANCH ?? ""}`,
               image,
             ],
-            { windowsHide: true, stdio: "ignore" },
+            { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] },
           )
         : spawn(process.execPath, [script], {
             // Own process group on Linux so stopApp can kill the whole app tree without killing the gate.
@@ -162,7 +168,17 @@ function boot() {
             env: { ...appEnv(), PORT: String(appPort) },
           });
       child = spawned;
-      spawned.on("exit", () => {
+      let dockerLog = "";
+      if (useDocker) {
+        spawned.stdout?.on("data", (chunk) => {
+          dockerLog += chunk.toString();
+        });
+        spawned.stderr?.on("data", (chunk) => {
+          dockerLog += chunk.toString();
+        });
+      }
+      spawned.on("exit", (code) => {
+        if (useDocker && code) console.error(dockerLog.trim());
         if (child === spawned) {
           child = null;
           listening = false;
