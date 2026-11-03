@@ -30,7 +30,8 @@ Copy `.env.example` to `.env.local`. `.env.local` stays on this machine.
 | `PREVIEW_BOOT_DELAY_MS` | Optional delay before the placeholder app listens, so the waking page is visible. Simulated, and not a real cold start. Example: `0`. |
 | `PREVIEW_STUCK_MINUTES` | Treat a preview stuck in provisioning, updating, or destroying as failed after this many minutes. Example: `10`. |
 | `REAPER_INTERVAL_MS` | How often the in-process reaper checks for expired and stuck previews. Example: `60000`. |
-| `DEPLOYER` | `process` starts one Node server per pull request. `fake` only writes a local record. |
+| `DEPLOYER` | `process` starts one preview per pull request. `fake` only writes a local record. |
+| `PREVIEW_RUNTIME` | `docker` runs the preview app in a container. `process` runs it as plain Node. This machine uses Docker. Render sets `process`. |
 | `PREVIEW_FAKE_DELAY_MS` | Artificial delay for the fake deployer. Example: `700`. |
 | `PREVIEW_BASE_URL` | Origin used in preview links. Example: `http://localhost:3000`. |
 | `GITHUB_WEBHOOK_SECRET` | Required in production. In development, an empty value accepts unsigned deliveries. |
@@ -80,7 +81,7 @@ Preview processes receive only `PATH`, `NODE_ENV` and `PREVIEW_*` variables (plu
 
 ## Known limitations
 
-Mayfly runs on one machine and stores state in a JSON file. It does not use Docker. On Vercel the deployer is a simulation: it writes records and does not start preview processes, and that state is ephemeral. Mayfly does not save preview logs; the app's output is discarded. Previews are placeholder apps, so running real pull request code would still need build isolation (for example containers).
+Mayfly runs on one machine and stores state in a JSON file. On this machine each preview app runs in its own Docker container. Render has no Docker daemon, so it keeps the plain Node app. On Vercel the deployer is a simulation: it writes records and does not start preview processes, and that state is ephemeral. Mayfly does not save preview logs; the app's output is discarded. Previews are still placeholder apps inside the container. They show the repository, branch, and commit, and do not build the pull request's real code.
 
 ## Name
 

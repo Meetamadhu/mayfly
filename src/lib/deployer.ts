@@ -1,7 +1,7 @@
 import { execFile, spawn } from "node:child_process";
 import net from "node:net";
 import path from "node:path";
-import { getConfig } from "./config";
+import { getConfig, previewRuntime } from "./config";
 import { createExclusive, dataDir, readJson, writeJson } from "./store";
 import type { DeploymentRecord } from "./types";
 
@@ -234,7 +234,38 @@ function previewBaseEnv(): NodeJS.ProcessEnv {
   return env;
 }
 
+const PREVIEW_IMAGE = "mayfly-preview:local";
+
+function run(command: string, args: string[]) {
+  return new Promise<void>((resolve, reject) => {
+    execFile(command, args, { windowsHide: true, cwd: process.cwd() }, (error, _stdout, stderr) => {
+      if (error) reject(new Error((stderr || error.message).toString().trim()));
+      else resolve();
+    });
+  });
+}
+
+let imageReady: Promise<void> | null = null;
+
+function ensurePreviewImage() {
+  if (!imageReady) {
+    imageReady = run("docker", ["build", "-f", "docker/preview.Dockerfile", "-t", PREVIEW_IMAGE, "."]).catch((error) => {
+      imageReady = null;
+      throw error;
+    });
+  }
+  return imageReady;
+}
+
+function removeContainer(appPort: number) {
+  return new Promise<void>((resolve) => {
+    execFile("docker", ["rm", "-f", `mayfly-app-${appPort}`], { windowsHide: true }, () => resolve());
+  });
+}
+
 function startPreview(port: number, input: DeployRequest) {
+  const appPort = port + 1000;
+  const docker = previewRuntime() === "docker";
   const child = spawn(process.execPath, [path.join(process.cwd(), "scripts", "preview-gate.mjs")], {
     detached: true,
     windowsHide: true,
@@ -242,13 +273,16 @@ function startPreview(port: number, input: DeployRequest) {
     env: {
       ...previewBaseEnv(),
       PORT: String(port),
-      APP_PORT: String(port + 1000),
+      APP_PORT: String(appPort),
       PREVIEW_SLEEP_MS: String(getConfig().sleepMs),
       PREVIEW_APP_SCRIPT: path.join(process.cwd(), "scripts", "preview-server.mjs"),
       PREVIEW_REPOSITORY: input.repository,
       PREVIEW_PR: String(input.prNumber),
       PREVIEW_SHA: input.sha,
       PREVIEW_BRANCH: input.branch,
+      PREVIEW_RUNTIME: docker ? "docker" : "process",
+      PREVIEW_IMAGE,
+      PREVIEW_CONTAINER: `mayfly-app-${appPort}`,
     },
   });
   child.unref();
@@ -257,7 +291,7 @@ function startPreview(port: number, input: DeployRequest) {
 }
 
 async function waitUntilListening(url: string) {
-  const deadline = Date.now() + 8_000;
+  const deadline = Date.now() + (previewRuntime() === "docker" ? 25_000 : 8_000);
   let last = "Preview process did not accept connections.";
   while (Date.now() < deadline) {
     try {
@@ -281,7 +315,9 @@ async function remember(record: DeploymentRecord) {
 
 async function launch(input: DeployRequest, previous?: DeploymentRecord): Promise<Deployment> {
   const deploymentId = previous?.deploymentId || input.deploymentId || deploymentIdFor(input.envId);
+  if (previewRuntime() === "docker") await ensurePreviewImage();
   if (previous?.pid && processAlive(previous.pid)) await killProcess(previous.pid);
+  if (previewRuntime() === "docker" && previous?.port) await removeContainer(previous.port + 1000);
   const port = await claimPort(previous?.port);
   const pid = startPreview(port, input);
   const listenUrl = previewListenUrl(port);
@@ -290,6 +326,7 @@ async function launch(input: DeployRequest, previous?: DeploymentRecord): Promis
     await waitUntilListening(listenUrl);
   } catch (error) {
     await killProcess(pid);
+    if (previewRuntime() === "docker") await removeContainer(port + 1000);
     throw error;
   }
   const now = new Date().toISOString();
@@ -335,6 +372,7 @@ const processDeployer: Deployer = {
       const file = await loadDeployments();
       const existing = file.deployments.find((item) => item.deploymentId === input.deploymentId);
       if (existing?.pid && processAlive(existing.pid)) await killProcess(existing.pid);
+      if (previewRuntime() === "docker" && existing?.port) await removeContainer(existing.port + 1000);
       file.deployments = file.deployments.filter((item) => item.deploymentId !== input.deploymentId);
       await writeJson(deployFile(), file);
     });

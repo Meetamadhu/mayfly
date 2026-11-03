@@ -16,6 +16,8 @@ services:
         value: "3"
       - key: ALLOW_SIMULATOR
         value: "true"
+      - key: PREVIEW_RUNTIME
+        value: "process"
       - key: DEMO_PREVIEW
         value: "meetamadhu/mayfly#1"
       - key: MAYFLY_ADMIN_TOKEN
