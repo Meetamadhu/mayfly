@@ -591,6 +591,30 @@ export async function recordActivity(id: string): Promise<LifecycleResult> {
   });
 }
 
+/** After a restart the gate processes are gone. Start live previews again and leave ones that are still up. */
+export async function restorePreviews() {
+  const state = await loadState();
+  const deployer = getDeployer();
+  const live = state.environments.filter(
+    (env) =>
+      (env.status === "ready" || env.status === "updating" || env.status === "provisioning") && env.deploymentId,
+  );
+  for (const env of live) {
+    try {
+      await deployer.revive({
+        envId: env.id,
+        repository: env.repository,
+        prNumber: env.prNumber,
+        sha: env.sha,
+        branch: env.branch,
+        deploymentId: env.deploymentId,
+      });
+    } catch (error) {
+      console.error(`Preview ${env.repository}#${env.prNumber} was not restored`, error);
+    }
+  }
+}
+
 export async function reap(): Promise<ReapResult> {
   const config = getConfig();
   const now = Date.now();
