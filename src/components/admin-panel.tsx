@@ -9,12 +9,13 @@ const LIVE = new Set<EnvironmentStatus>(["provisioning", "ready", "updating", "d
 const FAST_POLL_MS = 500;
 const LIVE_POLL_MS = 5000;
 
-// Hints and starting values for the simulator form: the sample app's pull request.
+// Hints and starting values for the simulator form: the sample app's pull request. The commit starts empty, which
+// means the pull request's latest commit, so a stale default can never roll a live preview back.
 const SAMPLE = {
   repository: "meetamadhu/mayfly-sample-app",
   prNumber: "1",
   branch: "feature/new-heading",
-  sha: "39f948303fe9acd4f26167bcb76bf8c21acdb1ee",
+  sha: "",
 };
 
 function previewPath(url: string) {
@@ -23,12 +24,6 @@ function previewPath(url: string) {
   } catch {
     return url;
   }
-}
-
-function randomSha() {
-  const bytes = new Uint8Array(8);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function formatDelta(iso: string, now = Date.now()) {
@@ -414,9 +409,8 @@ export function AdminPanel() {
               <input
                 value={sha}
                 onChange={(event) => setSha(event.target.value)}
-                placeholder={SAMPLE.sha}
+                placeholder="Empty = latest commit of the PR"
                 className="mono"
-                required
               />
             </label>
             <label>
@@ -437,11 +431,7 @@ export function AdminPanel() {
                 type="button"
                 className="secondary"
                 disabled={busy}
-                onClick={() => {
-                  const next = randomSha();
-                  setSha(next);
-                  void send("synchronize", { sha: next });
-                }}
+                onClick={() => void send("synchronize", { sha: "" })}
               >
                 Push commit
               </button>

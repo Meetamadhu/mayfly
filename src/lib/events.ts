@@ -25,8 +25,9 @@ export function parseSimulatorEvent(
   if (!Number.isInteger(prNumber) || prNumber < 1 || prNumber > 1_000_000) {
     return { ok: false, error: "Pull request number must be a positive integer." };
   }
-  if (!/^[0-9a-f]{7,64}$/.test(sha)) {
-    return { ok: false, error: "SHA must be 7 to 64 hex characters." };
+  // Empty means "the pull request's latest commit"; the simulator route fills it in.
+  if (sha && !/^[0-9a-f]{7,64}$/.test(sha)) {
+    return { ok: false, error: "SHA must be empty or 7 to 64 hex characters." };
   }
   if (!branch || branch.length > 200 || /\s/.test(branch)) {
     return { ok: false, error: "Branch must be a single token up to 200 characters." };
