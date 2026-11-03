@@ -50,6 +50,29 @@ export function previewRuntime(): "docker" | "process" {
   return (process.env.PREVIEW_RUNTIME ?? "").trim() === "docker" ? "docker" : "process";
 }
 
+/** Repositories whose pull requests may be built, from PREVIEW_REPOS (comma-separated owner/name). */
+export function previewRepos(): string[] {
+  return (process.env.PREVIEW_REPOS ?? "")
+    .split(",")
+    .map((item) => item.trim().replace(/^["']|["']$/g, "").toLowerCase())
+    .filter((item) => /^[\w.-]+\/[\w.-]+$/.test(item));
+}
+
+export function repositoryAllowed(repository: string) {
+  return previewRepos().includes(repository.trim().toLowerCase());
+}
+
+/**
+ * Docker previews build each pull request's own Dockerfile. Process mode and the fake deployer keep the
+ * placeholder app, and so does the demo preview.
+ */
+export function buildsPullRequests() {
+  return previewRuntime() === "docker" && !(process.env.VERCEL || process.env.DEPLOYER === "fake");
+}
+
+/** A build may take 10 minutes, so a preview is not stuck before that. */
+export const BUILD_LIMIT_MS = 10 * 60 * 1000;
+
 export function getConfig(): OrchestratorConfig {
   const ttlHours = positiveNumber("PREVIEW_TTL_HOURS", 8) || 8;
   const idleHours = positiveNumber("PREVIEW_IDLE_HOURS", 4) || 4;
@@ -62,7 +85,10 @@ export function getConfig(): OrchestratorConfig {
     idleHours,
     ttlMs: ttlHours * 60 * 60 * 1000,
     idleMs: idleHours * 60 * 60 * 1000,
-    stuckMs: (positiveNumber("PREVIEW_STUCK_MINUTES", 10) || 10) * 60 * 1000,
+    stuckMs: Math.max(
+      (positiveNumber("PREVIEW_STUCK_MINUTES", 10) || 10) * 60 * 1000,
+      buildsPullRequests() ? BUILD_LIMIT_MS + 2 * 60 * 1000 : 0,
+    ),
     reaperIntervalMs: positiveNumber("REAPER_INTERVAL_MS", 60_000) || 60_000,
     fakeDelayMs: positiveNumber("PREVIEW_FAKE_DELAY_MS", 700),
     sleepSeconds,

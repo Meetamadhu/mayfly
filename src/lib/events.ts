@@ -52,6 +52,7 @@ export function parseSimulatorEvent(
       branch,
       merged: body.merged === true,
       ttlMinutes,
+      headRepository: typeof body.headRepository === "string" ? body.headRepository.trim().toLowerCase() : undefined,
     },
   };
 }

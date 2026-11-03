@@ -57,6 +57,8 @@ export interface DeploymentRecord {
   updatedAt: string;
   pid?: number;
   port?: number;
+  /** The image this preview runs. Set only for built pull requests. */
+  image?: string;
 }
 
 export interface PullRequestEvent {
@@ -67,6 +69,8 @@ export interface PullRequestEvent {
   branch: string;
   merged?: boolean;
   ttlMinutes?: number;
+  /** Repository the pull request's head lives in. A value that differs from `repository` is a fork. */
+  headRepository?: string;
 }
 
 export interface OrchestratorConfigView {
