@@ -70,6 +70,30 @@ function webhookMode(mode: Overview["config"]["webhookVerification"]) {
 
 type Activity = { at: string; repository: string; prNumber: number; text: string };
 
+function describeActivity(text: string) {
+  const lower = text.toLowerCase();
+  if (lower === "created") return { tone: "ready", label: "Created", detail: null };
+  if (lower === "updated") return { tone: "work", label: "Updated", detail: null };
+  if (lower === "last visit") return { tone: "asleep", label: "Visit", detail: null };
+  if (lower.startsWith("removed")) {
+    const reason = text.replace(/^Removed\s*/i, "").replace(/^\((.*)\)$/, "$1").trim();
+    return { tone: "failed", label: "Removed", detail: reason || null };
+  }
+  if (lower.startsWith("preview ready:") || lower.startsWith("preview updated:")) {
+    const raw = text.slice(text.indexOf(":") + 1).trim();
+    let detail = raw;
+    try {
+      detail = new URL(raw).pathname;
+    } catch {
+      detail = raw;
+    }
+    return { tone: lower.startsWith("preview ready:") ? "ready" : "work", label: lower.startsWith("preview ready:") ? "Ready" : "Updated", detail };
+  }
+  const destroyed = /^Preview destroyed \(([^)]+)\)/i.exec(text);
+  if (destroyed) return { tone: "failed", label: "Removed", detail: destroyed[1] };
+  return { tone: "note", label: "Note", detail: text };
+}
+
 function recentActivity(environments: Environment[]) {
   const events: Activity[] = [];
   for (const env of environments) {
@@ -266,60 +290,56 @@ export function AdminPanel() {
         {!overview && !loadError ? <p className="empty">Loading the ledger…</p> : null}
         {overview && rows.length === 0 ? <p className="empty">No live previews.</p> : null}
         {rows.length > 0 ? (
-          <div className="table-wrap">
-            <table className="preview-table">
-              <thead>
-                <tr>
-                  <th>State</th>
-                  <th>Pull request</th>
-                  <th>Branch</th>
-                  <th>Last visit</th>
-                  <th>Expires</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((env) => {
-                  const demo = demoKey === `${env.repository}#${env.prNumber}`;
-                  const canSleep = env.status === "ready" && env.sleep === "awake";
-                  return (
-                    <tr key={env.id}>
-                      <td data-label="State">
-                        <span className="state-pill" data-state={stateTone(env)}>
-                          {stateWord(env)}
-                        </span>
-                      </td>
-                      <td data-label="Pull request">
-                        {env.repository} #{env.prNumber}
-                      </td>
-                      <td data-label="Branch">{env.branch}</td>
-                      <td data-label="Last visit">{formatDelta(env.lastActiveAt, now)}</td>
-                      <td data-label="Expires">{demo ? "Always on" : formatDelta(env.expiresAt, now)}</td>
-                      <td data-label="Actions">
-                        <div className="row-actions">
-                          {env.url ? (
-                            <a className="open-preview" href={previewPath(env.url)}>
-                              Open
-                            </a>
-                          ) : (
-                            <button type="button" className="open-preview" disabled>
-                              Open
-                            </button>
-                          )}
-                          <button type="button" className="secondary" disabled={busy || !canSleep} onClick={() => void sleepNow(env.id)}>
-                            Sleep now
-                          </button>
-                          <button type="button" className="destroy" disabled={busy || env.status === "destroying"} onClick={() => void destroy(env)}>
-                            Destroy
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <ul className="preview-list">
+            {rows.map((env) => {
+              const demo = demoKey === `${env.repository}#${env.prNumber}`;
+              const canSleep = env.status === "ready" && env.sleep === "awake";
+              const tone = stateTone(env);
+              return (
+                <li key={env.id} data-tone={tone}>
+                  <div className="preview-top">
+                    <span className="state-pill" data-state={tone}>
+                      {stateWord(env)}
+                    </span>
+                    <span className="activity-repo">
+                      {env.repository} <span className="activity-pr">#{env.prNumber}</span>
+                    </span>
+                  </div>
+                  <dl className="preview-meta">
+                    <div>
+                      <dt>Branch</dt>
+                      <dd>{env.branch}</dd>
+                    </div>
+                    <div>
+                      <dt>Last visit</dt>
+                      <dd>{formatDelta(env.lastActiveAt, now)}</dd>
+                    </div>
+                    <div>
+                      <dt>Expires</dt>
+                      <dd>{demo ? "Always on" : formatDelta(env.expiresAt, now)}</dd>
+                    </div>
+                  </dl>
+                  <div className="row-actions">
+                    {env.url ? (
+                      <a className="open-preview" href={previewPath(env.url)}>
+                        Open
+                      </a>
+                    ) : (
+                      <button type="button" className="open-preview" disabled>
+                        Open
+                      </button>
+                    )}
+                    <button type="button" className="secondary" disabled={busy || !canSleep} onClick={() => void sleepNow(env.id)}>
+                      Sleep now
+                    </button>
+                    <button type="button" className="destroy" disabled={busy || env.status === "destroying"} onClick={() => void destroy(env)}>
+                      Destroy
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         ) : null}
         {error ? <p className="error" role="alert">{error}</p> : null}
         {notice ? <p className="notice" role="status">{notice}</p> : null}
@@ -424,15 +444,25 @@ export function AdminPanel() {
         <h2>Recent activity</h2>
         {activity.length === 0 ? <p className="empty">No activity yet.</p> : null}
         <ol className="activity">
-          {activity.map((item, index) => (
-            <li key={`${item.at}:${item.repository}:${item.prNumber}:${index}`}>
-              <span className="activity-when">{formatDelta(item.at, now)}</span>
-              <span>
-                {item.repository} #{item.prNumber}
-              </span>
-              <span>{item.text}</span>
-            </li>
-          ))}
+          {activity.map((item, index) => {
+            const described = describeActivity(item.text);
+            return (
+              <li key={`${item.at}:${item.repository}:${item.prNumber}:${index}`} data-tone={described.tone}>
+                <div className="activity-top">
+                  <span className="activity-kind" data-tone={described.tone}>
+                    {described.label}
+                  </span>
+                  <span className="activity-repo">
+                    {item.repository} <span className="activity-pr">#{item.prNumber}</span>
+                  </span>
+                  <time className="activity-when" dateTime={item.at}>
+                    {formatDelta(item.at, now)}
+                  </time>
+                </div>
+                {described.detail ? <p className="activity-detail">{described.detail}</p> : null}
+              </li>
+            );
+          })}
         </ol>
       </section>
     </main>

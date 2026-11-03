@@ -21,6 +21,9 @@ function previewBase() {
   if (configured) return configured;
   const render = process.env.RENDER_EXTERNAL_URL?.replace(/\/$/, "");
   if (render) return render;
+  const codespace = process.env.CODESPACE_NAME?.trim();
+  const codespaceDomain = process.env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN?.trim();
+  if (codespace && codespaceDomain) return `https://${codespace}-3000.${codespaceDomain}`;
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
   return "http://localhost:3000";
 }
@@ -40,6 +43,14 @@ function positiveNumber(name: string, fallback: number): number {
   const value = Number(raw);
   if (!Number.isFinite(value) || value < 0) return fallback;
   return value;
+}
+
+/** Local previews run in Docker. Render and Vercel have no Docker daemon, so they keep the Node app. */
+export function previewRuntime(): "docker" | "process" {
+  const explicit = (process.env.PREVIEW_RUNTIME ?? "").trim();
+  if (explicit === "docker" || explicit === "process") return explicit;
+  if (process.env.RENDER || process.env.VERCEL) return "process";
+  return "docker";
 }
 
 export function getConfig(): OrchestratorConfig {

@@ -5,6 +5,9 @@ const port = Number(process.env.PORT);
 const appPort = Number(process.env.APP_PORT);
 const idleMs = Number(process.env.PREVIEW_SLEEP_MS || 20_000);
 const script = process.env.PREVIEW_APP_SCRIPT;
+const useDocker = process.env.PREVIEW_RUNTIME === "docker";
+const containerName = process.env.PREVIEW_CONTAINER || `mayfly-app-${appPort}`;
+const image = process.env.PREVIEW_IMAGE || "mayfly-preview:local";
 
 let child = null;
 let lastActive = 0;
@@ -31,8 +34,25 @@ function killAppGroup(pid) {
   }
 }
 
+function dockerExec(args) {
+  return new Promise((resolve) => {
+    execFile("docker", args, { windowsHide: true }, () => resolve());
+  });
+}
+
 function stopApp() {
   listening = false;
+  if (useDocker) {
+    const pid = child?.pid;
+    child = null;
+    stopping = dockerExec(["stop", "-t", "1", containerName]).then(() => {
+      if (!pid || process.platform !== "win32") return;
+      return new Promise((resolve) => {
+        execFile("taskkill", ["/PID", String(pid), "/T", "/F"], { windowsHide: true }, () => resolve());
+      });
+    });
+    return;
+  }
   if (!child?.pid) {
     child = null;
     return;
@@ -106,13 +126,41 @@ function boot() {
       // Starting a boot counts as activity so the idle reaper cannot kill a slow-starting app.
       lastActive = Date.now();
       if (stopping) await stopping;
-      const spawned = spawn(process.execPath, [script], {
-        // Own process group on Linux so stopApp can kill the whole app tree without killing the gate.
-        detached: process.platform !== "win32",
-        windowsHide: true,
-        stdio: "ignore",
-        env: { ...appEnv(), PORT: String(appPort) },
-      });
+      if (!useDocker && !script) throw new Error("PREVIEW_APP_SCRIPT is not set");
+      if (useDocker) await dockerExec(["rm", "-f", containerName]);
+      const spawned = useDocker
+        ? spawn(
+            "docker",
+            [
+              "run",
+              "--rm",
+              "--name",
+              containerName,
+              "-p",
+              `127.0.0.1:${appPort}:3000`,
+              "-e",
+              "PORT=3000",
+              "-e",
+              "HOST=0.0.0.0",
+              "-e",
+              `PREVIEW_REPOSITORY=${process.env.PREVIEW_REPOSITORY ?? ""}`,
+              "-e",
+              `PREVIEW_PR=${process.env.PREVIEW_PR ?? ""}`,
+              "-e",
+              `PREVIEW_SHA=${process.env.PREVIEW_SHA ?? ""}`,
+              "-e",
+              `PREVIEW_BRANCH=${process.env.PREVIEW_BRANCH ?? ""}`,
+              image,
+            ],
+            { windowsHide: true, stdio: "ignore" },
+          )
+        : spawn(process.execPath, [script], {
+            // Own process group on Linux so stopApp can kill the whole app tree without killing the gate.
+            detached: process.platform !== "win32",
+            windowsHide: true,
+            stdio: "ignore",
+            env: { ...appEnv(), PORT: String(appPort) },
+          });
       child = spawned;
       spawned.on("exit", () => {
         if (child === spawned) {
@@ -318,6 +366,10 @@ server.listen(port, "127.0.0.1");
 // so take it down here; otherwise it would outlive the gate.
 if (process.platform !== "win32") {
   const shutdown = () => {
+    if (useDocker) {
+      execFile("docker", ["stop", "-t", "1", containerName], { windowsHide: true }, () => process.exit(0));
+      return;
+    }
     if (child?.pid) killAppGroup(child.pid);
     process.exit(0);
   };
