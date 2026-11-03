@@ -34,6 +34,18 @@ Open port 3000 and go to `/board`. The first build takes a few minutes. Preview 
 
 With `PREVIEW_RUNTIME=docker`, set `PREVIEW_REPOS` (comma-separated `owner/name`) in `.env.local`. For a pull request on a listed repository, Mayfly clones it, checks out the exact commit, builds the repo-root `Dockerfile` as `mayfly-pr-<owner>-<name>-<pr>:<sha8>` (10 minute limit, last 20 log lines in the error), and runs that image in the same locked-down container. The app must listen on `$PORT` (3000) and run as user `node`. A new commit rebuilds and swaps the container; sleep and wake reuse the image; closing the pull request removes the container and the image. Other repositories fail with "Repository not allowed", a missing `Dockerfile` fails with "No Dockerfile at repo root", and fork pull requests are refused. `DEMO_PREVIEW` keeps the placeholder app. Process mode is unchanged.
 
+### Connect GitHub webhooks
+
+A webhook creates, updates, and removes previews when pull requests change, with no simulator. GitHub must be able to reach Mayfly, so make port 3000 public (in a Codespace, set the port visibility to Public) and use that address as `PREVIEW_BASE_URL`. Set `GITHUB_WEBHOOK_SECRET` in `.env.local`, then create the hook without printing the secret:
+
+```powershell
+$secret = ((Get-Content .env.local | Where-Object { $_ -like "GITHUB_WEBHOOK_SECRET=*" }) -replace "^GITHUB_WEBHOOK_SECRET=", "").Trim('"')
+@{ name = "web"; active = $true; events = @("pull_request"); config = @{ url = "$env:PREVIEW_BASE_URL/api/webhooks/github"; content_type = "json"; secret = $secret } } |
+  ConvertTo-Json -Depth 5 | gh api repos/<owner>/<repo>/hooks --method POST --input -
+```
+
+On Linux or macOS, build the same JSON with `jq` and pipe it to `gh api ... --input -`. The content type must be `application/json`. A request with a missing or wrong signature gets `401` and creates nothing. Check deliveries with `gh api repos/<owner>/<repo>/hooks/<id>/deliveries`. Set `GITHUB_TOKEN` to have Mayfly also comment on the pull request; without it Mayfly skips the comment. Quick tunnels and other temporary addresses change, so update the hook's URL when the address changes.
+
 Copy `.env.example` to `.env.local`. `.env.local` stays on this machine.
 
 | Key | What it does |
