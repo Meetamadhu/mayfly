@@ -30,7 +30,7 @@ export function imageTag(repository: string, prNumber: number, sha: string) {
  * works through a Docker socket proxy (BuildKit needs session and gRPC upgrades the proxy cannot pass) and
  * because it applies --memory and --cpu-quota to every build step.
  */
-function childEnv(): NodeJS.ProcessEnv {
+export function childEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env, GIT_TERMINAL_PROMPT: "0", DOCKER_BUILDKIT: "0" };
   for (const name of ["MAYFLY_ADMIN_TOKEN", "GITHUB_WEBHOOK_SECRET", "GITHUB_TOKEN"]) delete env[name];
   return env;
