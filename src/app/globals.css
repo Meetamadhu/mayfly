@@ -943,6 +943,23 @@ html[data-theme="dark"] .preview-list li[data-tone="failed"] { border-left-color
   text-transform: none;
 }
 
+.admin-panel .simulator input::placeholder {
+  color: var(--muted);
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.admin-panel .simulator .field-note {
+  display: block;
+  margin-top: 0.3rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  overflow-wrap: anywhere;
+}
+
 .admin-panel .simulator .actions {
   margin-top: 0.15rem;
   padding-top: 0.75rem;

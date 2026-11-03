@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AdminHeader } from "@/components/admin-header";
 import type { Environment, EnvironmentStatus, Overview } from "@/lib/types";
 
@@ -8,6 +8,14 @@ const TRANSITIONAL = new Set<EnvironmentStatus>(["provisioning", "updating", "de
 const LIVE = new Set<EnvironmentStatus>(["provisioning", "ready", "updating", "destroying"]);
 const FAST_POLL_MS = 500;
 const LIVE_POLL_MS = 5000;
+
+// Hints and starting values for the simulator form: the sample app's pull request.
+const SAMPLE = {
+  repository: "meetamadhu/mayfly-sample-app",
+  prNumber: "1",
+  branch: "feature/new-heading",
+  sha: "39f948303fe9acd4f26167bcb76bf8c21acdb1ee",
+};
 
 function previewPath(url: string) {
   try {
@@ -126,10 +134,11 @@ export function AdminPanel() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [repository, setRepository] = useState("acme/web");
-  const [prNumber, setPrNumber] = useState("42");
-  const [branch, setBranch] = useState("feat/preview-lifetime");
-  const [sha, setSha] = useState("a1b2c3d4e5f67890");
+  const [repository, setRepository] = useState(SAMPLE.repository);
+  const [prNumber, setPrNumber] = useState(SAMPLE.prNumber);
+  const [branch, setBranch] = useState(SAMPLE.branch);
+  const [sha, setSha] = useState(SAMPLE.sha);
+  const repositoryEdited = useRef(false);
   const [ttlMinutes, setTtlMinutes] = useState("480");
   const [now, setNow] = useState(() => Date.now());
 
@@ -271,6 +280,14 @@ export function AdminPanel() {
   }
 
   const config = overview?.config;
+  const allowed = config?.allowedRepositories;
+  const firstAllowed = allowed?.[0];
+
+  // Start from the first repository Mayfly may build, unless the person has already typed one.
+  useEffect(() => {
+    if (firstAllowed && !repositoryEdited.current) setRepository(firstAllowed);
+  }, [firstAllowed]);
+
   const demoKey = config?.demo ?? "";
   const rows = overview?.environments.filter((env) => env.status !== "destroyed") ?? [];
   const activity = overview ? recentActivity(overview.environments) : [];
@@ -359,19 +376,48 @@ export function AdminPanel() {
           >
             <label>
               Repository
-              <input value={repository} onChange={(event) => setRepository(event.target.value)} required />
+              <input
+                value={repository}
+                onChange={(event) => {
+                  repositoryEdited.current = true;
+                  setRepository(event.target.value);
+                }}
+                placeholder={SAMPLE.repository}
+                required
+              />
+              {allowed !== undefined ? (
+                <small className="field-note">
+                  {allowed === null
+                    ? "Allowed: any (process mode)"
+                    : allowed.length > 0
+                      ? `Allowed: ${allowed.join(", ")}`
+                      : "Allowed: none (set PREVIEW_REPOS)"}
+                </small>
+              ) : null}
             </label>
             <label>
               Pull request
-              <input value={prNumber} onChange={(event) => setPrNumber(event.target.value)} inputMode="numeric" required />
+              <input
+                value={prNumber}
+                onChange={(event) => setPrNumber(event.target.value)}
+                placeholder={SAMPLE.prNumber}
+                inputMode="numeric"
+                required
+              />
             </label>
             <label>
               Branch
-              <input value={branch} onChange={(event) => setBranch(event.target.value)} required />
+              <input value={branch} onChange={(event) => setBranch(event.target.value)} placeholder={SAMPLE.branch} required />
             </label>
             <label>
               Commit
-              <input value={sha} onChange={(event) => setSha(event.target.value)} className="mono" required />
+              <input
+                value={sha}
+                onChange={(event) => setSha(event.target.value)}
+                placeholder={SAMPLE.sha}
+                className="mono"
+                required
+              />
             </label>
             <label>
               TTL minutes
@@ -436,7 +482,9 @@ export function AdminPanel() {
               <dd>{config ? webhookMode(config.webhookVerification) : "–"}</dd>
             </div>
           </dl>
-          <p className="help">Change these in Render → Environment</p>
+          {config ? (
+            <p className="help">{config.onRender ? "Change these in Render → Environment" : "Change these in .env.local"}</p>
+          ) : null}
         </section>
       </div>
 

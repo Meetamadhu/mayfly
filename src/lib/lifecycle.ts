@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { isBuilding } from "./builder";
-import { buildsPullRequests, getConfig, previewRuntime } from "./config";
+import { buildsPullRequests, getConfig, previewRepos, previewRuntime } from "./config";
 import { getDeployer, previewUrl, publicPreviewUrl, type Deployment } from "./deployer";
 import { publishPullRequestComment } from "./http";
 import { exclusive, loadState, saveState } from "./store";
@@ -196,6 +196,8 @@ export async function getOverview(): Promise<Overview> {
       deployer: config.deployer,
       webhookVerification: config.webhookSecret ? "signed" : "open-in-development",
       demo: config.demo ? `${config.demo.repository}#${config.demo.prNumber}` : null,
+      allowedRepositories: buildsPullRequests() ? previewRepos() : null,
+      onRender: Boolean(process.env.RENDER),
     },
     summary: {
       live: environments.filter((env) => isLiveStatus(env.status)).length,
