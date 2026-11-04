@@ -33,6 +33,79 @@ function text(status: number, body: string) {
   });
 }
 
+function escapeHtml(value: string) {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+}
+
+// What a person sees at a preview address that has no live preview. The look follows the demo preview page
+// (scripts/preview-server.mjs): same colours, card and light/dark theme script.
+const NOT_FOUND_STYLE = `
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #efece4; color: #1c1915; font-family: "Segoe UI", system-ui, sans-serif; }
+      .card { width: min(36rem, calc(100% - 2rem)); overflow: hidden; border: 1px solid #ddd6c8; border-radius: 14px; background: #f7f5ef; }
+      .band { display: flex; align-items: center; gap: 0.7rem; padding: 0.9rem 1.1rem; background: #5b554b; color: #fff; }
+      .band svg { flex: none; }
+      .word { margin: 0; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.06em; }
+      .body { padding: 1.15rem 1.15rem 1.25rem; }
+      h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+      .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.75rem 0 0; }
+      .chip { max-width: 100%; overflow-wrap: anywhere; border-radius: 999px; background: #e7e1d4; padding: 0.2rem 0.55rem; color: #1c1915; font-size: 0.84rem; }
+      p.line { margin: 0.9rem 0 0; color: #6f685e; }
+      .back { display: inline-flex; align-items: center; min-height: 44px; margin-top: 1rem; padding: 0 0.9rem; border-radius: 6px; background: #1c1915; color: #f7f5ef; font-weight: 600; text-decoration: none; }
+      html[data-theme="dark"] body { background: #141311; color: #f6f3ec; }
+      html[data-theme="dark"] .card { background: #221f1a; border-color: #3d362e; }
+      html[data-theme="dark"] .band { background: #3d362e; }
+      html[data-theme="dark"] .chip { background: #2c2822; color: #f6f3ec; }
+      html[data-theme="dark"] p.line { color: #c9c0b4; }
+      html[data-theme="dark"] a.back { background: #f6f3ec; color: #141311; }`;
+
+const THEME_SCRIPT = `
+      try {
+        var theme = localStorage.getItem("mayfly-theme");
+        if (theme !== "light" && theme !== "dark") theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        document.documentElement.dataset.theme = theme;
+      } catch (e) {}`;
+
+/** A 404 page for an address with no live preview. Repository and number come from the URL, so they are escaped. */
+function noPreview(repository: string, pr: string, line: string) {
+  const shown = (value: string) => escapeHtml(value.length > 100 ? `${value.slice(0, 100)}…` : value);
+  const body = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>No live preview</title>
+    <style>${NOT_FOUND_STYLE}
+    </style>
+    <script>${THEME_SCRIPT}
+    </script>
+  </head>
+  <body>
+    <main class="card">
+      <header class="band">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M9 9l6 6M15 9l-6 6" />
+        </svg>
+        <p class="word">NO PREVIEW</p>
+      </header>
+      <div class="body">
+        <h1>No live preview</h1>
+        <p class="chips">
+          <span class="chip">${shown(repository)}</span>
+          <span class="chip">PR #${shown(pr)}</span>
+        </p>
+        <p class="line">${escapeHtml(line)}</p>
+        <a class="back" href="/board">Back to board</a>
+      </div>
+    </main>
+  </body>
+</html>`;
+  return new Response(body, {
+    status: 404,
+    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" },
+  });
+}
+
 /**
  * The path inside the preview app, taken from the raw request URL so encodings are preserved.
  * Everything up to and including /p/<owner>/<name>/<pr> is stripped.
@@ -57,16 +130,19 @@ function countActivity(envId: string) {
 }
 
 export async function proxyPreview(request: Request, params: PreviewParams): Promise<Response> {
-  if (!/^\d{1,9}$/.test(params.pr)) return text(404, "No preview for this pull request.");
+  const notAPreview = "This address is not a pull request preview.";
+  if (!/^\d{1,9}$/.test(params.pr)) return noPreview(`${params.owner}/${params.name}`, params.pr, notAPreview);
   let repository: string;
   try {
     repository = `${decodeURIComponent(params.owner)}/${decodeURIComponent(params.name)}`;
   } catch {
-    return text(404, "No preview for this pull request.");
+    return noPreview(`${params.owner}/${params.name}`, params.pr, notAPreview);
   }
 
   const target = await findProxyTarget(repository, Number(params.pr));
-  if (!target) return text(404, "No live preview for this pull request.");
+  if (!target) {
+    return noPreview(repository, params.pr, "This pull request was closed, expired or removed, so its preview is gone.");
+  }
 
   const { path, search } = upstreamTarget(request.url);
   const method = request.method.toUpperCase();

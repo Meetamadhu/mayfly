@@ -1,7 +1,5 @@
-import { AdminScreen } from "./admin/screen";
-
-export const dynamic = "force-dynamic";
+import { Landing } from "@/components/landing";
 
 export default function HomePage() {
-  return <AdminScreen />;
+  return <Landing />;
 }

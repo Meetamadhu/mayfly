@@ -5,11 +5,13 @@ import { AdminHeader } from "@/components/admin-header";
 
 export default function AdminLoginPage() {
   const [token, setToken] = useState("");
+  const [show, setShow] = useState(false);
   const [wrong, setWrong] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
+    if (!token.trim()) return;
     setBusy(true);
     setWrong(false);
     try {
@@ -33,25 +35,40 @@ export default function AdminLoginPage() {
   return (
     <main className="shell admin-panel">
       <AdminHeader />
-      <section className="panel admin" aria-label="Admin sign in">
-        <h1>Admin</h1>
-        <form className="admin-row" onSubmit={(event) => void onSubmit(event)}>
-          <label>
-            Admin token
+      <section className="panel login-card" aria-label="Admin sign in">
+        <h1>Admin sign-in</h1>
+        <p className="help login-lede">Admins only. Ask the project owner for the token.</p>
+        <form onSubmit={(event) => void onSubmit(event)}>
+          <label htmlFor="admin-token">Admin token</label>
+          <div className="token-field">
             <input
-              type="password"
-              autoComplete="current-password"
+              id="admin-token"
+              type={show ? "text" : "password"}
+              autoComplete="off"
               spellCheck={false}
+              required
               value={token}
               onChange={(event) => setToken(event.target.value)}
             />
-          </label>
-          <button type="submit" disabled={busy || !token.trim()}>
-            Sign in
+            <button
+              type="button"
+              className="secondary"
+              aria-pressed={show}
+              aria-label={show ? "Hide token" : "Show token"}
+              onClick={() => setShow((visible) => !visible)}
+            >
+              {show ? "Hide" : "Show"}
+            </button>
+          </div>
+          <button type="submit" className="login-submit" disabled={busy}>
+            {busy ? "Signing in…" : "Sign in"}
           </button>
         </form>
         {wrong ? <p className="error" role="alert">Wrong token</p> : null}
       </section>
+      <p className="login-back">
+        <a href="/board">Back to board</a>
+      </p>
     </main>
   );
 }

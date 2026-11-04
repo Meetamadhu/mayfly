@@ -17,7 +17,7 @@ const mono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: "Mayfly",
-  description: "Ephemeral pull request previews that live briefly, then disappear.",
+  description: "Pull request previews that sleep when idle, wake on visit, and clean up when the PR closes.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
