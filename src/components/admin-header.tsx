@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function AdminHeader({ onSignOut }: { onSignOut?: () => void }) {
   const [theme, setTheme] = useState<"light" | "dark">("light");
@@ -24,18 +25,11 @@ export function AdminHeader({ onSignOut }: { onSignOut?: () => void }) {
       <div className="mast-copy">
         <div className="mast-title">
           <h1>Mayfly</h1>
-          <p className="subtitle">Ephemeral environments</p>
+          <p className="subtitle">Pull request previews that sleep when idle</p>
         </div>
       </div>
       <div className="mast-actions">
-        <div className="theme-toggle" role="group" aria-label="Color theme">
-          <button type="button" aria-pressed={theme === "light"} onClick={() => chooseTheme("light")}>
-            Light
-          </button>
-          <button type="button" aria-pressed={theme === "dark"} onClick={() => chooseTheme("dark")}>
-            Dark
-          </button>
-        </div>
+        <ThemeToggle theme={theme} onChange={chooseTheme} />
         <a className="admin-link" href="/board">
           Board
         </a>

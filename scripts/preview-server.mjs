@@ -27,6 +27,7 @@ const page = `<!doctype html>
       .band svg { flex: none; margin-top: 0.1rem; }
       .word { margin: 0; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.06em; }
       .note { margin: 0.2rem 0 0; font-size: 0.95rem; }
+      .note.sub { font-size: 0.85rem; opacity: 0.85; }
       .body { padding: 1.15rem 1.15rem 1.25rem; }
       h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
       h1 span { color: #6f685e; font-weight: 500; }
@@ -58,6 +59,7 @@ const page = `<!doctype html>
         <div>
           <p class="word">AWAKE</p>
           <p class="note">This preview is awake.</p>
+          <p class="note sub">This is Mayfly's demo app. Real pull requests show their own app here.</p>
         </div>
       </header>
       <div class="body">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { ThemeToggle } from "@/components/theme-toggle";
 import type { Environment, EnvironmentStatus, Overview } from "@/lib/types";
 
 const TRANSITIONAL = new Set<EnvironmentStatus>(["provisioning", "updating", "destroying"]);
@@ -14,6 +15,7 @@ function EnvironmentCard({
   sleepSeconds,
   now,
   demo,
+  buildsCode,
   onCopy,
 }: {
   env: Environment;
@@ -21,6 +23,8 @@ function EnvironmentCard({
   sleepSeconds: number;
   now: number;
   demo: boolean;
+  /** True when this Mayfly builds each pull request's own Dockerfile (Docker runtime), not the placeholder app. */
+  buildsCode: boolean;
   onCopy: () => void;
 }) {
   if (env.status === "destroyed") {
@@ -42,7 +46,15 @@ function EnvironmentCard({
   const view = cardView(env);
   const path = env.url ? previewPath(env.url) : null;
   const remain = secondsUntilSleep(env, sleepSeconds, now);
-  const note = view.tone === "awake" ? `Sleeps in ${remain} s if nobody visits.` : view.note;
+  // A real pull request on a Docker Mayfly runs its own code; the demo and placeholder previews do not.
+  const fromCode = buildsCode && !demo;
+  const building = env.status === "provisioning" || env.status === "updating";
+  const note =
+    view.tone === "awake"
+      ? `Sleeps in ${remain} s if nobody visits.`
+      : fromCode && building
+        ? "Building from the PR's Dockerfile…"
+        : view.note;
   const showOpen = env.status !== "failed" && env.status !== "destroying";
   const openDisabled = env.status === "provisioning" || !env.url;
   return (
@@ -68,12 +80,9 @@ function EnvironmentCard({
           <span> #{env.prNumber}</span>
         </h3>
         <p className="meta">
-          <span className="chip">{env.branch}</span>
-          {env.sha.startsWith("d3m0") ? (
-            <span className="chip">demo build</span>
-          ) : (
-            <span className="chip mono">{env.sha.slice(0, 8)}</span>
-          )}
+          {demo ? null : <span className="chip">{env.branch}</span>}
+          {demo ? null : <span className="chip mono">{env.sha.slice(0, 8)}</span>}
+          {fromCode ? <span className="chip code-chip">Built from PR code</span> : null}
           <span className="chip">Last visit {formatDelta(env.lastActiveAt)}</span>
           {demo ? (
             <span className="chip">Always on</span>
@@ -104,6 +113,16 @@ function EnvironmentCard({
           )
         ) : (
           <span />
+        )}
+        {demo ? null : (
+          <a
+            className="gh-link"
+            href={`https://github.com/${env.repository}/pull/${env.prNumber}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            View PR on GitHub
+          </a>
         )}
       </footer>
     </article>
@@ -297,6 +316,8 @@ export function Dashboard() {
   const config = overview?.config;
   const current = overview?.environments.filter((env) => env.status !== "destroyed") ?? [];
   const removed = overview?.environments.filter((env) => env.status === "destroyed") ?? [];
+  // The overview lists allowed repositories only when Mayfly builds pull request code, which is the Docker runtime.
+  const dockerRuntime = config?.allowedRepositories != null;
   const liveCount = overview?.summary.live ?? 0;
   const capacity = config?.maxConcurrent ?? 0;
   const capacityRatio = capacity > 0 ? Math.min(1, liveCount / capacity) : 0;
@@ -329,18 +350,11 @@ export function Dashboard() {
         <div className="mast-copy">
           <div className="mast-title">
             <h1>Mayfly</h1>
-            <p className="subtitle">Ephemeral environments</p>
+            <p className="subtitle">Pull request previews that sleep when idle</p>
           </div>
         </div>
         <div className="mast-actions">
-          <div className="theme-toggle" role="group" aria-label="Color theme">
-            <button type="button" aria-pressed={theme === "light"} onClick={() => chooseTheme("light")}>
-              Light
-            </button>
-            <button type="button" aria-pressed={theme === "dark"} onClick={() => chooseTheme("dark")}>
-              Dark
-            </button>
-          </div>
+          <ThemeToggle theme={theme} onChange={chooseTheme} />
           <a className="admin-link" href="/admin/login">
             Admin
           </a>
@@ -407,13 +421,14 @@ export function Dashboard() {
                 sleepSeconds={config?.sleepSeconds ?? 20}
                 now={now}
                 demo={config?.demo === `${env.repository}#${env.prNumber}`}
-                onCopy={() => void copyUrl(env.id, previewPath(env.url ?? ""))}
+                buildsCode={dockerRuntime}
+                onCopy={() => void copyUrl(env.id, env.url ?? previewPath(""))}
               />
             ))}
           </div>
 
           <details className="advanced">
-            <summary>Advanced: processes</summary>
+            <summary>{dockerRuntime ? "Advanced: containers" : "Advanced: processes"}</summary>
           <div className="stack">
             {overview && overview.deployments.length === 0 ? (
               <p className="empty">Nothing is listening. Closed, idle, and expired previews are gone.</p>
@@ -462,7 +477,8 @@ export function Dashboard() {
                   sleepSeconds={config?.sleepSeconds ?? 20}
                   now={now}
                   demo={config?.demo === `${env.repository}#${env.prNumber}`}
-                  onCopy={() => void copyUrl(env.id, previewPath(env.url ?? ""))}
+                  buildsCode={dockerRuntime}
+                  onCopy={() => void copyUrl(env.id, env.url ?? previewPath(""))}
                 />
               ))}
             </div>
@@ -473,7 +489,7 @@ export function Dashboard() {
           <section className="panel try-it">
             <h2>Try it</h2>
             <ol>
-              <li>Open the Demo preview.</li>
+              <li>Open a preview (the Demo, or a real PR if one is listed).</li>
               <li>You&apos;ll see &apos;Waking up&apos;, then the page.</li>
               <li>Come back: it shows Awake, then Asleep after {config?.sleepSeconds ?? 20} s.</li>
             </ol>
@@ -484,9 +500,9 @@ export function Dashboard() {
 
       <p className="footer">
         {config?.deployer === "fake"
-          ? "This site keeps the record. The preview itself runs on the computer where Mayfly is running."
-          : `Each preview listens on its own port, sleeps after ${config?.sleepSeconds ?? 20}s without a request, and wakes on the next visit.`}{" "}
-        The reaper runs every {config ? Math.round(config.reaperIntervalMs / 1000) : 60}s.
+          ? "This site keeps the record. The preview itself runs on the computer where Mayfly is running. "
+          : ""}
+        Each preview sleeps after {formatSleep(config?.sleepSeconds ?? 20)} without visitors and wakes on the next visit.
       </p>
     </main>
   );
