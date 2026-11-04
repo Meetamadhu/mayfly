@@ -126,14 +126,6 @@ export function Landing() {
                 <span aria-hidden="true">▰</span>
                 Docker
               </li>
-              <li>
-                <span aria-hidden="true">⌘</span>
-                Your CI pipeline
-              </li>
-              <li>
-                <span aria-hidden="true">☁</span>
-                Your cloud
-              </li>
             </ul>
           </div>
           <div className="landing-orbit-chips">
