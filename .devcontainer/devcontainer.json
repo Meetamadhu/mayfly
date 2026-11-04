@@ -9,6 +9,9 @@
     "3000": {
       "label": "Mayfly",
       "onAutoForward": "notify"
+    },
+    "2375": {
+      "onAutoForward": "ignore"
     }
   },
   "postCreateCommand": "bash .devcontainer/setup.sh",
