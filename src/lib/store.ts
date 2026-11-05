@@ -1,5 +1,6 @@
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { loadStatePg, saveStatePg, usesPostgres, withPgExclusive } from "./store-pg";
 
 const locks = globalThis as unknown as Record<string, Promise<unknown> | undefined>;
 
@@ -15,7 +16,16 @@ export function createExclusive(key: string) {
   };
 }
 
-export const exclusive = createExclusive("__previewStateLock");
+const fileExclusive = createExclusive("__previewStateLock");
+
+/**
+ * Serialize read-modify-write of environment state.
+ * JSON mode: in-process queue. Postgres mode: one transaction with SELECT ... FOR UPDATE.
+ */
+export function exclusive<T>(fn: () => Promise<T>): Promise<T> {
+  if (usesPostgres()) return withPgExclusive(fn);
+  return fileExclusive(fn);
+}
 
 export interface State {
   environments: import("./types").Environment[];
@@ -28,6 +38,13 @@ export function dataDir() {
 
 function stateFile() {
   return path.join(dataDir(), "state.json");
+}
+
+function asState(value: unknown): State {
+  if (!value || typeof value !== "object") return { environments: [] };
+  const environments = (value as State).environments;
+  if (!Array.isArray(environments)) return { environments: [] };
+  return { environments };
 }
 
 export async function readJson<T>(file: string, fallback: T): Promise<T> {
@@ -53,11 +70,15 @@ export async function writeJson(file: string, value: unknown): Promise<void> {
 }
 
 export async function loadState(): Promise<State> {
+  if (usesPostgres()) return loadStatePg();
   const state = await readJson<State>(stateFile(), { environments: [] });
-  if (!Array.isArray(state.environments)) return { environments: [] };
-  return state;
+  return asState(state);
 }
 
 export async function saveState(state: State): Promise<void> {
-  await writeJson(stateFile(), state);
+  if (usesPostgres()) {
+    await saveStatePg(state);
+    return;
+  }
+  await writeJson(stateFile(), asState(state));
 }

@@ -70,6 +70,7 @@ Copy `.env.example` to `.env.local`. `.env.local` stays on this machine.
 | `PREVIEW_MEMORY`, `PREVIEW_CPUS` | Container limits for docker previews. Defaults `256m` (no swap) and `0.5` CPU, plus 100 processes, user `1000:1000`, all capabilities dropped, no new privileges, read-only filesystem, and a 16 MB `/tmp`. |
 | `PREVIEW_FAKE_DELAY_MS` | Artificial delay for the fake deployer. Example: `700`. |
 | `PREVIEW_BASE_URL` | Origin used in preview links. Example: `http://localhost:3000`. |
+| `DATABASE_URL` | Optional. Neon (or Postgres) connection string. When set, board/admin environment state is stored in Postgres (`mayfly_state`) instead of `data/state.json`. Use Neon's pooled URL. Empty keeps the JSON file. |
 | `GITHUB_WEBHOOK_SECRET` | Required in production. In development, an empty value accepts unsigned deliveries. |
 | `GITHUB_TOKEN` | Optional. When set, preview comments are also posted on the pull request. |
 | `MAYFLY_ADMIN_TOKEN` | Required for every action that changes things. Send it as `Authorization: Bearer <token>` or `x-mayfly-admin: <token>`, or paste it into the board's **Admin** field. When empty, those actions are always refused with 401. Generate one with `openssl rand -hex 32`. |
@@ -117,7 +118,7 @@ Preview processes receive only `PATH`, `NODE_ENV` and `PREVIEW_*` variables (plu
 
 ## Known limitations
 
-Mayfly runs on one machine and stores state in a JSON file. On this machine each preview app runs in its own Docker container. Render has no Docker daemon, so it keeps the plain Node app. On Vercel the deployer is a simulation: it writes records and does not start preview processes, and that state is ephemeral. Mayfly does not save preview logs; the app's output is discarded. Previews are still placeholder apps inside the container. They show the repository, branch, and commit, and do not build the pull request's real code.
+Mayfly runs on one machine. Environment state is a JSON file by default, or Neon/Postgres when `DATABASE_URL` is set. Local deployment records (`data/deployments.json`) stay on disk. On this machine each preview app can run in its own Docker container. Render has no Docker daemon, so it keeps the plain Node app. On Vercel the deployer is a simulation: it writes records and does not start preview processes, and that state is ephemeral unless `DATABASE_URL` is set. Mayfly does not save preview logs; the app's output is discarded. Process-mode and demo previews are still placeholder apps; Docker mode with `PREVIEW_REPOS` builds the pull request's own Dockerfile.
 
 ## Name
 

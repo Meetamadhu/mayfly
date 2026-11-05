@@ -24,3 +24,5 @@ services:
         sync: false
       - key: GITHUB_WEBHOOK_SECRET
         sync: false
+      - key: DATABASE_URL
+        sync: false
