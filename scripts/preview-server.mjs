@@ -21,25 +21,49 @@ const page = `<!doctype html>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${escapeHtml(repository)}#${escapeHtml(pr)}</title>
     <style>
-      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #efece4; color: #1c1915; font-family: "Segoe UI", system-ui, sans-serif; }
-      .card { width: min(36rem, calc(100% - 2rem)); overflow: hidden; border: 1px solid #ddd6c8; border-radius: 14px; background: #f7f5ef; }
-      .band { display: flex; align-items: flex-start; gap: 0.7rem; padding: 0.9rem 1.1rem; background: #6b4200; color: #fff; }
+      @font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/IBMPlexSans-Regular.woff2") format("woff2"); }
+      @font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/IBMPlexSans-Medium.woff2") format("woff2"); }
+      @font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 600; font-display: swap; src: url("/fonts/IBMPlexSans-SemiBold.woff2") format("woff2"); }
+      @font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 700; font-display: swap; src: url("/fonts/IBMPlexSans-Bold.woff2") format("woff2"); }
+      :root {
+        color-scheme: light;
+        --bg: #efece4; --surface: #f7f5ef; --ink: #1c1915; --muted: #6f685e; --line: #ddd6c8; --soft: #e7e1d4;
+        --on-ink: #f7f5ef; --accent: #ef6b42; --band-awake: #6b4200; --radius: 6px; --radius-lg: 14px; --btn-height: 44px;
+      }
+      html[data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #0f1c19; --surface: #17302b; --ink: #e8f0ea; --muted: #9bb0a8; --line: #2a4540; --soft: #1f3a34;
+        --on-ink: #0f1c19; --accent: #ef6b42; --band-awake: #6b4200;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; min-height: 100vh; display: grid; justify-items: center; align-content: start; gap: 1rem;
+        padding: 1.25rem 1rem 2rem; background: var(--bg); color: var(--ink);
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif; font-size: 16px; line-height: 1.45;
+      }
+      .mayfly-strip {
+        width: min(36rem, 100%); display: inline-flex; align-items: center; gap: 0.5rem;
+        padding: 0.65rem 0.9rem; border: 1px solid var(--line); border-radius: var(--radius-lg);
+        background: var(--surface); color: var(--ink); text-decoration: none; font-weight: 700; letter-spacing: -0.03em;
+      }
+      .mayfly-mark { width: 1.35rem; height: 1.2rem; color: var(--accent); flex: none; }
+      .card { width: min(36rem, 100%); overflow: hidden; border: 2px solid var(--band-awake); border-radius: var(--radius-lg); background: var(--surface); }
+      .band { display: flex; align-items: flex-start; gap: 0.7rem; padding: 0.9rem 1.1rem; background: var(--band-awake); color: #fff; }
       .band svg { flex: none; margin-top: 0.1rem; }
-      .word { margin: 0; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.06em; }
+      .word { margin: 0; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
       .note { margin: 0.2rem 0 0; font-size: 0.95rem; }
       .note.sub { font-size: 0.85rem; opacity: 0.85; }
       .body { padding: 1.15rem 1.15rem 1.25rem; }
       h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
-      h1 span { color: #6f685e; font-weight: 500; }
+      h1 span { color: var(--muted); font-weight: 500; }
       .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.75rem 0 0; }
-      .chip { border-radius: 999px; background: #e7e1d4; padding: 0.2rem 0.55rem; color: #1c1915; font-size: 0.84rem; }
+      .chip { border-radius: 999px; background: var(--soft); padding: 0.2rem 0.55rem; color: var(--ink); font-size: 0.84rem; }
       .mono { font-family: ui-monospace, monospace; }
-      .back { display: inline-flex; align-items: center; min-height: 44px; margin-top: 1rem; padding: 0 0.9rem; border-radius: 6px; background: #1c1915; color: #f7f5ef; font-weight: 600; text-decoration: none; }
-      html[data-theme="dark"] body { background: #141311; color: #f6f3ec; }
-      html[data-theme="dark"] .card { background: #221f1a; border-color: #3d362e; }
-      html[data-theme="dark"] h1 span { color: #c9c0b4; }
-      html[data-theme="dark"] .chip { background: #2c2822; color: #f6f3ec; }
-      html[data-theme="dark"] a.back { background: #f6f3ec; color: #141311; }
+      .back {
+        display: inline-flex; align-items: center; justify-content: center; min-height: var(--btn-height);
+        margin-top: 1rem; padding: 0.5rem 0.85rem; border: 1px solid var(--ink); border-radius: var(--radius);
+        background: var(--ink); color: var(--on-ink); font-weight: 600; text-decoration: none;
+      }
     </style>
     <script>
       try {
@@ -50,6 +74,12 @@ const page = `<!doctype html>
     </script>
   </head>
   <body>
+    <a class="mayfly-strip" href="/">
+      <svg class="mayfly-mark" viewBox="0 0 40 36" aria-hidden="true">
+        <path d="M19 30V13M20 18C-1 13 1-5 16 9l4 9C41-3 43 12 21 20M20 20C1 15 6 31 18 25M22 20c19-8 13 12 0 5M17 7l-3-5m8 5 4-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
+      </svg>
+      Mayfly
+    </a>
     <main class="card">
       <header class="band">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
@@ -57,7 +87,7 @@ const page = `<!doctype html>
           <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
         </svg>
         <div>
-          <p class="word">AWAKE</p>
+          <p class="word">Awake</p>
           <p class="note">This preview is awake.</p>
           <p class="note sub">This is Mayfly's demo app. Real pull requests show their own app here.</p>
         </div>
@@ -68,7 +98,7 @@ const page = `<!doctype html>
           <span class="chip">${escapeHtml(branch)}</span>
           <span class="chip mono">${escapeHtml(sha)}</span>
         </p>
-        <a class="back" href="/">Back</a>
+        <a class="back" href="/board">Back to board</a>
       </div>
     </main>
   </body>

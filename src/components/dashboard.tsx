@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { AdminHeader } from "@/components/admin-header";
 import type { Environment, EnvironmentStatus, Overview } from "@/lib/types";
 
 const TRANSITIONAL = new Set<EnvironmentStatus>(["provisioning", "updating", "destroying"]);
@@ -250,23 +250,8 @@ export function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [showRemoved, setShowRemoved] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
   const [now, setNow] = useState(() => Date.now());
   const [polledAt, setPolledAt] = useState<number | null>(null);
-
-  useEffect(() => {
-    setTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light");
-  }, []);
-
-  function chooseTheme(next: "light" | "dark") {
-    document.documentElement.dataset.theme = next;
-    try {
-      localStorage.setItem("mayfly-theme", next);
-    } catch {
-      // Storage can be blocked. The choice still applies to this page.
-    }
-    setTheme(next);
-  }
 
   const reload = useCallback(async () => {
     const response = await fetch("/api/environments", { cache: "no-store" });
@@ -346,20 +331,7 @@ export function Dashboard() {
           ) : null}
         </p>
       ) : null}
-      <header className="mast">
-        <div className="mast-copy">
-          <div className="mast-title">
-            <h1>Mayfly</h1>
-            <p className="subtitle">Pull request previews that sleep when idle</p>
-          </div>
-        </div>
-        <div className="mast-actions">
-          <ThemeToggle theme={theme} onChange={chooseTheme} />
-          <a className="admin-link" href="/admin/login">
-            Admin
-          </a>
-        </div>
-      </header>
+      <AdminHeader />
 
       <dl className="stats">
         <div>
@@ -428,31 +400,43 @@ export function Dashboard() {
           </div>
 
           <details className="advanced">
-            <summary>{dockerRuntime ? "Advanced: containers" : "Advanced: processes"}</summary>
-          <div className="stack">
-            {overview && overview.deployments.length === 0 ? (
-              <p className="empty">Nothing is listening. Closed, idle, and expired previews are gone.</p>
-            ) : null}
-            {overview?.deployments.map((deployment) => (
-              <article className="deployment" key={deployment.deploymentId}>
-                <div>
-                  <strong>
-                    {deployment.repository}
-                    <span>#{deployment.prNumber}</span>
-                  </strong>
-                  <p className="meta">
-                    <span className="chip mono">{deployment.sha.slice(0, 12)}</span>
-                    {deployment.port ? <span className="chip">port {deployment.port}</span> : null}
-                  </p>
-                </div>
-                {config?.deployer === "fake" ? null : (
-                  <a className="open-link" href={previewPath(deployment.url)}>
-                    Open
-                  </a>
-                )}
-              </article>
-            ))}
-          </div>
+            <summary>
+              {dockerRuntime ? "Advanced: containers" : "Advanced: processes"}
+              {overview && overview.deployments.length > 0 ? (
+                <span className="advanced-count">{overview.deployments.length}</span>
+              ) : null}
+            </summary>
+            <p className="advanced-help">
+              {dockerRuntime
+                ? "Containers that are still listening on this machine."
+                : "Gate and app processes that are still listening on this machine."}
+            </p>
+            <div className="stack advanced-list">
+              {overview && overview.deployments.length === 0 ? (
+                <p className="empty">Nothing is listening. Closed, idle, and expired previews are gone.</p>
+              ) : null}
+              {overview?.deployments.map((deployment) => (
+                <article className="deployment" key={deployment.deploymentId}>
+                  <div className="deployment-main">
+                    <strong>
+                      {deployment.repository}
+                      <span> #{deployment.prNumber}</span>
+                    </strong>
+                    <p className="meta">
+                      <span className="chip mono">{deployment.sha.slice(0, 8)}</span>
+                      {deployment.port ? (
+                        <span className="chip port-chip">port {deployment.port}</span>
+                      ) : null}
+                    </p>
+                  </div>
+                  {config?.deployer === "fake" ? null : (
+                    <a className="open-preview secondary" href={previewPath(deployment.url)}>
+                      Open
+                    </a>
+                  )}
+                </article>
+              ))}
+            </div>
           </details>
 
           {overview && removed.length > 0 ? (
