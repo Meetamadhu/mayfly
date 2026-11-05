@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { AdminHeader, MayflyMark } from "@/components/admin-header";
 
 const STEPS = [
   { label: "Open a PR", note: "GitHub sends a signed webhook" },
@@ -19,28 +19,8 @@ const CAPTIONS = [
   "Closing the PR, or letting it expire, removes the container and its image.",
 ];
 
-function MayflyMark({ className }: { className?: string }) {
-  // Same path as the concept mark in mayfly-landing.html.
-  return (
-    <svg className={className} viewBox="0 0 40 36" aria-hidden="true">
-      <path
-        d="M19 30V13M20 18C-1 13 1-5 16 9l4 9C41-3 43 12 21 20M20 20C1 15 6 31 18 25M22 20c19-8 13 12 0 5M17 7l-3-5m8 5 4-5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
 export function Landing() {
   const [step, setStep] = useState(0);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-
-  useEffect(() => {
-    setTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light");
-  }, []);
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -48,41 +28,11 @@ export function Landing() {
     return () => window.clearInterval(timer);
   }, []);
 
-  function chooseTheme(next: "light" | "dark") {
-    document.documentElement.dataset.theme = next;
-    try {
-      localStorage.setItem("mayfly-theme", next);
-    } catch {
-      // Storage can be blocked.
-    }
-    setTheme(next);
-  }
-
   return (
     <main className="landing">
-      <header className="landing-header">
-        <div className="landing-nav wrap">
-          <a className="landing-brand" href="/">
-            <MayflyMark className="landing-mark" />
-            mayfly
-          </a>
-          <nav className="landing-nav-links" aria-label="Landing">
-            <a href="#workflow">How it works</a>
-            <a href="#features">Features</a>
-            <a href="#faq">FAQ</a>
-            <a href="/board">Board</a>
-          </nav>
-          <div className="landing-nav-actions">
-            <ThemeToggle theme={theme} onChange={chooseTheme} />
-            <a className="landing-btn landing-btn-nav" href="/admin/login">
-              Sign in
-            </a>
-            <a className="landing-btn landing-btn-cta" href="/board">
-              Open board
-            </a>
-          </div>
-        </div>
-      </header>
+      <div className="landing-chrome wrap">
+        <AdminHeader />
+      </div>
 
       <section className="landing-hero">
         <div className="landing-hero-glow" aria-hidden="true" />
@@ -94,10 +44,10 @@ export function Landing() {
               Spin up a preview for every pull request. Review together. Clean up when you&apos;re done.
             </p>
             <div className="landing-actions">
-              <a className="landing-btn landing-btn-primary" href="/board">
+              <a className="btn" href="/board">
                 Open the board
               </a>
-              <a className="landing-btn landing-btn-ghost" href="/admin/login">
+              <a className="btn secondary" href="/admin/login">
                 Admin sign-in
               </a>
             </div>

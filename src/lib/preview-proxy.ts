@@ -37,26 +37,49 @@ function escapeHtml(value: string) {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
 
-// What a person sees at a preview address that has no live preview. The look follows the demo preview page
-// (scripts/preview-server.mjs): same colours, card and light/dark theme script.
+// What a person sees at a preview address that has no live preview. Matches board tokens / demo preview card.
 const NOT_FOUND_STYLE = `
-      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #efece4; color: #1c1915; font-family: "Segoe UI", system-ui, sans-serif; }
-      .card { width: min(36rem, calc(100% - 2rem)); overflow: hidden; border: 1px solid #ddd6c8; border-radius: 14px; background: #f7f5ef; }
-      .band { display: flex; align-items: center; gap: 0.7rem; padding: 0.9rem 1.1rem; background: #5b554b; color: #fff; }
+      @font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/IBMPlexSans-Regular.woff2") format("woff2"); }
+      @font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/IBMPlexSans-Medium.woff2") format("woff2"); }
+      @font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 600; font-display: swap; src: url("/fonts/IBMPlexSans-SemiBold.woff2") format("woff2"); }
+      @font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 700; font-display: swap; src: url("/fonts/IBMPlexSans-Bold.woff2") format("woff2"); }
+      :root {
+        color-scheme: light;
+        --bg: #efece4; --surface: #f7f5ef; --ink: #1c1915; --muted: #6f685e; --line: #ddd6c8; --soft: #e7e1d4;
+        --on-ink: #f7f5ef; --accent: #ef6b42; --dead: #5f594f; --radius: 6px; --radius-lg: 14px; --btn-height: 44px;
+      }
+      html[data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #0f1c19; --surface: #17302b; --ink: #e8f0ea; --muted: #9bb0a8; --line: #2a4540; --soft: #1f3a34;
+        --on-ink: #0f1c19; --accent: #ef6b42; --dead: #b7c7c1;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; min-height: 100vh; display: grid; justify-items: center; align-content: start; gap: 1rem;
+        padding: 1.25rem 1rem 2rem; background: var(--bg); color: var(--ink);
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif; font-size: 16px; line-height: 1.45;
+      }
+      .mayfly-strip {
+        width: min(36rem, 100%); display: inline-flex; align-items: center; gap: 0.5rem;
+        padding: 0.65rem 0.9rem; border: 1px solid var(--line); border-radius: var(--radius-lg);
+        background: var(--surface); color: var(--ink); text-decoration: none; font-weight: 700; letter-spacing: -0.03em;
+      }
+      .mayfly-mark { width: 1.35rem; height: 1.2rem; color: var(--accent); flex: none; }
+      .card { width: min(36rem, 100%); overflow: hidden; border: 2px solid var(--dead); border-radius: var(--radius-lg); background: var(--surface); }
+      .band { display: flex; align-items: center; gap: 0.7rem; padding: 0.9rem 1.1rem; background: var(--dead); color: #fff; }
+      html[data-theme="dark"] .band { background: #3d4a46; color: var(--dead); }
       .band svg { flex: none; }
-      .word { margin: 0; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.06em; }
+      .word { margin: 0; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
       .body { padding: 1.15rem 1.15rem 1.25rem; }
       h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
       .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.75rem 0 0; }
-      .chip { max-width: 100%; overflow-wrap: anywhere; border-radius: 999px; background: #e7e1d4; padding: 0.2rem 0.55rem; color: #1c1915; font-size: 0.84rem; }
-      p.line { margin: 0.9rem 0 0; color: #6f685e; }
-      .back { display: inline-flex; align-items: center; min-height: 44px; margin-top: 1rem; padding: 0 0.9rem; border-radius: 6px; background: #1c1915; color: #f7f5ef; font-weight: 600; text-decoration: none; }
-      html[data-theme="dark"] body { background: #141311; color: #f6f3ec; }
-      html[data-theme="dark"] .card { background: #221f1a; border-color: #3d362e; }
-      html[data-theme="dark"] .band { background: #3d362e; }
-      html[data-theme="dark"] .chip { background: #2c2822; color: #f6f3ec; }
-      html[data-theme="dark"] p.line { color: #c9c0b4; }
-      html[data-theme="dark"] a.back { background: #f6f3ec; color: #141311; }`;
+      .chip { max-width: 100%; overflow-wrap: anywhere; border-radius: 999px; background: var(--soft); padding: 0.2rem 0.55rem; color: var(--ink); font-size: 0.84rem; }
+      p.line { margin: 0.9rem 0 0; color: var(--muted); }
+      .back {
+        display: inline-flex; align-items: center; justify-content: center; min-height: var(--btn-height);
+        margin-top: 1rem; padding: 0.5rem 0.85rem; border: 1px solid var(--ink); border-radius: var(--radius);
+        background: var(--ink); color: var(--on-ink); font-weight: 600; text-decoration: none;
+      }`;
 
 const THEME_SCRIPT = `
       try {
@@ -80,13 +103,19 @@ function noPreview(repository: string, pr: string, line: string) {
     </script>
   </head>
   <body>
+    <a class="mayfly-strip" href="/">
+      <svg class="mayfly-mark" viewBox="0 0 40 36" aria-hidden="true">
+        <path d="M19 30V13M20 18C-1 13 1-5 16 9l4 9C41-3 43 12 21 20M20 20C1 15 6 31 18 25M22 20c19-8 13 12 0 5M17 7l-3-5m8 5 4-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
+      </svg>
+      Mayfly
+    </a>
     <main class="card">
       <header class="band">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
           <circle cx="12" cy="12" r="9" />
           <path d="M9 9l6 6M15 9l-6 6" />
         </svg>
-        <p class="word">NO PREVIEW</p>
+        <p class="word">No preview</p>
       </header>
       <div class="body">
         <h1>No live preview</h1>

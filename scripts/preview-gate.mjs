@@ -275,7 +275,7 @@ function escapeHtml(value) {
 const wakeLabel = `${escapeHtml(process.env.PREVIEW_REPOSITORY)}#${escapeHtml(process.env.PREVIEW_PR)}`;
 const wakeSha = escapeHtml((process.env.PREVIEW_SHA || "").slice(0, 7));
 
-// Self-contained: inline CSS and JS only, no external requests.
+// Self-contained HTML/CSS/JS. Fonts load from Mayfly at /fonts (same origin when opened via /p/...).
 const wakePage = `<!doctype html>
 <html lang="en">
   <head>
@@ -283,24 +283,49 @@ const wakePage = `<!doctype html>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Waking up this preview</title>
     <style>
-      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #efece4; color: #1c1915; font-family: "Segoe UI", system-ui, sans-serif; }
-      .card { width: min(36rem, calc(100% - 2rem)); overflow: hidden; border: 1px solid #ddd6c8; border-radius: 14px; background: #f7f5ef; }
-      .band { padding: 0.9rem 1.1rem; background: #8a5a12; color: #fff; }
-      .band.failed { background: #8d2e2e; }
-      .word { margin: 0; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.06em; }
-      h1 { margin: 0.2rem 0 0; font-size: 1.15rem; font-weight: 600; }
+      @font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/IBMPlexSans-Regular.woff2") format("woff2"); }
+      @font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/IBMPlexSans-Medium.woff2") format("woff2"); }
+      @font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 600; font-display: swap; src: url("/fonts/IBMPlexSans-SemiBold.woff2") format("woff2"); }
+      @font-face { font-family: "IBM Plex Sans"; font-style: normal; font-weight: 700; font-display: swap; src: url("/fonts/IBMPlexSans-Bold.woff2") format("woff2"); }
+      :root {
+        color-scheme: light;
+        --bg: #efece4; --surface: #f7f5ef; --ink: #1c1915; --muted: #6f685e; --line: #ddd6c8; --soft: #e7e1d4;
+        --on-ink: #f7f5ef; --accent: #ef6b42; --band-work: #8a5a12; --band-failed: #8d2e2e;
+        --radius: 6px; --radius-lg: 14px; --btn-height: 44px;
+      }
+      html[data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #0f1c19; --surface: #17302b; --ink: #e8f0ea; --muted: #9bb0a8; --line: #2a4540; --soft: #1f3a34;
+        --on-ink: #0f1c19; --accent: #ef6b42; --band-work: #8a5a12; --band-failed: #8d2e2e;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; min-height: 100vh; display: grid; justify-items: center; align-content: start; gap: 1rem;
+        padding: 1.25rem 1rem 2rem; background: var(--bg); color: var(--ink);
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif; font-size: 16px; line-height: 1.45;
+      }
+      .mayfly-strip {
+        width: min(36rem, 100%); display: inline-flex; align-items: center; gap: 0.5rem;
+        padding: 0.65rem 0.9rem; border: 1px solid var(--line); border-radius: var(--radius-lg);
+        background: var(--surface); color: var(--ink); text-decoration: none; font-weight: 700; letter-spacing: -0.03em;
+      }
+      .mayfly-mark { width: 1.35rem; height: 1.2rem; color: var(--accent); flex: none; }
+      .card { width: min(36rem, 100%); overflow: hidden; border: 2px solid var(--band-work); border-radius: var(--radius-lg); background: var(--surface); }
+      .card[data-failed="true"] { border-color: var(--band-failed); }
+      .band { padding: 0.9rem 1.1rem; background: var(--band-work); color: #fff; }
+      .band.failed { background: var(--band-failed); }
+      .word { margin: 0; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+      h1 { margin: 0.2rem 0 0; font-size: 1.15rem; font-weight: 600; color: #fff; }
       .body { padding: 1.15rem 1.15rem 1.3rem; }
-      .meta { margin: 0; color: #6f685e; }
+      .meta { margin: 0; color: var(--muted); }
       .sha { font-family: ui-monospace, monospace; }
-      .spinner { width: 28px; height: 28px; margin: 1rem 0; border: 3px solid #ddd6c8; border-top-color: #8a5a12; border-radius: 50%; animation: spin 0.9s linear infinite; }
-      a { color: #1c1915; }
-      a.back { display: inline-flex; align-items: center; min-height: 44px; margin-top: 1rem; padding: 0 0.9rem; border-radius: 6px; background: #1c1915; color: #f7f5ef; font-weight: 600; text-decoration: none; }
-      html[data-theme="dark"] body { background: #141311; color: #f6f3ec; }
-      html[data-theme="dark"] .card { background: #221f1a; border-color: #3d362e; }
-      html[data-theme="dark"] .meta { color: #c9c0b4; }
-      html[data-theme="dark"] a { color: #f6f3ec; }
-      html[data-theme="dark"] a.back { background: #f6f3ec; color: #141311; }
-      html[data-theme="dark"] .spinner { border-color: #3d362e; border-top-color: #f0c27a; }
+      .spinner { width: 28px; height: 28px; margin: 1rem 0; border: 3px solid var(--line); border-top-color: var(--band-work); border-radius: 50%; animation: spin 0.9s linear infinite; }
+      a { color: var(--ink); }
+      a.back {
+        display: inline-flex; align-items: center; justify-content: center; min-height: var(--btn-height);
+        margin-top: 1rem; padding: 0.5rem 0.85rem; border: 1px solid var(--ink); border-radius: var(--radius);
+        background: var(--ink); color: var(--on-ink); font-weight: 600; text-decoration: none;
+      }
       [hidden] { display: none; }
       @keyframes spin { to { transform: rotate(360deg); } }
     </style>
@@ -313,28 +338,34 @@ const wakePage = `<!doctype html>
     </script>
   </head>
   <body>
-    <main class="card">
+    <a class="mayfly-strip" href="/">
+      <svg class="mayfly-mark" viewBox="0 0 40 36" aria-hidden="true">
+        <path d="M19 30V13M20 18C-1 13 1-5 16 9l4 9C41-3 43 12 21 20M20 20C1 15 6 31 18 25M22 20c19-8 13 12 0 5M17 7l-3-5m8 5 4-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
+      </svg>
+      Mayfly
+    </a>
+    <main class="card" id="card">
       <div id="waking">
         <header class="band">
-          <p class="word">WAKING</p>
+          <p class="word">Waking</p>
           <h1>Waking up this preview</h1>
         </header>
         <div class="body">
           <p class="meta">${wakeLabel} <span class="sha">${wakeSha}</span></p>
           <div class="spinner" aria-hidden="true"></div>
           <p class="meta" role="status"><span id="elapsed">0</span>s</p>
-          <a class="back" href="/">Back</a>
+          <a class="back" href="/board">Back to board</a>
         </div>
       </div>
       <div id="failed" hidden>
         <header class="band failed">
-          <p class="word">FAILED</p>
+          <p class="word">Failed</p>
           <h1>Couldn't wake this preview</h1>
         </header>
         <div class="body">
           <p class="meta">${wakeLabel} <span class="sha">${wakeSha}</span></p>
           <p><a id="retry" href="">Retry</a></p>
-          <a class="back" href="/">Back</a>
+          <a class="back" href="/board">Back to board</a>
         </div>
       </div>
     </main>
@@ -347,6 +378,7 @@ const wakePage = `<!doctype html>
           if (failed) {
             document.getElementById("waking").hidden = true;
             document.getElementById("failed").hidden = false;
+            document.getElementById("card").setAttribute("data-failed", "true");
             document.getElementById("retry").href = location.href;
           }
         }
