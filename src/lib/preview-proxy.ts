@@ -1,5 +1,6 @@
 import { request as forward } from "node:http";
 import { Readable } from "node:stream";
+import { ADMIN_COOKIE } from "./admin";
 import { findProxyTarget, recordActivity } from "./lifecycle";
 
 export interface PreviewParams {
@@ -21,6 +22,47 @@ const HOP_BY_HOP = new Set([
   "upgrade",
 ]);
 const REQUEST_ONLY_DROP = new Set(["host", "x-mayfly-admin"]);
+
+/** Isolates preview document JS from Mayfly's origin (no allow-same-origin). */
+const PREVIEW_SANDBOX_CSP =
+  "sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads";
+
+const MAYFLY_PAGE_HEADER = "x-mayfly-page";
+
+/** True when a Set-Cookie line would set or clear Mayfly's admin session cookie. */
+function isAdminSetCookie(value: string) {
+  const eq = value.indexOf("=");
+  const name = (eq === -1 ? value : value.slice(0, eq)).trim();
+  return name === ADMIN_COOKIE;
+}
+
+/**
+ * Prepare headers for the browser: drop forged Mayfly-page markers and admin cookie writes,
+ * then sandbox real preview app responses (Mayfly's own waking page is exempt).
+ */
+function finalizePreviewHeaders(responseHeaders: Headers) {
+  const mayflyPage = responseHeaders.get(MAYFLY_PAGE_HEADER);
+  responseHeaders.delete(MAYFLY_PAGE_HEADER);
+
+  const setCookies =
+    typeof responseHeaders.getSetCookie === "function"
+      ? responseHeaders.getSetCookie()
+      : (() => {
+          const single = responseHeaders.get("set-cookie");
+          return single ? [single] : [];
+        })();
+  if (setCookies.length > 0) {
+    responseHeaders.delete("set-cookie");
+    for (const cookie of setCookies) {
+      if (!isAdminSetCookie(cookie)) responseHeaders.append("set-cookie", cookie);
+    }
+  }
+
+  // Only the gate may set x-mayfly-page (it strips the header from the app). Skip sandbox for those pages.
+  if (!mayflyPage) {
+    responseHeaders.append("content-security-policy", PREVIEW_SANDBOX_CSP);
+  }
+}
 
 // A page load fans out into many asset requests. One state write per environment per second is plenty.
 const ACTIVITY_THROTTLE_MS = 1000;
@@ -124,7 +166,7 @@ function noPreview(repository: string, pr: string, line: string) {
           <span class="chip">PR #${shown(pr)}</span>
         </p>
         <p class="line">${escapeHtml(line)}</p>
-        <a class="back" href="/board">Back to board</a>
+        <a class="back" href="/admin">Back to admin</a>
       </div>
     </main>
   </body>
@@ -211,6 +253,7 @@ export async function proxyPreview(request: Request, params: PreviewParams): Pro
             if (Array.isArray(value)) for (const item of value) responseHeaders.append(key, item);
             else responseHeaders.set(key, value);
           }
+          finalizePreviewHeaders(responseHeaders);
           const status = incoming.statusCode || 502;
           const noBody = method === "HEAD" || status === 204 || status === 205 || status === 304;
           if (noBody) incoming.resume();
