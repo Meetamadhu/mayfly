@@ -240,6 +240,13 @@ setInterval(() => {
   if (alive() && !booting && lastActive > 0 && Date.now() - lastActive >= idleMs) stopApp();
 }, 500).unref();
 
+/** Drop headers a preview app must not use to influence Mayfly's proxy policy. */
+function appResponseHeaders(incoming) {
+  const headers = { ...incoming.headers };
+  delete headers["x-mayfly-page"];
+  return headers;
+}
+
 function proxy(req, res) {
   const upstream = forward(
     {
@@ -250,7 +257,8 @@ function proxy(req, res) {
       headers: { ...req.headers, host: `127.0.0.1:${appPort}` },
     },
     (response) => {
-      res.writeHead(response.statusCode || 502, response.headers);
+      // Never forward x-mayfly-page from the app — only this gate may mark Mayfly pages.
+      res.writeHead(response.statusCode || 502, appResponseHeaders(response));
       response.pipe(res);
     },
   );
@@ -354,7 +362,7 @@ const wakePage = `<!doctype html>
           <p class="meta">${wakeLabel} <span class="sha">${wakeSha}</span></p>
           <div class="spinner" aria-hidden="true"></div>
           <p class="meta" role="status"><span id="elapsed">0</span>s</p>
-          <a class="back" href="/board">Back to board</a>
+          <a class="back" href="/admin">Back to admin</a>
         </div>
       </div>
       <div id="failed" hidden>
@@ -365,7 +373,7 @@ const wakePage = `<!doctype html>
         <div class="body">
           <p class="meta">${wakeLabel} <span class="sha">${wakeSha}</span></p>
           <p><a id="retry" href="">Retry</a></p>
-          <a class="back" href="/board">Back to board</a>
+          <a class="back" href="/admin">Back to admin</a>
         </div>
       </div>
     </main>
@@ -428,9 +436,14 @@ const server = createServer((req, res) => {
     return;
   }
   // Browser navigation to a sleeping preview: start the boot, answer immediately.
+  // x-mayfly-page tells Mayfly's /p/ proxy to skip the preview sandbox so this page can poll and reload.
   if (req.method === "GET" && wantsHtml(req) && !(alive() && listening)) {
     boot().catch(() => {});
-    res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+    res.writeHead(200, {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      "x-mayfly-page": "waking",
+    });
     res.end(wakePage);
     return;
   }
