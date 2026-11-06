@@ -363,7 +363,6 @@ const wakePage = `<!doctype html>
           <div class="spinner" aria-hidden="true"></div>
           <p class="meta" role="status"><span id="elapsed">0</span>s</p>
           <a class="back" id="back" href="/board">Back to board</a>
-          <script>(function(){var a=document.getElementById("back");try{var r=document.referrer?new URL(document.referrer):null;if(r&&r.host===location.host&&r.pathname.indexOf("/admin")===0){a.href="/admin";a.textContent="Back to admin";}}catch(e){}})();</script>
         </div>
       </div>
       <div id="failed" hidden>
@@ -374,13 +373,29 @@ const wakePage = `<!doctype html>
         <div class="body">
           <p class="meta">${wakeLabel} <span class="sha">${wakeSha}</span></p>
           <p><a id="retry" href="">Retry</a></p>
-          <a class="back" id="back" href="/board">Back to board</a>
-          <script>(function(){var a=document.getElementById("back");try{var r=document.referrer?new URL(document.referrer):null;if(r&&r.host===location.host&&r.pathname.indexOf("/admin")===0){a.href="/admin";a.textContent="Back to admin";}}catch(e){}})();</script>
+          <a class="back" href="/board">Back to board</a>
         </div>
       </div>
     </main>
     <script>
       (function () {
+        function fromAdmin() {
+          try {
+            var r = document.referrer ? new URL(document.referrer) : null;
+            if (r && r.host === location.host && r.pathname.indexOf("/admin") === 0) return true;
+            if (new URLSearchParams(location.search).get("mayfly_from") === "admin") return true;
+          } catch (e) {}
+          return false;
+        }
+        function applyBack() {
+          document.querySelectorAll("a.back").forEach(function (a) {
+            if (fromAdmin()) {
+              a.href = "/admin";
+              a.textContent = "Back to admin";
+            }
+          });
+        }
+        applyBack();
         var started = Date.now();
         var timer = null;
         function stop(failed) {
@@ -390,6 +405,7 @@ const wakePage = `<!doctype html>
             document.getElementById("failed").hidden = false;
             document.getElementById("card").setAttribute("data-failed", "true");
             document.getElementById("retry").href = location.href;
+            applyBack();
           }
         }
         function tick() {
@@ -401,7 +417,16 @@ const wakePage = `<!doctype html>
             .then(function (body) {
               if (body && body.state === "awake") {
                 stop(false);
-                location.reload();
+                // Reload would lose the /admin referrer; keep it in the query for the sandboxed app page.
+                var next = location.pathname + location.search;
+                try {
+                  if (fromAdmin()) {
+                    var q = new URLSearchParams(location.search);
+                    q.set("mayfly_from", "admin");
+                    next = location.pathname + "?" + q.toString();
+                  }
+                } catch (e) {}
+                location.replace(next);
               }
             })
             .catch(function () {});
