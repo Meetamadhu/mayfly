@@ -4,6 +4,9 @@ export interface OrchestratorConfig {
   idleMs: number;
   ttlHours: number;
   idleHours: number;
+  /** Hard cap: expiresAt may never pass createdAt + this. */
+  maxLifetimeHours: number;
+  maxLifetimeMs: number;
   stuckMs: number;
   reaperIntervalMs: number;
   fakeDelayMs: number;
@@ -113,6 +116,7 @@ export function buildLimits() {
 export function getConfig(): OrchestratorConfig {
   const ttlHours = positiveNumber("PREVIEW_TTL_HOURS", 8) || 8;
   const idleHours = positiveNumber("PREVIEW_IDLE_HOURS", 4) || 4;
+  const maxLifetimeHours = positiveNumber("PREVIEW_MAX_LIFETIME_HOURS", 168) || 168;
   const maxConcurrent = positiveNumber("MAX_CONCURRENT_ENVIRONMENTS", 10) || 10;
   const sleepSeconds = positiveNumber("PREVIEW_SLEEP_SECONDS", 20) || 20;
 
@@ -120,6 +124,8 @@ export function getConfig(): OrchestratorConfig {
     maxConcurrent,
     ttlHours,
     idleHours,
+    maxLifetimeHours,
+    maxLifetimeMs: maxLifetimeHours * 60 * 60 * 1000,
     ttlMs: ttlHours * 60 * 60 * 1000,
     idleMs: idleHours * 60 * 60 * 1000,
     stuckMs: Math.max(
