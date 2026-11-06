@@ -362,7 +362,7 @@ const wakePage = `<!doctype html>
           <p class="meta">${wakeLabel} <span class="sha">${wakeSha}</span></p>
           <div class="spinner" aria-hidden="true"></div>
           <p class="meta" role="status"><span id="elapsed">0</span>s</p>
-          <a class="back" href="/admin">Back to admin</a>
+          <a class="back" href="/board">Back to board</a>
         </div>
       </div>
       <div id="failed" hidden>
@@ -373,7 +373,7 @@ const wakePage = `<!doctype html>
         <div class="body">
           <p class="meta">${wakeLabel} <span class="sha">${wakeSha}</span></p>
           <p><a id="retry" href="">Retry</a></p>
-          <a class="back" href="/admin">Back to admin</a>
+          <a class="back" href="/board">Back to board</a>
         </div>
       </div>
     </main>

@@ -166,7 +166,7 @@ function noPreview(repository: string, pr: string, line: string) {
           <span class="chip">PR #${shown(pr)}</span>
         </p>
         <p class="line">${escapeHtml(line)}</p>
-        <a class="back" href="/admin">Back to admin</a>
+        <a class="back" href="/board">Back to board</a>
       </div>
     </main>
   </body>
