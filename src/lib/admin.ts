@@ -75,7 +75,9 @@ function originMatchesHost(request: Request) {
 
 export function sessionCookie(value: string, maxAge: number) {
   const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
-  return `${ADMIN_COOKIE}=${value}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure}`;
+  // Lax so a top-level click from a sandboxed preview (opaque origin) still sends the cookie
+  // and lands on /admin, not /admin/login. Non-GET admin actions still require a matching Origin.
+  return `${ADMIN_COOKIE}=${value}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}${secure}`;
 }
 
 export const SESSION_MAX_AGE = SESSION_SECONDS;
