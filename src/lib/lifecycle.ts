@@ -323,7 +323,8 @@ async function reserve(event: PullRequestEvent): Promise<LifecycleResult> {
       existing.branch = normalized.branch;
       existing.updatedAt = now;
       existing.lastActiveAt = now;
-      existing.expiresAt = expiresAt;
+      // Keep the later of the current expiry and a fresh TTL so an extended preview is not shortened.
+      existing.expiresAt = iso(Math.max(Date.parse(existing.expiresAt), Date.parse(expiresAt)));
       existing.error = null;
       existing.updateGeneration += 1;
       await saveState(state);
@@ -517,6 +518,57 @@ export async function destroyEnvironment(
 function isDemo(env: Environment) {
   const demo = getConfig().demo;
   return Boolean(demo && env.repository === demo.repository && env.prNumber === demo.prNumber);
+}
+
+const EXTEND_HOURS = new Set([2, 4, 12, 24]);
+
+/** Push expiresAt forward by a fixed number of hours, capped at createdAt + max lifetime. */
+export async function extendEnvironment(id: string, hours: number): Promise<LifecycleResult> {
+  if (!EXTEND_HOURS.has(hours)) {
+    return { ok: false, code: "invalid", error: "hours must be 2, 4, 12, or 24." };
+  }
+
+  return exclusive(async () => {
+    const state = await loadState();
+    const env = state.environments.find((item) => item.id === id);
+    if (!env) return { ok: false, code: "not_found", error: "No environment with that id." };
+    if (env.status === "destroying" || env.status === "destroyed" || !isLiveStatus(env.status)) {
+      return {
+        ok: false,
+        code: "conflict",
+        error: "Only a live preview can be extended.",
+        environment: clone(env),
+      };
+    }
+    if (isDemo(env)) {
+      return {
+        ok: false,
+        code: "invalid",
+        error: "The demo preview does not expire.",
+        environment: clone(env),
+      };
+    }
+
+    const nowMs = Date.now();
+    const currentExpires = Date.parse(env.expiresAt);
+    const createdMs = Date.parse(env.createdAt);
+    const cap = createdMs + getConfig().maxLifetimeMs;
+    const base = Math.max(nowMs, currentExpires);
+    if (!(base < cap)) {
+      return {
+        ok: false,
+        code: "invalid",
+        error: "Already at the maximum lifetime.",
+        environment: clone(env),
+      };
+    }
+
+    const next = Math.min(base + hours * 60 * 60 * 1000, cap);
+    env.expiresAt = iso(next);
+    env.updatedAt = iso(nowMs);
+    await saveState(state);
+    return { ok: true, action: "updated", environment: clone(env) };
+  });
 }
 
 /** Ask the gate on this machine to stop the app. The public /p/ proxy is not used. */

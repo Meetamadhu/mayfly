@@ -135,6 +135,7 @@ export function AdminPanel() {
   const [sha, setSha] = useState(SAMPLE.sha);
   const repositoryEdited = useRef(false);
   const [ttlMinutes, setTtlMinutes] = useState("480");
+  const [extendHours, setExtendHours] = useState("4");
   const [now, setNow] = useState(() => Date.now());
 
   const reload = useCallback(async () => {
@@ -224,6 +225,25 @@ export function AdminPanel() {
     try {
       const response = await fetch(`/api/environments/${id}?action=sleep`, { method: "POST", credentials: "include" });
       await readBody(response);
+      await reload();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Request failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function extend(env: Environment) {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await fetch(
+        `/api/environments/${env.id}?action=extend&hours=${encodeURIComponent(extendHours)}`,
+        { method: "POST", credentials: "include" },
+      );
+      const body = (await readBody(response)) as { environment: Environment };
+      setNotice(`Extended. New expiry ${body.environment.expiresAt}.`);
       await reload();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Request failed.");
@@ -343,6 +363,20 @@ export function AdminPanel() {
                     )}
                     <button type="button" className="secondary" disabled={busy || !canSleep} onClick={() => void sleepNow(env.id)}>
                       Sleep now
+                    </button>
+                    <select
+                      aria-label="Extend by"
+                      value={extendHours}
+                      disabled={busy || demo}
+                      onChange={(event) => setExtendHours(event.target.value)}
+                    >
+                      <option value="2">2h</option>
+                      <option value="4">4h</option>
+                      <option value="12">12h</option>
+                      <option value="24">24h</option>
+                    </select>
+                    <button type="button" className="secondary" disabled={busy || demo} onClick={() => void extend(env)}>
+                      Extend
                     </button>
                     <button type="button" className="destroy" disabled={busy || env.status === "destroying"} onClick={() => void destroy(env)}>
                       Destroy
