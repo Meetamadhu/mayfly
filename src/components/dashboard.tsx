@@ -467,19 +467,8 @@ export function Dashboard() {
               ))}
             </div>
           ) : null}
-        </section>
-
-        <div className="sim-column">
-          <section className="panel try-it">
-            <h2>Try it</h2>
-            <ol>
-              <li>Open a preview (the Demo, or a real PR if one is listed).</li>
-              <li>You&apos;ll see &apos;Waking up&apos;, then the page.</li>
-              <li>Come back: it shows Awake, then Asleep after {config?.sleepSeconds ?? 20} s.</li>
-            </ol>
-          </section>
           {error ? <p className="error" role="alert">{error}</p> : null}
-        </div>
+        </section>
       </div>
 
       <p className="footer">
