@@ -362,7 +362,8 @@ const wakePage = `<!doctype html>
           <p class="meta">${wakeLabel} <span class="sha">${wakeSha}</span></p>
           <div class="spinner" aria-hidden="true"></div>
           <p class="meta" role="status"><span id="elapsed">0</span>s</p>
-          <a class="back" href="/board">Back to board</a>
+          <a class="back" id="back" href="/board">Back to board</a>
+          <script>(function(){var a=document.getElementById("back");try{var r=document.referrer?new URL(document.referrer):null;if(r&&r.host===location.host&&r.pathname.indexOf("/admin")===0){a.href="/admin";a.textContent="Back to admin";}}catch(e){}})();</script>
         </div>
       </div>
       <div id="failed" hidden>
@@ -373,7 +374,8 @@ const wakePage = `<!doctype html>
         <div class="body">
           <p class="meta">${wakeLabel} <span class="sha">${wakeSha}</span></p>
           <p><a id="retry" href="">Retry</a></p>
-          <a class="back" href="/board">Back to board</a>
+          <a class="back" id="back" href="/board">Back to board</a>
+          <script>(function(){var a=document.getElementById("back");try{var r=document.referrer?new URL(document.referrer):null;if(r&&r.host===location.host&&r.pathname.indexOf("/admin")===0){a.href="/admin";a.textContent="Back to admin";}}catch(e){}})();</script>
         </div>
       </div>
     </main>

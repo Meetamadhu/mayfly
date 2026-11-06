@@ -98,7 +98,8 @@ const page = `<!doctype html>
           <span class="chip">${escapeHtml(branch)}</span>
           <span class="chip mono">${escapeHtml(sha)}</span>
         </p>
-        <a class="back" href="/board">Back to board</a>
+        <a class="back" id="back" href="/board">Back to board</a>
+        <script>(function(){var a=document.getElementById("back");try{var r=document.referrer?new URL(document.referrer):null;if(r&&r.host===location.host&&r.pathname.indexOf("/admin")===0){a.href="/admin";a.textContent="Back to admin";}}catch(e){}})();</script>
       </div>
     </main>
   </body>

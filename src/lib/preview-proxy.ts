@@ -166,7 +166,8 @@ function noPreview(repository: string, pr: string, line: string) {
           <span class="chip">PR #${shown(pr)}</span>
         </p>
         <p class="line">${escapeHtml(line)}</p>
-        <a class="back" href="/board">Back to board</a>
+        <a class="back" id="back" href="/board">Back to board</a>
+        <script>(function(){var a=document.getElementById("back");try{var r=document.referrer?new URL(document.referrer):null;if(r&&r.host===location.host&&r.pathname.indexOf("/admin")===0){a.href="/admin";a.textContent="Back to admin";}}catch(e){}})();</script>
       </div>
     </main>
   </body>
