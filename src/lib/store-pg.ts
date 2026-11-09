@@ -1,8 +1,20 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import net from "node:net";
 import { Pool, type PoolClient } from "pg";
 import type { State } from "./store";
 
+// Neon from far regions (e.g. Codespaces) often needs >250 ms to the first
+// address Node tries; without this, Autoselect fails with AggregateError.
+net.setDefaultAutoSelectFamilyAttemptTimeout(2000);
+
 const STATE_ID = 1;
+
+const RETRYABLE_CODES = new Set([
+  "ETIMEDOUT",
+  "ECONNRESET",
+  "ENETUNREACH",
+  "ECONNREFUSED",
+]);
 
 type PgStore = {
   client: PoolClient;
@@ -28,6 +40,28 @@ export function usesPostgres() {
   return Boolean(connectionString());
 }
 
+function isRetryableConnectError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const err = error as { code?: string; errors?: unknown[] };
+  if (err.code && RETRYABLE_CODES.has(err.code)) return true;
+  if (error instanceof AggregateError || Array.isArray(err.errors)) {
+    const nested = error instanceof AggregateError ? error.errors : err.errors ?? [];
+    return nested.some((inner) => isRetryableConnectError(inner));
+  }
+  return false;
+}
+
+async function connectClient(): Promise<PoolClient> {
+  const p = getPool();
+  try {
+    return await p.connect();
+  } catch (error) {
+    if (!isRetryableConnectError(error)) throw error;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    return await p.connect();
+  }
+}
+
 function getPool() {
   const url = connectionString();
   if (!url) throw new Error("DATABASE_URL is not set");
@@ -37,6 +71,9 @@ function getPool() {
       // Neon (and most hosted Postgres) require TLS.
       ssl: { rejectUnauthorized: true },
       max: 10,
+      connectionTimeoutMillis: 10000,
+      idleTimeoutMillis: 30000,
+      keepAlive: true,
     });
     pool.on("error", (error) => {
       console.error("Postgres pool error", error.message);
@@ -73,7 +110,7 @@ async function ensureSchema(client: PoolClient) {
 function ensureSchemaOnce() {
   if (!schemaReady) {
     schemaReady = (async () => {
-      const client = await getPool().connect();
+      const client = await connectClient();
       try {
         await ensureSchema(client);
       } finally {
@@ -105,7 +142,7 @@ export async function loadStatePg(): Promise<State> {
   const tx = pgTx.getStore();
   if (tx) return asState(tx.state);
   await ensureSchemaOnce();
-  const client = await getPool().connect();
+  const client = await connectClient();
   try {
     return await selectState(client, false);
   } finally {
@@ -144,7 +181,7 @@ export async function withPgExclusive<T>(fn: () => Promise<T>): Promise<T> {
   if (pgTx.getStore()) return fn();
 
   await ensureSchemaOnce();
-  const client = await getPool().connect();
+  const client = await connectClient();
   try {
     await client.query("BEGIN");
     const state = await selectState(client, true);
