@@ -8,12 +8,13 @@
   "portsAttributes": {
     "3000": {
       "label": "Mayfly",
-      "onAutoForward": "notify"
+      "onAutoForward": "openBrowser"
     },
     "2375": {
       "onAutoForward": "ignore"
     }
   },
   "postCreateCommand": "bash .devcontainer/setup.sh",
+  "postStartCommand": "bash .devcontainer/start.sh",
   "remoteUser": "node"
 }
