@@ -539,6 +539,9 @@ function usageForMonth(usage: UsageMonth | undefined, ms: number): UsageMonth {
   return usage;
 }
 
+/** First reaper tick after process start only reseeds lastSampleAt — downtime is not billed. */
+let usageSampleReady = false;
+
 const EXTEND_HOURS = new Set([2, 4, 12, 24]);
 
 /** Push expiresAt forward by a fixed number of hours, capped at createdAt + max lifetime. */
@@ -754,7 +757,10 @@ export async function reap(): Promise<ReapResult> {
     const state = await loadState();
     const month = monthKey(now);
     let usage = state.usage && state.usage.month === month ? { ...state.usage } : emptyUsage(now);
-    if (state.usage && state.usage.month === month) {
+    if (!usageSampleReady) {
+      usage.lastSampleAt = iso(now);
+      usageSampleReady = true;
+    } else if (state.usage && state.usage.month === month) {
       const elapsed = Math.min(
         300,
         Math.max(0, Math.floor((now - Date.parse(usage.lastSampleAt)) / 1000)),

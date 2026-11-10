@@ -248,6 +248,11 @@ function formatMoney(amount: number) {
   return amount.toFixed(2);
 }
 
+function formatSaved(amount: number) {
+  if (amount < 0.01) return "≈ < $0.01";
+  return `≈ $${amount.toFixed(2)}`;
+}
+
 function formatContainerHours(seconds: number) {
   const hours = seconds / 3600;
   if (hours >= 10) return hours.toFixed(1);
@@ -376,7 +381,7 @@ export function Dashboard() {
         </div>
         <div className="stat-saved" data-stat="saved">
           <dt>Saved this month</dt>
-          <dd>{overview ? `≈ $${formatMoney(overview.savedEstimate)}` : "–"}</dd>
+          <dd>{overview ? formatSaved(overview.savedEstimate) : "–"}</dd>
           <p className="stat-sub">
             {overview
               ? `${formatContainerHours(overview.usage?.asleepSeconds ?? 0)} container-hours asleep · estimate at $${formatMoney(overview.costPerHour ?? 0.05)} per container-hour`
