@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { loadStatePg, saveStatePg, usesPostgres, withPgExclusive } from "./store-pg";
+import { loadStateMongo, saveStateMongo, usesMongo, withMongoExclusive } from "./store-mongo";
 
 const locks = globalThis as unknown as Record<string, Promise<unknown> | undefined>;
 
@@ -20,10 +20,10 @@ const fileExclusive = createExclusive("__previewStateLock");
 
 /**
  * Serialize read-modify-write of environment state.
- * JSON mode: in-process queue. Postgres mode: one transaction with SELECT ... FOR UPDATE.
+ * JSON mode: in-process queue. MongoDB mode: lease lock on the state document.
  */
 export function exclusive<T>(fn: () => Promise<T>): Promise<T> {
-  if (usesPostgres()) return withPgExclusive(fn);
+  if (usesMongo()) return withMongoExclusive(fn);
   return fileExclusive(fn);
 }
 
@@ -91,14 +91,14 @@ export async function writeJson(file: string, value: unknown): Promise<void> {
 }
 
 export async function loadState(): Promise<State> {
-  if (usesPostgres()) return loadStatePg();
+  if (usesMongo()) return loadStateMongo();
   const state = await readJson<State>(stateFile(), { environments: [] });
   return asState(state);
 }
 
 export async function saveState(state: State): Promise<void> {
-  if (usesPostgres()) {
-    await saveStatePg(state);
+  if (usesMongo()) {
+    await saveStateMongo(state);
     return;
   }
   await writeJson(stateFile(), asState(state));
