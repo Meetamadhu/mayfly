@@ -67,6 +67,44 @@ function stateTone(env: Environment) {
   return "awake";
 }
 
+function stateNote(env: Environment) {
+  if (env.status === "provisioning" || env.status === "updating") {
+    return "Setting up the preview for this commit.";
+  }
+  if (env.status === "destroying") return "Removing this preview.";
+  if (env.status === "failed") return "The preview did not start.";
+  if (env.sleep === "asleep") return "App stopped. Wakes on the next visit.";
+  if (env.sleep === "waking") return "Starting up…";
+  return "Ready for review.";
+}
+
+function formatAgo(iso: string, now: number) {
+  const delta = now - Date.parse(iso);
+  if (Number.isNaN(delta)) return iso;
+  const minutes = Math.round(Math.abs(delta) / 60000);
+  if (minutes < 1) return "just now";
+  const hours = Math.floor(Math.abs(delta) / 3600000);
+  const rest = minutes % 60;
+  if (hours >= 48) return `${Math.floor(hours / 24)} d ${hours % 24} h ago`;
+  if (hours > 0) return `${hours} h ${rest} m ago`;
+  return `${minutes} m ago`;
+}
+
+function formatExpiresValue(iso: string, now: number) {
+  const delta = Date.parse(iso) - now;
+  if (Number.isNaN(delta)) return iso;
+  if (delta <= 0) return "Expired";
+  const totalMin = Math.floor(delta / 60000);
+  const hours = Math.floor(totalMin / 60);
+  const mins = totalMin % 60;
+  if (hours >= 48) {
+    const days = Math.floor(hours / 24);
+    return `in ${days} d ${hours % 24} h`;
+  }
+  if (hours > 0) return `in ${hours} h ${mins} m`;
+  return `in ${Math.max(1, mins)} m`;
+}
+
 function webhookMode(mode: Overview["config"]["webhookVerification"]) {
   return mode === "signed" ? "Signed" : "Open in development";
 }
@@ -327,61 +365,74 @@ export function AdminPanel() {
               const demo = demoKey === `${env.repository}#${env.prNumber}`;
               const canSleep = env.status === "ready" && env.sleep === "awake";
               const tone = stateTone(env);
+              const expiresValue = demo ? "Always on" : formatExpiresValue(env.expiresAt, now);
               return (
-                <li key={env.id} data-tone={tone}>
-                  <div className="preview-top">
-                    <span className="state-pill" data-state={tone}>
-                      {stateWord(env)}
-                    </span>
-                    <span className="activity-repo">
-                      {env.repository} <span className="activity-pr">#{env.prNumber}</span>
-                    </span>
+                <li key={env.id} className={env.status === "ready" ? "env featured" : "env"}>
+                  <header className="state-band" data-state={tone}>
+                    <div>
+                      <p className="state-word">{stateWord(env)}</p>
+                      <p className="explainer">{stateNote(env)}</p>
+                    </div>
+                    {demo ? <span className="chip demo-chip">Demo</span> : null}
+                  </header>
+                  <div className="card-body">
+                    <p className="card-repo">{env.repository}</p>
+                    <h3>{demo ? <>#{env.prNumber} · demo</> : <>#{env.prNumber}</>}</h3>
+                    <p className="meta meta-facts">
+                      {demo ? null : (
+                        <span className="fact-pill" data-fact="branch">
+                          <span className="fact-label">Branch</span>
+                          <span className="fact-value mono">{env.branch}</span>
+                        </span>
+                      )}
+                      <span className="fact-pill" data-fact="visit">
+                        <span className="fact-label">Last visit</span>
+                        <span className="fact-value">{formatAgo(env.lastActiveAt, now)}</span>
+                      </span>
+                      <span className="fact-pill" data-fact="expires">
+                        <span className="fact-label">Expires</span>
+                        <span className="fact-value">{expiresValue}</span>
+                      </span>
+                    </p>
+                    {demo ? null : (
+                      <p className="meta">
+                        <span className="chip mono">{env.sha.slice(0, 8)}</span>
+                      </p>
+                    )}
                   </div>
-                  <p className="meta meta-facts">
-                    <span className="fact-pill" data-fact="branch">
-                      <span className="fact-label">Branch</span>
-                      <span className="fact-value mono">{env.branch}</span>
-                    </span>
-                    <span className="fact-pill" data-fact="visit">
-                      <span className="fact-label">Last visit</span>
-                      <span className="fact-value">{formatDelta(env.lastActiveAt, now)}</span>
-                    </span>
-                    <span className="fact-pill" data-fact="expires">
-                      <span className="fact-label">Expires</span>
-                      <span className="fact-value">{demo ? "Always on" : formatDelta(env.expiresAt, now)}</span>
-                    </span>
-                  </p>
-                  <div className="row-actions">
+                  <footer className="card-foot card-foot-admin">
                     {env.url ? (
                       <a className="open-preview" href={previewPath(env.url)}>
-                        Open
+                        Open preview
                       </a>
                     ) : (
                       <button type="button" className="open-preview" disabled>
-                        Open
+                        Open preview
                       </button>
                     )}
-                    <button type="button" className="secondary" disabled={busy || !canSleep} onClick={() => void sleepNow(env.id)}>
-                      Sleep now
-                    </button>
-                    <select
-                      aria-label="Extend by"
-                      value={extendHours}
-                      disabled={busy || demo}
-                      onChange={(event) => setExtendHours(event.target.value)}
-                    >
-                      <option value="2">2h</option>
-                      <option value="4">4h</option>
-                      <option value="12">12h</option>
-                      <option value="24">24h</option>
-                    </select>
-                    <button type="button" className="secondary" disabled={busy || demo} onClick={() => void extend(env)}>
-                      Extend
-                    </button>
-                    <button type="button" className="destroy" disabled={busy || env.status === "destroying"} onClick={() => void destroy(env)}>
-                      Destroy
-                    </button>
-                  </div>
+                    <div className="admin-actions">
+                      <button type="button" className="secondary" disabled={busy || !canSleep} onClick={() => void sleepNow(env.id)}>
+                        Sleep now
+                      </button>
+                      <select
+                        aria-label="Extend by"
+                        value={extendHours}
+                        disabled={busy || demo}
+                        onChange={(event) => setExtendHours(event.target.value)}
+                      >
+                        <option value="2">2h</option>
+                        <option value="4">4h</option>
+                        <option value="12">12h</option>
+                        <option value="24">24h</option>
+                      </select>
+                      <button type="button" className="secondary" disabled={busy || demo} onClick={() => void extend(env)}>
+                        Extend
+                      </button>
+                      <button type="button" className="destroy" disabled={busy || env.status === "destroying"} onClick={() => void destroy(env)}>
+                        Destroy
+                      </button>
+                    </div>
+                  </footer>
                 </li>
               );
             })}
