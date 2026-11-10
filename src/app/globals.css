@@ -752,21 +752,49 @@ html[data-theme="dark"] .env:has(.state-band[data-state="asleep"]) {
   overflow-wrap: anywhere;
 }
 
-.env h3 .card-title-sep {
-  color: var(--muted);
-  font-weight: 500;
+.meta-facts {
+  gap: 0.4rem;
 }
 
-.env h3 .card-branch {
-  color: var(--ink);
+.fact-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 100%;
+  border-radius: 999px;
+  padding: 0.28rem 0.7rem;
+  font-size: 0.8rem;
+  line-height: 1.25;
+}
+
+.fact-pill .fact-label {
+  flex: none;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.88;
+}
+
+.fact-pill .fact-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-weight: 600;
 }
 
-.card-quiet {
-  margin: 0.55rem 0 0;
-  color: var(--muted);
-  font-size: 0.84rem;
-  line-height: 1.4;
+.fact-pill[data-fact="branch"] {
+  background: var(--asleep-bg);
+  color: var(--asleep);
+}
+
+.fact-pill[data-fact="visit"] {
+  background: var(--awake-bg);
+  color: var(--awake);
+}
+
+.fact-pill[data-fact="expires"] {
+  background: var(--warn-bg);
+  color: var(--warn);
 }
 
 .meta, .comment, .footer, .url {
@@ -1108,7 +1136,6 @@ html[data-theme="dark"] .chip {
   border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
 }
 
-html[data-theme="dark"] .card-quiet,
 html[data-theme="dark"] .card-repo {
   color: var(--muted);
 }
@@ -1294,25 +1321,9 @@ html[data-theme="dark"] .preview-list li[data-tone="failed"] { border-left-color
   min-width: 0;
 }
 
-.preview-meta {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.55rem 1rem;
-  margin: 0;
+.preview-list .meta-facts {
+  margin: 0.15rem 0 0;
 }
-
-.preview-meta div { display: grid; gap: 0.12rem; min-width: 0; }
-
-.preview-meta dt {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.preview-meta dd { margin: 0; overflow-wrap: anywhere; }
 
 .preview-list .row-actions { margin-top: 0; }
 
@@ -1480,7 +1491,6 @@ html[data-theme="dark"] .activity li[data-tone="failed"] { border-left-color: #f
 }
 
 @media (max-width: 720px) {
-  .preview-meta { grid-template-columns: 1fr; }
   .settings div { grid-template-columns: 1fr; gap: 0.15rem; }
   .activity-when { margin-left: 0; }
 }

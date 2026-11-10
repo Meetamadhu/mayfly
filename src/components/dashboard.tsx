@@ -57,9 +57,7 @@ function EnvironmentCard({
         : view.note;
   const showOpen = env.status !== "failed" && env.status !== "destroying";
   const openDisabled = env.status === "provisioning" || !env.url;
-  const quietLine = demo
-    ? `Last visit ${formatAgo(env.lastActiveAt, now)} · Always on`
-    : `Last visit ${formatAgo(env.lastActiveAt, now)} · ${formatExpires(env.expiresAt, now)}`;
+  const expiresValue = demo ? "Always on" : formatExpiresValue(env.expiresAt, now);
 
   return (
     <article className={env.status === "ready" ? "env featured" : "env"} data-status={env.status}>
@@ -80,22 +78,27 @@ function EnvironmentCard({
       </header>
       <div className="card-body">
         <p className="card-repo">{env.repository}</p>
-        <h3>
-          {demo ? (
-            <>#{env.prNumber} · demo</>
-          ) : (
-            <>
-              #{env.prNumber}
-              <span className="card-title-sep"> · </span>
-              <span className="card-branch">{env.branch}</span>
-            </>
+        <h3>{demo ? <>#{env.prNumber} · demo</> : <>#{env.prNumber}</>}</h3>
+        <p className="meta meta-facts">
+          {demo ? null : (
+            <span className="fact-pill" data-fact="branch">
+              <span className="fact-label">Branch</span>
+              <span className="fact-value mono">{env.branch}</span>
+            </span>
           )}
-        </h3>
+          <span className="fact-pill" data-fact="visit">
+            <span className="fact-label">Last visit</span>
+            <span className="fact-value">{formatAgo(env.lastActiveAt, now)}</span>
+          </span>
+          <span className="fact-pill" data-fact="expires">
+            <span className="fact-label">Expires</span>
+            <span className="fact-value">{expiresValue}</span>
+          </span>
+        </p>
         <p className="meta">
           {demo ? null : <span className="chip mono">{env.sha.slice(0, 8)}</span>}
           {fromCode ? <span className="chip code-chip">Built from PR code</span> : null}
         </p>
-        <p className="card-quiet">{quietLine}</p>
         {path && env.url ? (
           <p className="url">
             <a href={previewHref(env.url)}>{path}</a>
@@ -287,7 +290,7 @@ function formatAgo(iso: string, now: number) {
   return `${minutes} m ago`;
 }
 
-function formatExpires(iso: string, now: number) {
+function formatExpiresValue(iso: string, now: number) {
   const delta = Date.parse(iso) - now;
   if (Number.isNaN(delta)) return iso;
   if (delta <= 0) return "Expired";
@@ -296,10 +299,10 @@ function formatExpires(iso: string, now: number) {
   const mins = totalMin % 60;
   if (hours >= 48) {
     const days = Math.floor(hours / 24);
-    return `Expires in ${days} d ${hours % 24} h`;
+    return `in ${days} d ${hours % 24} h`;
   }
-  if (hours > 0) return `Expires in ${hours} h ${mins} m`;
-  return `Expires in ${Math.max(1, mins)} m`;
+  if (hours > 0) return `in ${hours} h ${mins} m`;
+  return `in ${Math.max(1, mins)} m`;
 }
 
 function formatSleep(seconds: number) {
