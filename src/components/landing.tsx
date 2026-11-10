@@ -24,7 +24,9 @@ export function Landing() {
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const timer = window.setInterval(() => setStep((current) => (current + 1) % STEPS.length), 2800);
+    const timer = window.setInterval(() => {
+      setStep((current) => (current + 1) % STEPS.length);
+    }, 2800);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -55,11 +57,6 @@ export function Landing() {
             </div>
             <div className="landing-hero-visual" aria-hidden="true">
               <MayflyMark className="landing-hero-mark" />
-              <div className="landing-hero-stage">
-                <span>pr / checkout / 142</span>
-                <span>preview live</span>
-                <span>sleeps when idle</span>
-              </div>
             </div>
           </div>
         </section>
