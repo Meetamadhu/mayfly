@@ -397,89 +397,118 @@ export function AdminPanel() {
           <p className="help">
             This talks to Mayfly directly. GitHub can send the same actions to <span className="mono">/api/webhooks/github</span>.
           </p>
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              void send("opened");
-            }}
-          >
-            <label>
-              Repository
-              <input
-                value={repository}
-                onChange={(event) => {
-                  repositoryEdited.current = true;
-                  setRepository(event.target.value);
+          <article className="sim-pr-card" aria-label="Pull request draft">
+            <header className="sim-pr-band">
+              <span className="sim-pr-open">Open</span>
+              <div className="sim-pr-title">
+                <p className="sim-pr-repo">{repository || SAMPLE.repository}</p>
+                <h3>
+                  #{prNumber || SAMPLE.prNumber}
+                  <span className="sim-pr-sep"> · </span>
+                  <span className="mono">{branch || SAMPLE.branch}</span>
+                </h3>
+              </div>
+            </header>
+            <div className="sim-pr-body">
+              <p className="meta meta-facts">
+                <span className="fact-pill" data-fact="branch">
+                  <span className="fact-label">Branch</span>
+                  <span className="fact-value mono">{branch || SAMPLE.branch}</span>
+                </span>
+                <span className="fact-pill" data-fact="visit">
+                  <span className="fact-label">Commit</span>
+                  <span className="fact-value mono">{sha.trim() ? sha.trim().slice(0, 8) : "latest"}</span>
+                </span>
+                <span className="fact-pill" data-fact="expires">
+                  <span className="fact-label">TTL</span>
+                  <span className="fact-value">{ttlMinutes === "0" ? "expire now" : `${ttlMinutes || "–"} m`}</span>
+                </span>
+              </p>
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void send("opened");
                 }}
-                placeholder={SAMPLE.repository}
-                required
-              />
-              {allowed !== undefined ? (
-                <small className="field-note">
-                  {allowed === null
-                    ? "Allowed: any (process mode)"
-                    : allowed.length > 0
-                      ? `Allowed: ${allowed.join(", ")}`
-                      : "Allowed: none (set PREVIEW_REPOS)"}
-                </small>
-              ) : null}
-            </label>
-            <label>
-              Pull request
-              <input
-                value={prNumber}
-                onChange={(event) => setPrNumber(event.target.value)}
-                placeholder={SAMPLE.prNumber}
-                inputMode="numeric"
-                required
-              />
-            </label>
-            <label>
-              Branch
-              <input value={branch} onChange={(event) => setBranch(event.target.value)} placeholder={SAMPLE.branch} required />
-            </label>
-            <label>
-              Commit
-              <input
-                value={sha}
-                onChange={(event) => setSha(event.target.value)}
-                placeholder="Empty = latest commit of the PR"
-                className="mono"
-              />
-            </label>
-            <label>
-              TTL minutes
-              <input
-                value={ttlMinutes}
-                onChange={(event) => setTtlMinutes(event.target.value)}
-                inputMode="numeric"
-                min={0}
-                max={10080}
-                required
-              />
-            </label>
-            <p className="help">Use 0 to expire as soon as the preview is ready, then run the reaper.</p>
-            <div className="actions">
-              <button type="submit" disabled={busy}>Open PR</button>
-              <button
-                type="button"
-                className="secondary"
-                disabled={busy}
-                onClick={() => void send("synchronize", { sha: "" })}
               >
-                Push commit
-              </button>
-              <button type="button" className="secondary" disabled={busy} onClick={() => void send("closed")}>
-                Close PR
-              </button>
-              <button type="button" className="secondary" disabled={busy} onClick={() => void send("closed", { merged: true })}>
-                Merge PR
-              </button>
-              <button type="button" className="secondary" disabled={busy} onClick={() => void runReaper()}>
-                Run reaper
-              </button>
+                <label>
+                  Repository
+                  <input
+                    value={repository}
+                    onChange={(event) => {
+                      repositoryEdited.current = true;
+                      setRepository(event.target.value);
+                    }}
+                    placeholder={SAMPLE.repository}
+                    required
+                  />
+                  {allowed !== undefined ? (
+                    <small className="field-note">
+                      {allowed === null
+                        ? "Allowed: any (process mode)"
+                        : allowed.length > 0
+                          ? `Allowed: ${allowed.join(", ")}`
+                          : "Allowed: none (set PREVIEW_REPOS)"}
+                    </small>
+                  ) : null}
+                </label>
+                <label>
+                  Pull request
+                  <input
+                    value={prNumber}
+                    onChange={(event) => setPrNumber(event.target.value)}
+                    placeholder={SAMPLE.prNumber}
+                    inputMode="numeric"
+                    required
+                  />
+                </label>
+                <label>
+                  Branch
+                  <input value={branch} onChange={(event) => setBranch(event.target.value)} placeholder={SAMPLE.branch} required />
+                </label>
+                <label>
+                  Commit
+                  <input
+                    value={sha}
+                    onChange={(event) => setSha(event.target.value)}
+                    placeholder="Empty = latest commit of the PR"
+                    className="mono"
+                  />
+                </label>
+                <label>
+                  TTL minutes
+                  <input
+                    value={ttlMinutes}
+                    onChange={(event) => setTtlMinutes(event.target.value)}
+                    inputMode="numeric"
+                    min={0}
+                    max={10080}
+                    required
+                  />
+                </label>
+                <p className="help">Use 0 to expire as soon as the preview is ready, then run the reaper.</p>
+                <div className="actions">
+                  <button type="submit" disabled={busy}>Open PR</button>
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={busy}
+                    onClick={() => void send("synchronize", { sha: "" })}
+                  >
+                    Push commit
+                  </button>
+                  <button type="button" className="secondary" disabled={busy} onClick={() => void send("closed")}>
+                    Close PR
+                  </button>
+                  <button type="button" className="secondary" disabled={busy} onClick={() => void send("closed", { merged: true })}>
+                    Merge PR
+                  </button>
+                  <button type="button" className="secondary" disabled={busy} onClick={() => void runReaper()}>
+                    Run reaper
+                  </button>
+                </div>
+              </form>
             </div>
-          </form>
+          </article>
         </details>
 
         <section className="panel" aria-label="Settings">
