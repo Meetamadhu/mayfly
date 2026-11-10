@@ -98,7 +98,7 @@ function EnvironmentCard({
         <p className="card-quiet">{quietLine}</p>
         {path && env.url ? (
           <p className="url">
-            <a href={path}>{path}</a>
+            <a href={previewHref(env.url)}>{path}</a>
             <button type="button" className="copy-icon" onClick={onCopy} aria-label={copied ? "Copied" : "Copy link"} title={copied ? "Copied" : "Copy link"}>
               {copied ? <CheckIcon /> : <ClipboardIcon />}
             </button>
@@ -115,7 +115,7 @@ function EnvironmentCard({
               Open preview
             </button>
           ) : (
-            <a className="open-preview" href={path ?? undefined}>
+            <a className="open-preview" href={previewHref(env.url)}>
               Open preview
             </a>
           )
@@ -236,6 +236,25 @@ function previewPath(url: string) {
     return new URL(url).pathname;
   } catch {
     return url;
+  }
+}
+
+/** Sandboxed previews cannot read localStorage; pass the board theme in the URL. */
+function previewHref(url: string | null | undefined) {
+  if (!url) return undefined;
+  const path = previewPath(url);
+  try {
+    const theme =
+      typeof document !== "undefined" &&
+      (document.documentElement.dataset.theme === "dark" || document.documentElement.dataset.theme === "light")
+        ? document.documentElement.dataset.theme
+        : null;
+    if (!theme) return path;
+    const next = new URL(path, typeof window !== "undefined" ? window.location.origin : "http://localhost");
+    next.searchParams.set("mayfly_theme", theme);
+    return `${next.pathname}${next.search}`;
+  } catch {
+    return path;
   }
 }
 

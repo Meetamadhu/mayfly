@@ -303,8 +303,14 @@ const wakePage = `<!doctype html>
       }
       html[data-theme="dark"] {
         color-scheme: dark;
-        --bg: #0f1c19; --surface: #17302b; --ink: #e8f0ea; --muted: #9bb0a8; --line: #2a4540; --soft: #1f3a34;
+        --bg: #0f1c19; --surface: #17302b; --ink: #e8f0ea; --muted: #9bb0a8; --line: #2a4540; --soft: #2a4a42;
         --on-ink: #0f1c19; --accent: #ef6b42; --band-work: #8a5a12; --band-failed: #8d2e2e;
+      }
+      @media (prefers-color-scheme: dark) {
+        html:not([data-theme="light"]) {
+          --bg: #0f1c19; --surface: #17302b; --ink: #e8f0ea; --muted: #9bb0a8; --line: #2a4540; --soft: #2a4a42;
+          --on-ink: #0f1c19; --accent: #ef6b42; --band-work: #8a5a12; --band-failed: #8d2e2e;
+        }
       }
       * { box-sizing: border-box; }
       body {
@@ -338,11 +344,27 @@ const wakePage = `<!doctype html>
       @keyframes spin { to { transform: rotate(360deg); } }
     </style>
     <script>
-      try {
-        var theme = localStorage.getItem("mayfly-theme");
-        if (theme !== "light" && theme !== "dark") theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      (function () {
+        var theme = null;
+        try {
+          var q = new URLSearchParams(location.search).get("mayfly_theme");
+          if (q === "light" || q === "dark") theme = q;
+        } catch (e) {}
+        if (!theme) {
+          try {
+            var stored = localStorage.getItem("mayfly-theme");
+            if (stored === "light" || stored === "dark") theme = stored;
+          } catch (e) {}
+        }
+        if (!theme) {
+          try {
+            theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          } catch (e) {
+            theme = "light";
+          }
+        }
         document.documentElement.dataset.theme = theme;
-      } catch (e) {}
+      })();
     </script>
   </head>
   <body>
