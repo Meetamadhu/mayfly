@@ -1327,13 +1327,76 @@ html[data-theme="dark"] .preview-list li[data-tone="failed"] { border-left-color
 
 .preview-list .row-actions { margin-top: 0; }
 
-.admin-panel .simulator form {
+.sim-pr-card {
+  display: grid;
   margin-top: 0.85rem;
-  padding: 0.9rem;
-  border: 1px solid #efeae0;
-  border-left: 4px solid #e4ddd0;
-  border-radius: 12px;
-  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--paper);
+  overflow: hidden;
+  box-shadow: 0 10px 28px rgba(28, 25, 21, 0.06);
+}
+
+.sim-pr-band {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  background: linear-gradient(135deg, #1f5c4a 0%, #2a6b56 55%, #3a7a62 100%);
+  color: #f4faf6;
+}
+
+.sim-pr-open {
+  flex: none;
+  border-radius: 999px;
+  padding: 0.22rem 0.65rem;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sim-pr-title {
+  min-width: 0;
+  flex: 1 1 12rem;
+}
+
+.sim-pr-repo {
+  margin: 0;
+  color: rgba(244, 250, 246, 0.78);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.sim-pr-title h3 {
+  margin: 0.15rem 0 0;
+  font-size: 1.15rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.sim-pr-sep { opacity: 0.65; font-weight: 500; }
+
+.sim-pr-body {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.95rem 1rem 1rem;
+  background: color-mix(in srgb, var(--paper) 92%, var(--soft));
+}
+
+.sim-pr-body .meta-facts { margin: 0; }
+
+.admin-panel .simulator form {
+  margin-top: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .admin-panel .simulator label {
@@ -1345,14 +1408,21 @@ html[data-theme="dark"] .preview-list li[data-tone="failed"] { border-left-color
 }
 
 .admin-panel .simulator input {
-  border: 1px solid #efeae0;
+  border: 1px solid var(--line);
   border-radius: 8px;
   min-height: 44px;
+  background: var(--field);
   color: var(--ink);
   font-size: 1rem;
   font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
+}
+
+.admin-panel .simulator input:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 1px;
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
 }
 
 .admin-panel .simulator input::placeholder {
@@ -1375,13 +1445,31 @@ html[data-theme="dark"] .preview-list li[data-tone="failed"] { border-left-color
 .admin-panel .simulator .actions {
   margin-top: 0.15rem;
   padding-top: 0.75rem;
-  border-top: 1px solid #efeae0;
+  border-top: 1px solid var(--line);
 }
 
-html[data-theme="dark"] .admin-panel .simulator form,
-html[data-theme="dark"] .admin-panel .simulator input,
+html[data-theme="dark"] .sim-pr-card {
+  border-color: var(--line);
+  background: var(--surface);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+}
+
+html[data-theme="dark"] .sim-pr-band {
+  background: linear-gradient(135deg, #163f35 0%, #1f5c4a 48%, #2a6b56 100%);
+  border-bottom: 1px solid color-mix(in srgb, #8fd4ad 22%, transparent);
+}
+
+html[data-theme="dark"] .sim-pr-body {
+  background: color-mix(in srgb, var(--paper) 82%, #000);
+}
+
+html[data-theme="dark"] .admin-panel .simulator input {
+  border-color: var(--line);
+  background: var(--field);
+}
+
 html[data-theme="dark"] .admin-panel .simulator .actions {
-  border-color: #3a342c;
+  border-color: var(--line);
 }
 
 .state-pill[data-state="awake"] { background: var(--awake-bg); color: var(--awake); }
