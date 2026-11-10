@@ -29,6 +29,7 @@ export function exclusive<T>(fn: () => Promise<T>): Promise<T> {
 
 export interface State {
   environments: import("./types").Environment[];
+  usage?: import("./types").UsageMonth;
 }
 
 export function dataDir() {
@@ -40,11 +41,31 @@ function stateFile() {
   return path.join(dataDir(), "state.json");
 }
 
+function asUsage(value: unknown): import("./types").UsageMonth | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const raw = value as Record<string, unknown>;
+  if (typeof raw.month !== "string" || !/^\d{4}-\d{2}$/.test(raw.month)) return undefined;
+  if (typeof raw.asleepSeconds !== "number" || !Number.isFinite(raw.asleepSeconds) || raw.asleepSeconds < 0) {
+    return undefined;
+  }
+  if (typeof raw.awakeSeconds !== "number" || !Number.isFinite(raw.awakeSeconds) || raw.awakeSeconds < 0) {
+    return undefined;
+  }
+  if (typeof raw.lastSampleAt !== "string" || !Number.isFinite(Date.parse(raw.lastSampleAt))) return undefined;
+  return {
+    month: raw.month,
+    asleepSeconds: raw.asleepSeconds,
+    awakeSeconds: raw.awakeSeconds,
+    lastSampleAt: raw.lastSampleAt,
+  };
+}
+
 function asState(value: unknown): State {
   if (!value || typeof value !== "object") return { environments: [] };
   const environments = (value as State).environments;
   if (!Array.isArray(environments)) return { environments: [] };
-  return { environments };
+  const usage = asUsage((value as State).usage);
+  return usage ? { environments, usage } : { environments };
 }
 
 export async function readJson<T>(file: string, fallback: T): Promise<T> {

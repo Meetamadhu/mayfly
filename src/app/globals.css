@@ -226,12 +226,12 @@ h1 {
 .stats {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 0;
+  gap: 0.65rem;
   margin: 0 0 1.25rem;
-  overflow: hidden;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 14px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
 }
 
 .stats div, .panel, .env {
@@ -240,42 +240,81 @@ h1 {
   border-radius: 8px;
 }
 
-.stats div { padding: 0.85rem 1rem 0.75rem; }
-
 .stats > div {
-  background: transparent;
-  border: 0;
-  border-right: 1px solid var(--line);
-  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0.85rem 0.95rem 0.8rem;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--glow) 55%, transparent), transparent 42%),
+    var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--ink) 4%, transparent);
 }
 
-.stats > div:last-child { border-right: 0; }
+.stats > div[data-stat="awake"] {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--awake-bg) 70%, var(--paper)), var(--paper) 70%);
+  border-color: color-mix(in srgb, var(--awake) 22%, var(--line));
+}
+
+.stats > div[data-stat="asleep"] {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--asleep-bg) 80%, var(--paper)), var(--paper) 70%);
+  border-color: color-mix(in srgb, var(--asleep) 18%, var(--line));
+}
+
+.stats > div[data-stat="saved"] {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.35rem 1.25rem;
+  padding: 0.95rem 1.1rem 0.9rem;
+  background:
+    linear-gradient(120deg, color-mix(in srgb, var(--success-bg) 85%, var(--paper)), var(--paper) 58%);
+  border-color: color-mix(in srgb, var(--success) 24%, var(--line));
+}
 
 .stats dt {
   color: var(--muted);
-  font-size: 0.78rem;
-  letter-spacing: 0.04em;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .stats dd {
-  margin: 0.2rem 0 0;
-  font-size: 1.7rem;
+  margin: 0.28rem 0 0;
+  font-size: 1.65rem;
+  font-weight: 600;
   letter-spacing: -0.04em;
+  line-height: 1.1;
 }
 
 .stats dd span {
   color: var(--muted);
-  font-size: 1rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.stats > div[data-stat="awake"] dd { color: var(--awake); }
+.stats > div[data-stat="asleep"] dd { color: var(--asleep); }
+.stats > div[data-stat="saved"] dd {
+  margin: 0.15rem 0 0;
+  color: var(--success);
+  font-size: 1.85rem;
 }
 
 .stats .meter {
-  height: 0.4rem;
-  margin-top: 0.7rem;
+  height: 0.35rem;
+  margin-top: auto;
   padding: 0;
   border: 0;
   border-radius: 999px;
-  background: var(--line);
+  background: color-mix(in srgb, var(--line) 80%, transparent);
   overflow: hidden;
 }
 
@@ -288,6 +327,25 @@ h1 {
 }
 
 .stats .meter span[data-hot="true"] { background: var(--work); }
+
+.stats .stat-sub {
+  flex: 1 1 14rem;
+  margin: 0;
+  max-width: 28rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.stats > div[data-stat="saved"] > :is(dt, dd) {
+  flex: 0 0 auto;
+}
+
+.stats > div[data-stat="saved"] dt {
+  width: 100%;
+}
 
 .workspace {
   display: flex;
@@ -754,23 +812,24 @@ a.url, .notice a, .url a {
   .advanced .open-preview.secondary { width: 100%; }
   .mast-title { flex-wrap: wrap; }
   .pills { justify-content: flex-start; }
-  .stats { grid-template-columns: 1fr 1fr; }
-  .stats > div { border-bottom: 1px solid var(--line); }
-  .stats > div:nth-child(even) { border-right: 0; }
-  .stats > div:nth-last-child(-n + 2) { border-bottom: 0; }
+  .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .stats > div[data-stat="saved"] { grid-column: 1 / -1; }
   .simulator form { grid-template-columns: 1fr; }
   .shell { width: min(100% - 1.25rem, 1120px); }
 }
 
 @media (max-width: 600px) {
-  .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .stats > div { padding: 0.6rem 0.45rem 0.5rem; }
-  .stats dd { font-size: 1.15rem; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.55rem; }
+  .stats > div { padding: 0.7rem 0.7rem 0.65rem; }
+  .stats dd { font-size: 1.25rem; }
   .stats dd span { font-size: 0.8rem; }
-  .stats > div:nth-child(even) { border-right: 1px solid var(--line); }
-  .stats > div:nth-child(3n) { border-right: 0; }
-  .stats > div:nth-last-child(-n + 2) { border-bottom: 1px solid var(--line); }
-  .stats > div:nth-last-child(-n + 3) { border-bottom: 0; }
+  .stats > div[data-stat="saved"] {
+    grid-column: 1 / -1;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .stats > div[data-stat="saved"] dd { font-size: 1.45rem; }
+  .stats .stat-sub { max-width: none; font-size: 0.72rem; }
 }
 
 .admin { margin-bottom: 1rem; }
@@ -1383,13 +1442,16 @@ html[data-theme="dark"] .activity li[data-tone="failed"] { border-left-color: #f
 .landing-hero {
   position: relative;
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   min-height: min(62vh, 560px);
   display: grid;
   align-content: center;
   margin-top: 1rem;
-  padding: 3.5rem 0 3rem;
+  padding: 3.5rem 1.25rem 3rem;
   background: var(--surface);
-  border-block: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   color: var(--text);
   overflow: hidden;
 }
@@ -1696,10 +1758,14 @@ html[data-theme="dark"] .activity li[data-tone="failed"] { border-left-color: #f
 }
 
 .landing-compare {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   margin-top: 3.5rem;
-  padding: 3.5rem 0;
+  padding: 2.75rem 1.25rem;
   background: var(--surface);
-  border-block: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   color: var(--text);
 }
 
@@ -1818,7 +1884,7 @@ html[data-theme="dark"] .activity li[data-tone="failed"] { border-left-color: #f
   .landing-steps { grid-template-columns: 1fr; }
   .landing-features,
   .landing-compare-grid { grid-template-columns: 1fr; }
-  .landing-hero { min-height: auto; padding: 2.75rem 0 3rem; }
+  .landing-hero { min-height: auto; padding: 2.75rem 1rem 3rem; }
   .landing-hero-inner {
     grid-template-columns: 1fr;
     gap: 2rem;

@@ -34,34 +34,36 @@ export function Landing() {
         <AdminHeader />
       </div>
 
-      <section className="landing-hero">
-        <div className="landing-hero-glow" aria-hidden="true" />
-        <div className="landing-hero-inner wrap">
-          <div className="landing-hero-main">
-            <h1>Mayfly</h1>
-            <p className="landing-lede landing-lede-lead">Give every pull request a place to land.</p>
-            <p className="landing-lede">
-              Spin up a preview for every pull request. Review together. Clean up when you&apos;re done.
-            </p>
-            <div className="landing-actions">
-              <a className="btn" href="/board">
-                Open the board
-              </a>
-              <a className="btn secondary" href="/admin/login">
-                Admin sign-in
-              </a>
+      <div className="wrap">
+        <section className="landing-hero">
+          <div className="landing-hero-glow" aria-hidden="true" />
+          <div className="landing-hero-inner">
+            <div className="landing-hero-main">
+              <h1>Mayfly</h1>
+              <p className="landing-lede landing-lede-lead">Give every pull request a place to land.</p>
+              <p className="landing-lede">
+                Spin up a preview for every pull request. Review together. Clean up when you&apos;re done.
+              </p>
+              <div className="landing-actions">
+                <a className="btn" href="/board">
+                  Open the board
+                </a>
+                <a className="btn secondary" href="/admin/login">
+                  Admin sign-in
+                </a>
+              </div>
+            </div>
+            <div className="landing-hero-visual" aria-hidden="true">
+              <MayflyMark className="landing-hero-mark" />
+              <div className="landing-hero-stage">
+                <span>pr / checkout / 142</span>
+                <span>preview live</span>
+                <span>sleeps when idle</span>
+              </div>
             </div>
           </div>
-          <div className="landing-hero-visual" aria-hidden="true">
-            <MayflyMark className="landing-hero-mark" />
-            <div className="landing-hero-stage">
-              <span>pr / checkout / 142</span>
-              <span>preview live</span>
-              <span>sleeps when idle</span>
-            </div>
-          </div>
-        </div>
-      </section>
+        </section>
+      </div>
 
       <div className="landing-orbit">
         <div className="wrap landing-orbit-row">
@@ -144,8 +146,8 @@ export function Landing() {
         </div>
       </section>
 
-      <section className="landing-compare">
-        <div className="wrap">
+      <div className="wrap">
+        <section className="landing-compare">
           <h2>Staging shouldn&apos;t stay on forever.</h2>
           <div className="landing-compare-grid">
             <div>
@@ -165,8 +167,8 @@ export function Landing() {
               </ul>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
 
       <section className="landing-section wrap" id="faq">
         <div className="landing-section-head">

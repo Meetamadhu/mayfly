@@ -113,6 +113,11 @@ export function buildLimits() {
   };
 }
 
+/** Assumed cost of one preview container running for an hour. */
+export function previewCostPerHour() {
+  return positiveNumber("PREVIEW_COST_PER_HOUR", 0.05) || 0.05;
+}
+
 export function getConfig(): OrchestratorConfig {
   const ttlHours = positiveNumber("PREVIEW_TTL_HOURS", 8) || 8;
   const idleHours = positiveNumber("PREVIEW_IDLE_HOURS", 4) || 4;

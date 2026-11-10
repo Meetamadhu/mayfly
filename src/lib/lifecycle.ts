@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { isBuilding } from "./builder";
-import { buildsPullRequests, getConfig, previewRepos, previewRuntime } from "./config";
+import { buildsPullRequests, getConfig, previewCostPerHour, previewRepos, previewRuntime } from "./config";
 import { getDeployer, previewUrl, publicPreviewUrl, type Deployment } from "./deployer";
 import { publishPullRequestComment } from "./http";
 import { exclusive, loadState, saveState } from "./store";
@@ -15,6 +15,7 @@ import {
   type PullRequestEvent,
   type ReapResult,
   type SleepState,
+  type UsageMonth,
 } from "./types";
 
 function clone<T>(value: T): T {
@@ -166,6 +167,7 @@ export async function findProxyTarget(
 
 export async function getOverview(): Promise<Overview> {
   const config = getConfig();
+  const costPerHour = previewCostPerHour();
   const [state, deployments] = await Promise.all([
     exclusive(async () => loadState()),
     getDeployer().list(),
@@ -180,6 +182,7 @@ export async function getOverview(): Promise<Overview> {
     sorted.map(async (env) => ({ ...env, sleep: await readSleep(env, deployments) })),
   );
 
+  const usage = usageForMonth(state.usage, Date.now());
   return {
     environments,
     deployments: deployments.map((item) => {
@@ -207,6 +210,9 @@ export async function getOverview(): Promise<Overview> {
       waking: environments.filter((env) => isLiveStatus(env.status) && env.sleep === "waking").length,
       asleep: environments.filter((env) => isLiveStatus(env.status) && env.sleep === "asleep").length,
     },
+    usage,
+    costPerHour,
+    savedEstimate: (usage.asleepSeconds / 3600) * costPerHour,
   };
 }
 
@@ -520,6 +526,19 @@ function isDemo(env: Environment) {
   return Boolean(demo && env.repository === demo.repository && env.prNumber === demo.prNumber);
 }
 
+function monthKey(ms: number) {
+  return new Date(ms).toISOString().slice(0, 7);
+}
+
+function emptyUsage(ms: number): UsageMonth {
+  return { month: monthKey(ms), asleepSeconds: 0, awakeSeconds: 0, lastSampleAt: iso(ms) };
+}
+
+function usageForMonth(usage: UsageMonth | undefined, ms: number): UsageMonth {
+  if (!usage || usage.month !== monthKey(ms)) return emptyUsage(ms);
+  return usage;
+}
+
 const EXTEND_HOURS = new Set([2, 4, 12, 24]);
 
 /** Push expiresAt forward by a fixed number of hours, capped at createdAt + max lifetime. */
@@ -716,8 +735,43 @@ export async function restorePreviews() {
 export async function reap(): Promise<ReapResult> {
   const config = getConfig();
   const now = Date.now();
+  const deployments = await getDeployer().list();
+
+  const sampled = await exclusive(async () => {
+    const state = await loadState();
+    return state.environments
+      .filter((env) => isLiveStatus(env.status) && !isDemo(env))
+      .map((env) => clone(env));
+  });
+  const sleepById = new Map<string, SleepState>();
+  await Promise.all(
+    sampled.map(async (env) => {
+      sleepById.set(env.id, await readSleep(env, deployments));
+    }),
+  );
+
   const due = await exclusive(async () => {
     const state = await loadState();
+    const month = monthKey(now);
+    let usage = state.usage && state.usage.month === month ? { ...state.usage } : emptyUsage(now);
+    if (state.usage && state.usage.month === month) {
+      const elapsed = Math.min(
+        300,
+        Math.max(0, Math.floor((now - Date.parse(usage.lastSampleAt)) / 1000)),
+      );
+      if (elapsed > 0) {
+        for (const env of state.environments) {
+          if (!isLiveStatus(env.status) || isDemo(env)) continue;
+          const sleep = sleepById.get(env.id);
+          if (sleep === "asleep") usage.asleepSeconds += elapsed;
+          else if (sleep === "awake") usage.awakeSeconds += elapsed;
+        }
+      }
+      usage.lastSampleAt = iso(now);
+    }
+    state.usage = usage;
+    await saveState(state);
+
     const targets: { id: string; reason: DestroyReason }[] = [];
     for (const env of state.environments) {
       const age = now - Date.parse(env.updatedAt);
