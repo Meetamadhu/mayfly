@@ -57,6 +57,10 @@ function EnvironmentCard({
         : view.note;
   const showOpen = env.status !== "failed" && env.status !== "destroying";
   const openDisabled = env.status === "provisioning" || !env.url;
+  const quietLine = demo
+    ? `Last visit ${formatAgo(env.lastActiveAt, now)} · Always on`
+    : `Last visit ${formatAgo(env.lastActiveAt, now)} · ${formatExpires(env.expiresAt, now)}`;
+
   return (
     <article className={env.status === "ready" ? "env featured" : "env"} data-status={env.status}>
       <header className="state-band" data-state={view.tone}>
@@ -75,29 +79,33 @@ function EnvironmentCard({
         {demo ? <span className="chip demo-chip">Demo</span> : null}
       </header>
       <div className="card-body">
+        <p className="card-repo">{env.repository}</p>
         <h3>
-          {env.repository}
-          <span> #{env.prNumber}</span>
+          {demo ? (
+            <>#{env.prNumber} · demo</>
+          ) : (
+            <>
+              #{env.prNumber}
+              <span className="card-title-sep"> · </span>
+              <span className="card-branch">{env.branch}</span>
+            </>
+          )}
         </h3>
         <p className="meta">
-          {demo ? null : <span className="chip">{env.branch}</span>}
           {demo ? null : <span className="chip mono">{env.sha.slice(0, 8)}</span>}
           {fromCode ? <span className="chip code-chip">Built from PR code</span> : null}
-          <span className="chip">Last visit {formatDelta(env.lastActiveAt)}</span>
-          {demo ? (
-            <span className="chip">Always on</span>
-          ) : (
-            <span className="chip">Removed {formatDelta(env.expiresAt)}</span>
-          )}
         </p>
+        <p className="card-quiet">{quietLine}</p>
         {path && env.url ? (
           <p className="url">
             <a href={path}>{path}</a>
-            <button type="button" className="secondary" onClick={onCopy}>
-              {copied ? "Copied" : "Copy"}
+            <button type="button" className="copy-icon" onClick={onCopy} aria-label={copied ? "Copied" : "Copy link"} title={copied ? "Copied" : "Copy link"}>
+              {copied ? <CheckIcon /> : <ClipboardIcon />}
             </button>
           </p>
-        ) : null}
+        ) : (
+          <p className="url url-empty" aria-hidden="true" />
+        )}
         {env.status === "failed" && env.error ? <pre className="fail-box">{env.error}</pre> : null}
       </div>
       <footer className="card-foot">
@@ -206,6 +214,23 @@ function StateIcon({ name }: { name: "moon" | "sun" | "clock" | "alert" }) {
   );
 }
 
+function ClipboardIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
 function previewPath(url: string) {
   try {
     return new URL(url).pathname;
@@ -229,6 +254,33 @@ function formatDelta(iso: string) {
         ? `${hours}h ${rest}m`
         : `${minutes}m`;
   return delta >= 0 ? `in ${text}` : `${text} ago`;
+}
+
+function formatAgo(iso: string, now: number) {
+  const delta = now - Date.parse(iso);
+  if (Number.isNaN(delta)) return iso;
+  const minutes = Math.round(Math.abs(delta) / 60000);
+  if (minutes < 1) return "just now";
+  const hours = Math.floor(Math.abs(delta) / 3600000);
+  const rest = minutes % 60;
+  if (hours >= 48) return `${Math.floor(hours / 24)} d ${hours % 24} h ago`;
+  if (hours > 0) return `${hours} h ${rest} m ago`;
+  return `${minutes} m ago`;
+}
+
+function formatExpires(iso: string, now: number) {
+  const delta = Date.parse(iso) - now;
+  if (Number.isNaN(delta)) return iso;
+  if (delta <= 0) return "Expired";
+  const totalMin = Math.floor(delta / 60000);
+  const hours = Math.floor(totalMin / 60);
+  const mins = totalMin % 60;
+  if (hours >= 48) {
+    const days = Math.floor(hours / 24);
+    return `Expires in ${days} d ${hours % 24} h`;
+  }
+  if (hours > 0) return `Expires in ${hours} h ${mins} m`;
+  return `Expires in ${Math.max(1, mins)} m`;
 }
 
 function formatSleep(seconds: number) {
@@ -348,6 +400,30 @@ export function Dashboard() {
       ) : null}
       <AdminHeader />
 
+      <section className="savings-hero" aria-label="Savings this month">
+        <p className="savings-figure">
+          {overview ? (
+            <>
+              {formatSaved(overview.savedEstimate)}
+              <span> saved this month</span>
+            </>
+          ) : (
+            "–"
+          )}
+        </p>
+        <p className="savings-sub">
+          {overview
+            ? `${formatContainerHours(overview.usage?.asleepSeconds ?? 0)} container-hours asleep · estimate at $${formatMoney(overview.costPerHour ?? 0.05)} per container-hour`
+            : "Waiting for the first reaper sample…"}
+        </p>
+      </section>
+
+      <p className="board-settings">
+        {config
+          ? `Sleeps after ${formatSleep(config.sleepSeconds)} · Max lifetime ${formatLifetime(config.ttlHours)}`
+          : "Sleeps after – · Max lifetime –"}
+      </p>
+
       <dl className="stats">
         <div data-stat="live">
           <dt>Live</dt>
@@ -371,27 +447,7 @@ export function Dashboard() {
           <dt>Removed</dt>
           <dd>{overview?.summary.destroyed ?? "–"}</dd>
         </div>
-        <div data-stat="sleep">
-          <dt>Sleeps after</dt>
-          <dd>{config ? formatSleep(config.sleepSeconds) : "–"}</dd>
-        </div>
-        <div data-stat="lifetime">
-          <dt>Max lifetime</dt>
-          <dd>{config ? formatLifetime(config.ttlHours) : "–"}</dd>
-        </div>
-        <div className="stat-saved" data-stat="saved">
-          <dt>Saved this month</dt>
-          <dd>{overview ? formatSaved(overview.savedEstimate) : "–"}</dd>
-          <p className="stat-sub">
-            {overview
-              ? `${formatContainerHours(overview.usage?.asleepSeconds ?? 0)} container-hours asleep · estimate at $${formatMoney(overview.costPerHour ?? 0.05)} per container-hour`
-              : "Waiting for the first reaper sample…"}
-          </p>
-        </div>
       </dl>
-      {polledAt != null ? (
-        <p className="updated">Updated {Math.max(0, Math.floor((now - polledAt) / 1000))} s ago</p>
-      ) : null}
 
       <div className="workspace">
         <section className="live-column">
@@ -423,60 +479,66 @@ export function Dashboard() {
             ))}
           </div>
 
-          <details className="advanced">
-            <summary>
-              {dockerRuntime ? "Advanced: containers" : "Advanced: processes"}
-              {overview && overview.deployments.length > 0 ? (
-                <span className="advanced-count">{overview.deployments.length}</span>
-              ) : null}
-            </summary>
-            <p className="advanced-help">
-              {dockerRuntime
-                ? "Containers that are still listening on this machine."
-                : "Gate and app processes that are still listening on this machine."}
-            </p>
-            <div className="stack advanced-list">
-              {overview && overview.deployments.length === 0 ? (
-                <p className="empty">Nothing is listening. Closed, idle, and expired previews are gone.</p>
-              ) : null}
-              {overview?.deployments.map((deployment) => (
-                <article className="deployment" key={deployment.deploymentId}>
-                  <div className="deployment-main">
-                    <strong>
-                      {deployment.repository}
-                      <span> #{deployment.prNumber}</span>
-                    </strong>
-                    <p className="meta">
-                      <span className="chip mono">{deployment.sha.slice(0, 8)}</span>
-                      {deployment.port ? (
-                        <span className="chip port-chip">port {deployment.port}</span>
-                      ) : null}
-                    </p>
-                  </div>
-                  {config?.deployer === "fake" ? null : (
-                    <a className="open-preview secondary" href={previewPath(deployment.url)}>
-                      Open
-                    </a>
-                  )}
-                </article>
-              ))}
-            </div>
-          </details>
+          <div className="board-toolbar">
+            <details className="advanced">
+              <summary>
+                {dockerRuntime ? "Advanced: containers" : "Advanced: processes"}
+                {overview && overview.deployments.length > 0 ? (
+                  <span className="advanced-count">{overview.deployments.length}</span>
+                ) : null}
+              </summary>
+              <p className="advanced-help">
+                {dockerRuntime
+                  ? "Containers that are still listening on this machine."
+                  : "Gate and app processes that are still listening on this machine."}
+              </p>
+              <div className="stack advanced-list">
+                {overview && overview.deployments.length === 0 ? (
+                  <p className="empty">Nothing is listening. Closed, idle, and expired previews are gone.</p>
+                ) : null}
+                {overview?.deployments.map((deployment) => (
+                  <article className="deployment" key={deployment.deploymentId}>
+                    <div className="deployment-main">
+                      <strong>
+                        {deployment.repository}
+                        <span> #{deployment.prNumber}</span>
+                      </strong>
+                      <p className="meta">
+                        <span className="chip mono">{deployment.sha.slice(0, 8)}</span>
+                        {deployment.port ? (
+                          <span className="chip port-chip">port {deployment.port}</span>
+                        ) : null}
+                      </p>
+                    </div>
+                    {config?.deployer === "fake" ? null : (
+                      <a className="open-preview secondary" href={previewPath(deployment.url)}>
+                        Open
+                      </a>
+                    )}
+                  </article>
+                ))}
+              </div>
+            </details>
 
-          {overview && removed.length > 0 ? (
-            <button
-              type="button"
-              className="history-toggle secondary"
-              aria-expanded={showRemoved}
-              onClick={() => setShowRemoved((open) => !open)}
-            >
-              {showRemoved ? "Hide removed" : "Show removed"}
-              <span>{removed.length}</span>
-            </button>
-          ) : null}
+            {overview && removed.length > 0 ? (
+              <button
+                type="button"
+                className="history-toggle secondary"
+                aria-expanded={showRemoved}
+                onClick={() => setShowRemoved((open) => !open)}
+              >
+                {showRemoved ? "Hide removed" : "Show removed"}
+                <span>{removed.length}</span>
+              </button>
+            ) : null}
+
+            {polledAt != null ? (
+              <p className="updated">Updated {Math.max(0, Math.floor((now - polledAt) / 1000))} s ago</p>
+            ) : null}
+          </div>
+
           {showRemoved && removed.length > 0 ? (
             <div className="stack">
-              {removed.length === 0 ? <p className="empty">No removed previews.</p> : null}
               {removed.map((env) => (
                 <EnvironmentCard
                   key={env.id}
