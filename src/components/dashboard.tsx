@@ -244,6 +244,16 @@ function formatLifetime(hours: number) {
   return `${hours} h`;
 }
 
+function formatMoney(amount: number) {
+  return amount.toFixed(2);
+}
+
+function formatContainerHours(seconds: number) {
+  const hours = seconds / 3600;
+  if (hours >= 10) return hours.toFixed(1);
+  return hours.toFixed(2);
+}
+
 export function Dashboard() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -334,7 +344,7 @@ export function Dashboard() {
       <AdminHeader />
 
       <dl className="stats">
-        <div>
+        <div data-stat="live">
           <dt>Live</dt>
           <dd>
             {overview ? liveCount : "–"}
@@ -344,25 +354,34 @@ export function Dashboard() {
             <span data-hot={capacityRatio >= 0.8 ? "true" : "false"} style={{ width: `${capacityRatio * 100}%` }} />
           </div>
         </div>
-        <div>
+        <div data-stat="awake">
           <dt>Awake</dt>
           <dd>{overview?.summary.awake ?? "–"}</dd>
         </div>
-        <div>
+        <div data-stat="asleep">
           <dt>Asleep</dt>
           <dd>{overview?.summary.asleep ?? "–"}</dd>
         </div>
-        <div>
+        <div data-stat="removed">
           <dt>Removed</dt>
           <dd>{overview?.summary.destroyed ?? "–"}</dd>
         </div>
-        <div>
+        <div data-stat="sleep">
           <dt>Sleeps after</dt>
           <dd>{config ? formatSleep(config.sleepSeconds) : "–"}</dd>
         </div>
-        <div>
+        <div data-stat="lifetime">
           <dt>Max lifetime</dt>
           <dd>{config ? formatLifetime(config.ttlHours) : "–"}</dd>
+        </div>
+        <div className="stat-saved" data-stat="saved">
+          <dt>Saved this month</dt>
+          <dd>{overview ? `≈ $${formatMoney(overview.savedEstimate)}` : "–"}</dd>
+          <p className="stat-sub">
+            {overview
+              ? `${formatContainerHours(overview.usage?.asleepSeconds ?? 0)} container-hours asleep · estimate at $${formatMoney(overview.costPerHour ?? 0.05)} per container-hour`
+              : "Waiting for the first reaper sample…"}
+          </p>
         </div>
       </dl>
       {polledAt != null ? (

@@ -89,6 +89,14 @@ export interface OrchestratorConfigView {
   onRender: boolean;
 }
 
+/** Accumulators for preview awake/asleep time in the current calendar month (UTC). */
+export interface UsageMonth {
+  month: string;
+  asleepSeconds: number;
+  awakeSeconds: number;
+  lastSampleAt: string;
+}
+
 export interface Overview {
   environments: Environment[];
   deployments: DeploymentRecord[];
@@ -101,6 +109,10 @@ export interface Overview {
     waking: number;
     asleep: number;
   };
+  usage: UsageMonth;
+  costPerHour: number;
+  /** asleepSeconds/3600 * costPerHour for the current month. */
+  savedEstimate: number;
 }
 
 export type LifecycleResult =
