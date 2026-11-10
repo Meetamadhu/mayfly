@@ -363,24 +363,48 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.65rem 0.85rem;
+  gap: 0.55rem 0.85rem;
+  width: fit-content;
+  max-width: 100%;
   margin-top: 1.1rem;
-  padding: 0.7rem 0.85rem;
+  padding: 0.55rem 0.85rem;
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 12px;
 }
 
+.board-toolbar-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.85rem;
+  width: fit-content;
+  max-width: 100%;
+}
+
 .board-toolbar .advanced {
   margin: 0;
-  flex: 1 1 14rem;
+  flex: 0 1 auto;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0;
   border: 0;
   background: transparent;
 }
 
+.board-toolbar .advanced[open] {
+  flex: 1 1 100%;
+  width: 100%;
+}
+
+.board-toolbar .advanced[open] ~ .updated {
+  margin-left: 0;
+}
+
 .board-toolbar .advanced summary {
   min-height: 40px;
-  padding: 0.35rem 0;
+  width: fit-content;
+  padding: 0.2rem 0;
 }
 
 .board-toolbar .history-toggle {
@@ -388,7 +412,7 @@ h1 {
 }
 
 .board-toolbar .updated {
-  margin: 0 0 0 auto;
+  margin: 0;
   color: var(--muted);
   font-size: 0.86rem;
   white-space: nowrap;
@@ -910,7 +934,6 @@ a.url, .notice a, .url a {
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .simulator form { grid-template-columns: 1fr; }
   .shell { width: min(100% - 1.25rem, 1120px); }
-  .board-toolbar .updated { margin-left: 0; width: 100%; }
   .stack:has(.env) { grid-template-columns: 1fr; }
   .env { min-height: 0; }
 }
@@ -923,10 +946,18 @@ a.url, .notice a, .url a {
   .stats dd { font-size: 1.25rem; }
   .stats dd span { font-size: 0.8rem; }
   .board-toolbar {
-    flex-direction: column;
-    align-items: stretch;
+    width: fit-content;
+    max-width: 100%;
+    padding: 0.45rem 0.7rem;
   }
-  .board-toolbar .updated { margin: 0; }
+  .board-toolbar-main {
+    width: fit-content;
+    max-width: 100%;
+  }
+  .board-toolbar .advanced[open] {
+    flex: 1 1 100%;
+    width: 100%;
+  }
 }
 
 .admin { margin-bottom: 1rem; }

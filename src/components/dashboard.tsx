@@ -301,7 +301,7 @@ function formatMoney(amount: number) {
 }
 
 function formatSaved(amount: number) {
-  if (amount < 0.01) return "≈ < $0.01";
+  if (amount < 0.01) return "< $0.01";
   return `≈ $${amount.toFixed(2)}`;
 }
 
@@ -480,45 +480,50 @@ export function Dashboard() {
           </div>
 
           <div className="board-toolbar">
-            <details className="advanced">
-              <summary>
-                {dockerRuntime ? "Advanced: containers" : "Advanced: processes"}
-                {overview && overview.deployments.length > 0 ? (
-                  <span className="advanced-count">{overview.deployments.length}</span>
-                ) : null}
-              </summary>
-              <p className="advanced-help">
-                {dockerRuntime
-                  ? "Containers that are still listening on this machine."
-                  : "Gate and app processes that are still listening on this machine."}
-              </p>
-              <div className="stack advanced-list">
-                {overview && overview.deployments.length === 0 ? (
-                  <p className="empty">Nothing is listening. Closed, idle, and expired previews are gone.</p>
-                ) : null}
-                {overview?.deployments.map((deployment) => (
-                  <article className="deployment" key={deployment.deploymentId}>
-                    <div className="deployment-main">
-                      <strong>
-                        {deployment.repository}
-                        <span> #{deployment.prNumber}</span>
-                      </strong>
-                      <p className="meta">
-                        <span className="chip mono">{deployment.sha.slice(0, 8)}</span>
-                        {deployment.port ? (
-                          <span className="chip port-chip">port {deployment.port}</span>
-                        ) : null}
-                      </p>
-                    </div>
-                    {config?.deployer === "fake" ? null : (
-                      <a className="open-preview secondary" href={previewPath(deployment.url)}>
-                        Open
-                      </a>
-                    )}
-                  </article>
-                ))}
-              </div>
-            </details>
+            <div className="board-toolbar-main">
+              <details className="advanced">
+                <summary>
+                  {dockerRuntime ? "Advanced: containers" : "Advanced: processes"}
+                  {overview && overview.deployments.length > 0 ? (
+                    <span className="advanced-count">{overview.deployments.length}</span>
+                  ) : null}
+                </summary>
+                <p className="advanced-help">
+                  {dockerRuntime
+                    ? "Containers that are still listening on this machine."
+                    : "Gate and app processes that are still listening on this machine."}
+                </p>
+                <div className="stack advanced-list">
+                  {overview && overview.deployments.length === 0 ? (
+                    <p className="empty">Nothing is listening. Closed, idle, and expired previews are gone.</p>
+                  ) : null}
+                  {overview?.deployments.map((deployment) => (
+                    <article className="deployment" key={deployment.deploymentId}>
+                      <div className="deployment-main">
+                        <strong>
+                          {deployment.repository}
+                          <span> #{deployment.prNumber}</span>
+                        </strong>
+                        <p className="meta">
+                          <span className="chip mono">{deployment.sha.slice(0, 8)}</span>
+                          {deployment.port ? (
+                            <span className="chip port-chip">port {deployment.port}</span>
+                          ) : null}
+                        </p>
+                      </div>
+                      {config?.deployer === "fake" ? null : (
+                        <a className="open-preview secondary" href={previewPath(deployment.url)}>
+                          Open
+                        </a>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              </details>
+              {polledAt != null ? (
+                <p className="updated">Updated {Math.max(0, Math.floor((now - polledAt) / 1000))} s ago</p>
+              ) : null}
+            </div>
 
             {overview && removed.length > 0 ? (
               <button
@@ -530,10 +535,6 @@ export function Dashboard() {
                 {showRemoved ? "Hide removed" : "Show removed"}
                 <span>{removed.length}</span>
               </button>
-            ) : null}
-
-            {polledAt != null ? (
-              <p className="updated">Updated {Math.max(0, Math.floor((now - polledAt) / 1000))} s ago</p>
             ) : null}
           </div>
 
@@ -557,12 +558,11 @@ export function Dashboard() {
         </section>
       </div>
 
-      <p className="footer">
-        {config?.deployer === "fake"
-          ? "This site keeps the record. The preview itself runs on the computer where Mayfly is running. "
-          : ""}
-        Each preview sleeps after {formatSleep(config?.sleepSeconds ?? 20)} without visitors and wakes on the next visit.
-      </p>
+      {config?.deployer === "fake" ? (
+        <p className="footer">
+          This site keeps the record. The preview itself runs on the computer where Mayfly is running.
+        </p>
+      ) : null}
     </main>
   );
 }
