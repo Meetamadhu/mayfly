@@ -337,20 +337,20 @@ export function AdminPanel() {
                       {env.repository} <span className="activity-pr">#{env.prNumber}</span>
                     </span>
                   </div>
-                  <dl className="preview-meta">
-                    <div>
-                      <dt>Branch</dt>
-                      <dd>{env.branch}</dd>
-                    </div>
-                    <div>
-                      <dt>Last visit</dt>
-                      <dd>{formatDelta(env.lastActiveAt, now)}</dd>
-                    </div>
-                    <div>
-                      <dt>Expires</dt>
-                      <dd>{demo ? "Always on" : formatDelta(env.expiresAt, now)}</dd>
-                    </div>
-                  </dl>
+                  <p className="meta meta-facts">
+                    <span className="fact-pill" data-fact="branch">
+                      <span className="fact-label">Branch</span>
+                      <span className="fact-value mono">{env.branch}</span>
+                    </span>
+                    <span className="fact-pill" data-fact="visit">
+                      <span className="fact-label">Last visit</span>
+                      <span className="fact-value">{formatDelta(env.lastActiveAt, now)}</span>
+                    </span>
+                    <span className="fact-pill" data-fact="expires">
+                      <span className="fact-label">Expires</span>
+                      <span className="fact-value">{demo ? "Always on" : formatDelta(env.expiresAt, now)}</span>
+                    </span>
+                  </p>
                   <div className="row-actions">
                     {env.url ? (
                       <a className="open-preview" href={previewPath(env.url)}>
