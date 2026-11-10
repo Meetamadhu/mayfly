@@ -54,7 +54,7 @@ html[data-theme="dark"] {
   --muted: #9bb0a8;
   --line: #2a4540;
   --border: var(--line);
-  --soft: #1f3a34;
+  --soft: #2a4a42;
   --field: #1f3a34;
   --on-ink: #0f1c19;
   --glow: rgba(232, 240, 234, 0.05);
@@ -1090,7 +1090,28 @@ html[data-theme="dark"] .state-band[data-state="asleep"] .state-word {
   font-weight: 600;
 }
 
-.card-body { padding: 1rem 1.05rem 0.9rem; min-width: 0; flex: 1 1 auto; }
+.card-body {
+  padding: 1rem 1.05rem 0.9rem;
+  min-width: 0;
+  flex: 1 1 auto;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+html[data-theme="dark"] .card-body {
+  background: color-mix(in srgb, var(--paper) 88%, #000);
+}
+
+html[data-theme="dark"] .chip {
+  background: var(--soft);
+  color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+}
+
+html[data-theme="dark"] .card-quiet,
+html[data-theme="dark"] .card-repo {
+  color: var(--muted);
+}
 
 .card-foot {
   display: flex;

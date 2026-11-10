@@ -28,12 +28,18 @@ const page = `<!doctype html>
       :root {
         color-scheme: light;
         --bg: #efece4; --surface: #f7f5ef; --ink: #1c1915; --muted: #6f685e; --line: #ddd6c8; --soft: #e7e1d4;
-        --on-ink: #f7f5ef; --accent: #ef6b42; --band-awake: #6b4200; --radius: 6px; --radius-lg: 14px; --btn-height: 44px;
+        --on-ink: #f7f5ef; --accent: #ef6b42; --band-awake: #1f5c4a; --radius: 6px; --radius-lg: 14px; --btn-height: 44px;
       }
       html[data-theme="dark"] {
         color-scheme: dark;
-        --bg: #0f1c19; --surface: #17302b; --ink: #e8f0ea; --muted: #9bb0a8; --line: #2a4540; --soft: #1f3a34;
-        --on-ink: #0f1c19; --accent: #ef6b42; --band-awake: #6b4200;
+        --bg: #0f1c19; --surface: #17302b; --ink: #e8f0ea; --muted: #9bb0a8; --line: #2a4540; --soft: #2a4a42;
+        --on-ink: #0f1c19; --accent: #ef6b42; --band-awake: #1f5c4a;
+      }
+      @media (prefers-color-scheme: dark) {
+        html:not([data-theme="light"]) {
+          --bg: #0f1c19; --surface: #17302b; --ink: #e8f0ea; --muted: #9bb0a8; --line: #2a4540; --soft: #2a4a42;
+          --on-ink: #0f1c19; --accent: #ef6b42; --band-awake: #1f5c4a;
+        }
       }
       * { box-sizing: border-box; }
       body {
@@ -66,11 +72,27 @@ const page = `<!doctype html>
       }
     </style>
     <script>
-      try {
-        var theme = localStorage.getItem("mayfly-theme");
-        if (theme !== "light" && theme !== "dark") theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      (function () {
+        var theme = null;
+        try {
+          var q = new URLSearchParams(location.search).get("mayfly_theme");
+          if (q === "light" || q === "dark") theme = q;
+        } catch (e) {}
+        if (!theme) {
+          try {
+            var stored = localStorage.getItem("mayfly-theme");
+            if (stored === "light" || stored === "dark") theme = stored;
+          } catch (e) {}
+        }
+        if (!theme) {
+          try {
+            theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          } catch (e) {
+            theme = "light";
+          }
+        }
         document.documentElement.dataset.theme = theme;
-      } catch (e) {}
+      })();
     </script>
   </head>
   <body>

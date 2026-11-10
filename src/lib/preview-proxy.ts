@@ -92,8 +92,14 @@ const NOT_FOUND_STYLE = `
       }
       html[data-theme="dark"] {
         color-scheme: dark;
-        --bg: #0f1c19; --surface: #17302b; --ink: #e8f0ea; --muted: #9bb0a8; --line: #2a4540; --soft: #1f3a34;
+        --bg: #0f1c19; --surface: #17302b; --ink: #e8f0ea; --muted: #9bb0a8; --line: #2a4540; --soft: #2a4a42;
         --on-ink: #0f1c19; --accent: #ef6b42; --dead: #b7c7c1;
+      }
+      @media (prefers-color-scheme: dark) {
+        html:not([data-theme="light"]) {
+          --bg: #0f1c19; --surface: #17302b; --ink: #e8f0ea; --muted: #9bb0a8; --line: #2a4540; --soft: #2a4a42;
+          --on-ink: #0f1c19; --accent: #ef6b42; --dead: #b7c7c1;
+        }
       }
       * { box-sizing: border-box; }
       body {
@@ -123,12 +129,30 @@ const NOT_FOUND_STYLE = `
         background: var(--ink); color: var(--on-ink); font-weight: 600; text-decoration: none;
       }`;
 
+// Preview pages are CSP-sandboxed without allow-same-origin, so localStorage throws.
+// Prefer ?mayfly_theme=, then localStorage, then prefers-color-scheme.
 const THEME_SCRIPT = `
-      try {
-        var theme = localStorage.getItem("mayfly-theme");
-        if (theme !== "light" && theme !== "dark") theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      (function () {
+        var theme = null;
+        try {
+          var q = new URLSearchParams(location.search).get("mayfly_theme");
+          if (q === "light" || q === "dark") theme = q;
+        } catch (e) {}
+        if (!theme) {
+          try {
+            var stored = localStorage.getItem("mayfly-theme");
+            if (stored === "light" || stored === "dark") theme = stored;
+          } catch (e) {}
+        }
+        if (!theme) {
+          try {
+            theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          } catch (e) {
+            theme = "light";
+          }
+        }
         document.documentElement.dataset.theme = theme;
-      } catch (e) {}`;
+      })();`;
 
 /** A 404 page for an address with no live preview. Repository and number come from the URL, so they are escaped. */
 function noPreview(repository: string, pr: string, line: string) {
