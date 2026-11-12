@@ -8,6 +8,8 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
+      - key: NODE_ENV
+        value: "production"
       - key: PREVIEW_TTL_HOURS
         value: "168"
       - key: PREVIEW_SLEEP_SECONDS

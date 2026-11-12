@@ -1,11 +1,16 @@
 import express from "express";
-import next from "next";
 
 const port = Number(process.env.PORT) || 3000;
 const host = process.env.HOST || "0.0.0.0";
-const dev = process.env.NODE_ENV !== "production";
+const dev = process.argv.includes("--dev");
 
 async function main() {
+  // Production must not depend on the host having set NODE_ENV.
+  if (!dev) {
+    (process.env as NodeJS.ProcessEnv & { NODE_ENV: string }).NODE_ENV = "production";
+  }
+
+  const { default: next } = await import("next");
   const app = next({ dev });
   await app.prepare();
   const handle = app.getRequestHandler();
@@ -22,7 +27,7 @@ async function main() {
     httpServer.on("error", reject);
   });
 
-  console.log(`Mayfly ready on http://${host}:${port}`);
+  console.log(`Mayfly ready on http://${host}:${port} (${dev ? "dev" : "production"})`);
 }
 
 main().catch((error) => {
