@@ -21,19 +21,63 @@ function validBranch(value: unknown): string | null {
   return branch;
 }
 
-/** Prefer git ls-remote; fall back to the GitHub API (works when git is missing from PATH). */
-function pullRequestHeadViaGit(repository: string, prNumber: number): Promise<string | null> {
+function lsRemote(repository: string, ...refs: string[]): Promise<string | null> {
   return new Promise((resolve) => {
     execFile(
       "git",
-      ["ls-remote", `https://github.com/${repository}.git`, `refs/pull/${prNumber}/head`],
+      ["ls-remote", `https://github.com/${repository}.git`, ...refs],
       { timeout: LOOKUP_LIMIT_MS, windowsHide: true, env: childEnv() },
       (error, stdout) => {
         if (error) return resolve(null);
-        resolve(validSha(String(stdout).trim().split(/\s+/)[0]));
+        resolve(String(stdout));
       },
     );
   });
+}
+
+/** Prefer git ls-remote for the PR head SHA alone. */
+function pullRequestHeadViaGit(repository: string, prNumber: number): Promise<string | null> {
+  return lsRemote(repository, `refs/pull/${prNumber}/head`).then((stdout) => {
+    if (!stdout) return null;
+    return validSha(stdout.trim().split(/\s+/)[0]);
+  });
+}
+
+/**
+ * When the API is unavailable: ls-remote the repo, take refs/pull/<n>/head's SHA, then the single
+ * refs/heads/* branch that points at that SHA. None or several matching heads → null.
+ */
+async function pullRequestHeadViaGitDetails(
+  repository: string,
+  prNumber: number,
+): Promise<PullRequestHeadDetails | null> {
+  const stdout = await lsRemote(repository);
+  if (!stdout) return null;
+
+  const pullRef = `refs/pull/${prNumber}/head`;
+  let headSha: string | null = null;
+  const headsBySha = new Map<string, string[]>();
+
+  for (const line of stdout.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const [rawSha, ref] = trimmed.split(/\s+/);
+    const sha = validSha(rawSha);
+    if (!sha || !ref) continue;
+    if (ref === pullRef) headSha = sha;
+    if (ref.startsWith("refs/heads/")) {
+      const name = ref.slice("refs/heads/".length);
+      if (!validBranch(name)) continue;
+      const list = headsBySha.get(sha) ?? [];
+      list.push(name);
+      headsBySha.set(sha, list);
+    }
+  }
+
+  if (!headSha) return null;
+  const matches = headsBySha.get(headSha) ?? [];
+  if (matches.length !== 1) return null;
+  return { sha: headSha, branch: matches[0] };
 }
 
 async function pullRequestHeadViaApi(repository: string, prNumber: number): Promise<PullRequestHeadDetails | null> {
@@ -61,15 +105,19 @@ async function pullRequestHeadViaApi(repository: string, prNumber: number): Prom
   }
 }
 
-/** SHA + branch of a pull request head on GitHub (API). Null when either cannot be found. */
+/** SHA + branch of a pull request head. API first; git ls-remote branch match as fallback. */
 export async function pullRequestHeadDetails(
   repository: string,
   prNumber: number,
 ): Promise<PullRequestHeadDetails | null> {
-  return pullRequestHeadViaApi(repository, prNumber);
+  return (await pullRequestHeadViaApi(repository, prNumber)) ?? pullRequestHeadViaGitDetails(repository, prNumber);
 }
 
 /** The commit a pull request points at on GitHub right now, or null if it cannot be found. */
 export async function pullRequestHead(repository: string, prNumber: number): Promise<string | null> {
-  return (await pullRequestHeadViaGit(repository, prNumber)) ?? (await pullRequestHeadViaApi(repository, prNumber))?.sha ?? null;
+  return (
+    (await pullRequestHeadViaGit(repository, prNumber)) ??
+    (await pullRequestHeadViaApi(repository, prNumber))?.sha ??
+    null
+  );
 }
