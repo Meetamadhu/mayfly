@@ -16,20 +16,25 @@ export function sameToken(given: string, expected: string) {
   return timingSafeEqual(a, b);
 }
 
-function presentedToken(request: Request) {
-  const header = request.headers.get("authorization") ?? "";
-  const bearer = /^Bearer\s+(.+)$/i.exec(header);
+export type AdminRequestView = {
+  method: string;
+  header(name: string): string | null;
+};
+
+function presentedToken(header: AdminRequestView["header"]) {
+  const auth = header("authorization") ?? "";
+  const bearer = /^Bearer\s+(.+)$/i.exec(auth);
   if (bearer) return bearer[1].trim();
-  return request.headers.get("x-mayfly-admin")?.trim() ?? "";
+  return header("x-mayfly-admin")?.trim() ?? "";
 }
 
 function sessionKey(token: string) {
   return createHash("sha256").update(`mayfly-session:${token}`).digest();
 }
 
-function cookieValue(request: Request, name: string) {
-  const header = request.headers.get("cookie") ?? "";
-  for (const part of header.split(";")) {
+function cookieValue(header: AdminRequestView["header"], name: string) {
+  const raw = header("cookie") ?? "";
+  for (const part of raw.split(";")) {
     const trimmed = part.trim();
     const eq = trimmed.indexOf("=");
     if (eq === -1) continue;
@@ -60,8 +65,8 @@ export function sessionIsValid(value: string, token: string, nowMs = Date.now())
   return Number(expiryEpoch) * 1000 > nowMs;
 }
 
-function originMatchesHost(request: Request) {
-  const origin = request.headers.get("origin");
+function originMatchesHost(header: AdminRequestView["header"]) {
+  const origin = header("origin");
   if (!origin) return false;
   let originHost = "";
   try {
@@ -69,7 +74,8 @@ function originMatchesHost(request: Request) {
   } catch {
     return false;
   }
-  const host = (request.headers.get("host") ?? new URL(request.url).host).toLowerCase();
+  const host = (header("host") ?? "").toLowerCase();
+  if (!host) return false;
   return originHost.toLowerCase() === host;
 }
 
@@ -83,33 +89,48 @@ export function sessionCookie(value: string, maxAge: number) {
 export const SESSION_MAX_AGE = SESSION_SECONDS;
 
 /**
- * Guard for routes that change or destroy things.
- * Accepts MAYFLY_ADMIN_TOKEN as `Authorization: Bearer <token>` or `x-mayfly-admin`,
- * or a valid unexpired mayfly_admin cookie.
- * Cookie-authenticated requests that are not GET must send an Origin for this host.
- * When MAYFLY_ADMIN_TOKEN is unset, every guarded request is refused.
- * Returns a 401 or 403 Response to send, or null when the request may continue. The token is never echoed.
+ * Framework-free admin guard. One implementation for Express and Next.
+ * Accepts MAYFLY_ADMIN_TOKEN as Authorization Bearer or x-mayfly-admin, or a valid mayfly_admin cookie.
+ * Cookie-authenticated non-GET requests must send Origin matching Host.
+ * Returns null when allowed, or a status + JSON body to send. Never echoes the token.
  */
-export function requireAdmin(request: Request): Response | null {
+export function checkAdmin(input: AdminRequestView): null | { status: number; body: Record<string, unknown> } {
   const expected = configuredToken();
   if (!expected) {
-    return json({ ok: false, code: "unauthorized", error: "MAYFLY_ADMIN_TOKEN is not configured." }, 401);
+    return { status: 401, body: { ok: false, code: "unauthorized", error: "MAYFLY_ADMIN_TOKEN is not configured." } };
   }
-  const given = presentedToken(request);
+  const given = presentedToken(input.header);
   if (given && sameToken(given, expected)) return null;
 
-  const cookie = cookieValue(request, ADMIN_COOKIE);
+  const cookie = cookieValue(input.header, ADMIN_COOKIE);
   if (cookie && sessionIsValid(cookie, expected)) {
-    if (request.method !== "GET" && !originMatchesHost(request)) {
-      return json({ ok: false, code: "forbidden", error: "Origin does not match this host." }, 403);
+    if (input.method !== "GET" && !originMatchesHost(input.header)) {
+      return { status: 403, body: { ok: false, code: "forbidden", error: "Origin does not match this host." } };
     }
     return null;
   }
-  return json({ ok: false, code: "unauthorized", error: "Admin token required." }, 401);
+  return { status: 401, body: { ok: false, code: "unauthorized", error: "Admin token required." } };
+}
+
+/**
+ * Next.js adapter used by /api/events until step 3. Delegates to checkAdmin — no second copy of the rules.
+ */
+export function requireAdmin(request: Request): Response | null {
+  const denied = checkAdmin({
+    method: request.method,
+    header: (name) => request.headers.get(name),
+  });
+  if (!denied) return null;
+  return json(denied.body, denied.status);
+}
+
+/** Shared delay before refusing a wrong sign-in (timing pad). */
+export async function delayWrongSignIn() {
+  await new Promise((resolve) => setTimeout(resolve, 500));
 }
 
 export async function rejectSignIn() {
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  await delayWrongSignIn();
   return json({ ok: false, code: "unauthorized", error: "Wrong token." }, 401);
 }
 

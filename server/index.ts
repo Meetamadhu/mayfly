@@ -1,4 +1,7 @@
-import express from "express";
+import express, { type NextFunction, type Request, type Response } from "express";
+import { adminRouter } from "./routes/admin";
+import { environmentsRouter } from "./routes/environments";
+import { sendJson } from "./lib/respond";
 
 const port = Number(process.env.PORT) || 3000;
 const host = process.env.HOST || "0.0.0.0";
@@ -17,7 +20,20 @@ async function main() {
 
   const server = express();
   server.disable("x-powered-by");
-  // Forward every request to Next.js. Route logic stays in the App Router.
+
+  // Admin / environment APIs live on Express. Mount before the Next.js catch-all.
+  server.use(adminRouter);
+  server.use(environmentsRouter);
+  server.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
+    if (res.headersSent) {
+      next(err);
+      return;
+    }
+    console.error(err);
+    sendJson(res, { ok: false, code: "internal", error: "Internal error." }, 500);
+  });
+
+  // Everything else stays in the App Router for now.
   server.use((req, res) => {
     void handle(req, res);
   });
