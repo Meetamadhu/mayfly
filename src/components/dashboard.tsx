@@ -350,13 +350,14 @@ function formatDurationMs(ms: number) {
 
 type BoardFilter = "all" | "awake" | "asleep" | "expiring";
 
-const EXPIRING_SOON_MS = 24 * 60 * 60 * 1000;
+const EXPIRING_SOON_MS = 2 * 60 * 60 * 1000;
 
-function matchesBoardFilter(env: Environment, filter: BoardFilter, now: number) {
+function matchesBoardFilter(env: Environment, filter: BoardFilter, now: number, demoKey: string | null) {
   if (filter === "all") return true;
   if (filter === "awake") return env.sleep === "awake" || env.sleep === "waking";
   if (filter === "asleep") return env.sleep === "asleep";
   if (filter === "expiring") {
+    if (demoKey && demoKey === `${env.repository}#${env.prNumber}`) return false;
     if (!env.expiresAt) return false;
     const left = Date.parse(env.expiresAt) - now;
     return Number.isFinite(left) && left > 0 && left <= EXPIRING_SOON_MS;
@@ -433,8 +434,9 @@ export function Dashboard() {
 
   const config = overview?.config;
   const current = overview?.environments.filter((env) => env.status !== "destroyed") ?? [];
+  const demoKey = config?.demo ?? null;
   const visible = current.filter(
-    (env) => matchesBoardFilter(env, boardFilter, now) && matchesBoardSearch(env, boardQuery),
+    (env) => matchesBoardFilter(env, boardFilter, now, demoKey) && matchesBoardSearch(env, boardQuery),
   );
   const removed = overview?.environments.filter((env) => env.status === "destroyed") ?? [];
   // The overview lists allowed repositories only when Mayfly builds pull request code, which is the Docker runtime.
@@ -576,7 +578,7 @@ export function Dashboard() {
                 copied={copiedId === env.id}
                 sleepSeconds={config?.sleepSeconds ?? 20}
                 now={now}
-                demo={config?.demo === `${env.repository}#${env.prNumber}`}
+                demo={demoKey === `${env.repository}#${env.prNumber}`}
                 buildsCode={dockerRuntime}
                 onCopy={() => void copyUrl(env.id, env.url ?? previewPath(""))}
               />
