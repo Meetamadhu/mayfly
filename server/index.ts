@@ -1,6 +1,8 @@
 import express, { type NextFunction, type Request, type Response } from "express";
 import { adminRouter } from "./routes/admin";
 import { environmentsRouter } from "./routes/environments";
+import { eventsRouter } from "./routes/events";
+import { webhooksRouter } from "./routes/webhooks";
 import { sendJson } from "./lib/respond";
 
 const port = Number(process.env.PORT) || 3000;
@@ -21,9 +23,11 @@ async function main() {
   const server = express();
   server.disable("x-powered-by");
 
-  // Admin / environment APIs live on Express. Mount before the Next.js catch-all.
+  // API routes live on Express. Mount before the Next.js catch-all.
   server.use(adminRouter);
   server.use(environmentsRouter);
+  server.use(webhooksRouter);
+  server.use(eventsRouter);
   server.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
     if (res.headersSent) {
       next(err);
