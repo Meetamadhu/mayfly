@@ -2,6 +2,7 @@ import express, { type NextFunction, type Request, type Response } from "express
 import { adminRouter } from "./routes/admin";
 import { environmentsRouter } from "./routes/environments";
 import { eventsRouter } from "./routes/events";
+import { previewRouter } from "./routes/preview";
 import { webhooksRouter } from "./routes/webhooks";
 import { sendJson } from "./lib/respond";
 
@@ -23,21 +24,38 @@ async function main() {
   const server = express();
   server.disable("x-powered-by");
 
-  // API routes live on Express. Mount before the Next.js catch-all.
+  // API + preview proxy live on Express. Mount before the Next.js catch-all.
   server.use(adminRouter);
   server.use(environmentsRouter);
   server.use(webhooksRouter);
   server.use(eventsRouter);
+  server.use(previewRouter);
   server.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
     if (res.headersSent) {
       next(err);
+      return;
+    }
+    const status =
+      typeof err === "object" && err !== null
+        ? Number(
+            "status" in err
+              ? (err as { status?: unknown }).status
+              : "statusCode" in err
+                ? (err as { statusCode?: unknown }).statusCode
+                : NaN,
+          )
+        : NaN;
+    if (Number.isInteger(status) && status >= 400 && status <= 499) {
+      const message =
+        err instanceof Error && err.message.trim() ? err.message : "Request error.";
+      sendJson(res, { ok: false, error: message }, status);
       return;
     }
     console.error(err);
     sendJson(res, { ok: false, code: "internal", error: "Internal error." }, 500);
   });
 
-  // Everything else stays in the App Router for now.
+  // Pages stay in the App Router for now.
   server.use((req, res) => {
     void handle(req, res);
   });

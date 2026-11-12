@@ -1,14 +1,7 @@
-import { request as forward } from "node:http";
-import { Readable } from "node:stream";
+import { request as forward, type IncomingHttpHeaders, type IncomingMessage } from "node:http";
+import type { Request, Response } from "express";
 import { ADMIN_COOKIE } from "./admin";
 import { findProxyTarget, recordActivity } from "./lifecycle";
-
-export interface PreviewParams {
-  owner: string;
-  name: string;
-  pr: string;
-  path?: string[];
-}
 
 // Never forwarded in either direction. host is rewritten, x-mayfly-admin is a Mayfly secret.
 const HOP_BY_HOP = new Set([
@@ -36,31 +29,39 @@ function isAdminSetCookie(value: string) {
   return name === ADMIN_COOKIE;
 }
 
+function headerValue(headers: IncomingHttpHeaders, name: string): string | undefined {
+  const value = headers[name];
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
+
 /**
  * Prepare headers for the browser: drop forged Mayfly-page markers and admin cookie writes,
  * then sandbox real preview app responses (Mayfly's own waking page is exempt).
+ * Mutates a plain Node header object in place — one copy for Express and (formerly) Next.
  */
-function finalizePreviewHeaders(responseHeaders: Headers) {
-  const mayflyPage = responseHeaders.get(MAYFLY_PAGE_HEADER);
-  responseHeaders.delete(MAYFLY_PAGE_HEADER);
+export function finalizePreviewHeaders(headers: IncomingHttpHeaders) {
+  const mayflyPage = headerValue(headers, MAYFLY_PAGE_HEADER);
+  delete headers[MAYFLY_PAGE_HEADER];
 
-  const setCookies =
-    typeof responseHeaders.getSetCookie === "function"
-      ? responseHeaders.getSetCookie()
-      : (() => {
-          const single = responseHeaders.get("set-cookie");
-          return single ? [single] : [];
-        })();
-  if (setCookies.length > 0) {
-    responseHeaders.delete("set-cookie");
-    for (const cookie of setCookies) {
-      if (!isAdminSetCookie(cookie)) responseHeaders.append("set-cookie", cookie);
-    }
+  const rawCookies = headers["set-cookie"];
+  if (rawCookies) {
+    const setCookies = Array.isArray(rawCookies) ? rawCookies : [rawCookies];
+    const kept = setCookies.filter((cookie) => !isAdminSetCookie(cookie));
+    if (kept.length === 0) delete headers["set-cookie"];
+    else headers["set-cookie"] = kept;
   }
 
   // Only the gate may set x-mayfly-page (it strips the header from the app). Skip sandbox for those pages.
   if (!mayflyPage) {
-    responseHeaders.append("content-security-policy", PREVIEW_SANDBOX_CSP);
+    const existing = headers["content-security-policy"];
+    if (existing === undefined) {
+      headers["content-security-policy"] = PREVIEW_SANDBOX_CSP;
+    } else if (Array.isArray(existing)) {
+      headers["content-security-policy"] = [...existing, PREVIEW_SANDBOX_CSP];
+    } else {
+      headers["content-security-policy"] = [existing, PREVIEW_SANDBOX_CSP];
+    }
   }
 }
 
@@ -68,11 +69,11 @@ function finalizePreviewHeaders(responseHeaders: Headers) {
 const ACTIVITY_THROTTLE_MS = 1000;
 const lastRecorded = globalThis as unknown as { __previewActivity?: Map<string, number> };
 
-function text(status: number, body: string) {
-  return new Response(body, {
-    status,
-    headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
-  });
+function sendText(res: Response, status: number, body: string) {
+  res
+    .status(status)
+    .set({ "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" })
+    .send(body);
 }
 
 function escapeHtml(value: string) {
@@ -155,7 +156,7 @@ const THEME_SCRIPT = `
       })();`;
 
 /** A 404 page for an address with no live preview. Repository and number come from the URL, so they are escaped. */
-function noPreview(repository: string, pr: string, line: string) {
+function noPreview(res: Response, repository: string, pr: string, line: string) {
   const shown = (value: string) => escapeHtml(value.length > 100 ? `${value.slice(0, 100)}…` : value);
   const body = `<!doctype html>
 <html lang="en">
@@ -196,21 +197,27 @@ function noPreview(repository: string, pr: string, line: string) {
     </main>
   </body>
 </html>`;
-  return new Response(body, {
-    status: 404,
-    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" },
-  });
+  res
+    .status(404)
+    .set({
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      "x-content-type-options": "nosniff",
+    })
+    .send(body);
 }
 
 /**
  * The path inside the preview app, taken from the raw request URL so encodings are preserved.
  * Everything up to and including /p/<owner>/<name>/<pr> is stripped.
  */
-function upstreamTarget(requestUrl: string) {
-  const url = new URL(requestUrl);
-  const parts = url.pathname.split("/"); // ["", "p", owner, name, pr, ...rest]
+function upstreamTarget(originalUrl: string) {
+  const q = originalUrl.indexOf("?");
+  const pathname = q === -1 ? originalUrl : originalUrl.slice(0, q);
+  const search = q === -1 ? "" : originalUrl.slice(q);
+  const parts = pathname.split("/"); // ["", "p", owner, name, pr, ...rest]
   const rest = parts.slice(5).join("/");
-  return { path: `/${rest}`, search: url.search };
+  return { path: `/${rest}`, search };
 }
 
 function countActivity(envId: string) {
@@ -225,89 +232,152 @@ function countActivity(envId: string) {
   );
 }
 
-export async function proxyPreview(request: Request, params: PreviewParams): Promise<Response> {
+function paramString(value: string | string[] | undefined): string {
+  if (Array.isArray(value)) return value[0] ?? "";
+  return value ?? "";
+}
+
+function copyResponseHeaders(incoming: IncomingMessage): IncomingHttpHeaders {
+  const headers: IncomingHttpHeaders = {};
+  for (const [key, value] of Object.entries(incoming.headers)) {
+    if (HOP_BY_HOP.has(key) || value === undefined) continue;
+    headers[key] = value;
+  }
+  finalizePreviewHeaders(headers);
+  return headers;
+}
+
+/**
+ * Express preview proxy. Streams the client request to the gate/app and the upstream
+ * response back — no Web Request/Response conversion.
+ */
+export async function proxyPreview(req: Request, res: Response): Promise<void> {
+  const owner = paramString(req.params.owner);
+  const name = paramString(req.params.name);
+  const pr = paramString(req.params.pr);
   const notAPreview = "This address is not a pull request preview.";
-  if (!/^\d{1,9}$/.test(params.pr)) return noPreview(`${params.owner}/${params.name}`, params.pr, notAPreview);
+
+  if (!/^\d{1,9}$/.test(pr)) {
+    noPreview(res, `${owner}/${name}`, pr, notAPreview);
+    return;
+  }
+
   let repository: string;
   try {
-    repository = `${decodeURIComponent(params.owner)}/${decodeURIComponent(params.name)}`;
+    repository = `${decodeURIComponent(owner)}/${decodeURIComponent(name)}`;
   } catch {
-    return noPreview(`${params.owner}/${params.name}`, params.pr, notAPreview);
+    noPreview(res, `${owner}/${name}`, pr, notAPreview);
+    return;
   }
 
-  const target = await findProxyTarget(repository, Number(params.pr));
+  const target = await findProxyTarget(repository, Number(pr));
   if (!target) {
-    return noPreview(repository, params.pr, "This pull request was closed, expired or removed, so its preview is gone.");
+    noPreview(res, repository, pr, "This pull request was closed, expired or removed, so its preview is gone.");
+    return;
   }
 
-  const { path, search } = upstreamTarget(request.url);
-  const method = request.method.toUpperCase();
+  const { path, search } = upstreamTarget(req.originalUrl);
+  const method = req.method.toUpperCase();
   // The gate's sleep control is not part of the public preview. Callers who can reach the
   // proxy must not be able to stop the app; Mayfly talks to 127.0.0.1 itself.
   if (path.startsWith("/__preview_") && !(method === "GET" && path === "/__preview_status")) {
-    return text(404, "Not found.");
+    sendText(res, 404, "Not found.");
+    return;
   }
+
   const isStatus = path === "/__preview_status";
-  const isProbe = request.headers.has("x-mayfly-probe");
+  const isProbe = Boolean(req.headers["x-mayfly-probe"]);
 
   // Only a real visit counts as activity. Status polls and wake probes never do.
   // This is the one place activity is recorded; the forward below goes to the gate, which does not call back.
   const activity = isStatus || isProbe ? Promise.resolve() : countActivity(target.envId);
 
-  const headers: Record<string, string> = {};
-  request.headers.forEach((value, key) => {
-    if (HOP_BY_HOP.has(key) || REQUEST_ONLY_DROP.has(key)) return;
+  const headers: Record<string, string | string[] | undefined> = {};
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (HOP_BY_HOP.has(key) || REQUEST_ONLY_DROP.has(key) || value === undefined) continue;
     headers[key] = value;
-  });
+  }
   headers.host = `127.0.0.1:${target.port}`;
-  const originalHost = request.headers.get("host");
+  const originalHost = req.headers.host;
   if (originalHost) headers["x-forwarded-host"] = originalHost;
-  headers["x-forwarded-proto"] = new URL(request.url).protocol.replace(":", "");
+  // Same protocol value Express/Mayfly sees for this request (http behind a plain listen).
+  headers["x-forwarded-proto"] = req.protocol;
 
-  const hasBody = method !== "GET" && method !== "HEAD" && request.body !== null;
+  const hasBody = method !== "GET" && method !== "HEAD";
 
-  const upstreamResponse = await new Promise<Response>((resolve) => {
+  await new Promise<void>((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+
     let upstream: ReturnType<typeof forward>;
     try {
       upstream = forward(
         { hostname: "127.0.0.1", port: target.port, path: `${path}${search}`, method, headers },
         (incoming) => {
-          const responseHeaders = new Headers();
-          for (const [key, value] of Object.entries(incoming.headers)) {
-            if (HOP_BY_HOP.has(key) || value === undefined) continue;
-            if (Array.isArray(value)) for (const item of value) responseHeaders.append(key, item);
-            else responseHeaders.set(key, value);
-          }
-          finalizePreviewHeaders(responseHeaders);
+          const responseHeaders = copyResponseHeaders(incoming);
           const status = incoming.statusCode || 502;
           const noBody = method === "HEAD" || status === 204 || status === 205 || status === 304;
-          if (noBody) incoming.resume();
-          // Resolve as soon as headers arrive and stream the rest: a waking page returns immediately.
-          resolve(
-            new Response(noBody ? null : (Readable.toWeb(incoming) as unknown as ReadableStream), {
-              status,
-              headers: responseHeaders,
-            }),
-          );
+
+          res.status(status);
+          for (const [key, value] of Object.entries(responseHeaders)) {
+            if (value === undefined) continue;
+            res.setHeader(key, value);
+          }
+
+          if (noBody) {
+            incoming.resume();
+            res.end();
+            finish();
+            return;
+          }
+
+          incoming.on("error", () => {
+            if (!res.headersSent) sendText(res, 502, "Preview is not reachable.");
+            else res.destroy();
+            finish();
+          });
+          res.on("close", () => {
+            incoming.destroy();
+            finish();
+          });
+          incoming.pipe(res);
+          res.on("finish", finish);
         },
       );
     } catch {
-      resolve(text(400, "Invalid preview path."));
+      sendText(res, 400, "Invalid preview path.");
+      finish();
       return;
     }
 
-    upstream.on("error", () => resolve(text(502, "Preview is not reachable.")));
-    request.signal.addEventListener("abort", () => upstream.destroy(), { once: true });
+    upstream.on("error", () => {
+      if (!res.headersSent) sendText(res, 502, "Preview is not reachable.");
+      finish();
+    });
+
+    const onClientGone = () => {
+      upstream.destroy();
+      finish();
+    };
+    req.on("aborted", onClientGone);
+    res.on("close", () => {
+      if (!res.writableEnded) onClientGone();
+    });
 
     if (hasBody) {
-      const body = Readable.fromWeb(request.body as import("node:stream/web").ReadableStream);
-      body.on("error", () => upstream.destroy());
-      body.pipe(upstream);
+      req.on("error", () => {
+        upstream.destroy();
+        finish();
+      });
+      req.pipe(upstream);
     } else {
       upstream.end();
     }
   });
 
   await activity;
-  return upstreamResponse;
 }
