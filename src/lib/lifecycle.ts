@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { isBuilding } from "./builder";
+import { imageTag, isBuilding } from "./builder";
 import { buildsPullRequests, getConfig, previewCostPerHour, previewRepos, previewRuntime } from "./config";
 import { getDeployer, previewUrl, publicPreviewUrl, type Deployment } from "./deployer";
 import { publishCommitStatus, publishPullRequestComment } from "./http";
@@ -783,7 +783,10 @@ function docker(args: string[]) {
 export async function removeOrphanPreviewContainers() {
   if (previewRuntime() !== "docker") return;
   const state = await loadState();
-  const live = new Set(state.environments.filter((env) => isLiveStatus(env.status)).map((env) => env.id));
+  const liveEnvs = state.environments.filter((env) => isLiveStatus(env.status));
+  const live = new Set(liveEnvs.map((env) => env.id));
+  // Image tags are shared by PR+commit; keep any tag still needed by a live environment.
+  const liveImageTags = new Set(liveEnvs.map((env) => imageTag(env.repository, env.prNumber, env.sha)));
 
   const listed = await docker(["ps", "-aq", "--filter", "label=mayfly.preview=1"]);
   const ids = listed.split(/\s+/).filter(Boolean);
@@ -798,8 +801,12 @@ export async function removeOrphanPreviewContainers() {
   const images = (await docker(["images", "-q", "--filter", "label=mayfly.image=1"])).split(/\s+/).filter(Boolean);
   const staleImages: string[] = [];
   for (const id of new Set(images)) {
-    const envId = (await docker(["image", "inspect", "--format", '{{index .Config.Labels "mayfly.image.env"}}', id])).trim();
-    if (!live.has(envId)) staleImages.push(id);
+    const tagsRaw = (
+      await docker(["image", "inspect", "--format", "{{range .RepoTags}}{{.}} {{end}}", id])
+    ).trim();
+    const tags = tagsRaw.split(/\s+/).filter(Boolean);
+    const needed = tags.some((tag) => liveImageTags.has(tag));
+    if (!needed) staleImages.push(id);
   }
   if (staleImages.length > 0) await docker(["rmi", "-f", ...staleImages]);
 }

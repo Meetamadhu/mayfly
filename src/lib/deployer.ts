@@ -310,6 +310,17 @@ function builtImage(image: string | undefined) {
   return image && image !== PREVIEW_IMAGE ? image : undefined;
 }
 
+/** True when another deployment record still points at this built image tag (same PR+commit). */
+function imageUsedElsewhere(
+  deployments: DeploymentRecord[],
+  image: string,
+  exceptDeploymentId: string,
+) {
+  return deployments.some(
+    (item) => item.deploymentId !== exceptDeploymentId && builtImage(item.image) === image,
+  );
+}
+
 function removeContainer(appPort: number) {
   return new Promise<void>((resolve) => {
     execFile("docker", ["rm", "-f", `mayfly-app-${appPort}`], { windowsHide: true }, () => resolve());
@@ -373,9 +384,12 @@ async function launch(input: DeployRequest, previous: DeploymentRecord | undefin
   const docker = previewRuntime() === "docker";
   if (previous?.pid && gateAlive(previous.pid)) await killProcess(previous.pid);
   if (docker && previous?.port) await removeContainer(previous.port + 1000);
-  // A new commit swaps the container; the old commit's image goes with it.
+  // A new commit swaps the container; drop the old image only if no other deployment still uses it.
   const old = builtImage(previous?.image);
-  if (docker && old && old !== image) await removeImage(old);
+  if (docker && old && old !== image) {
+    const file = await loadDeployments();
+    if (!imageUsedElsewhere(file.deployments, old, deploymentId)) await removeImage(old);
+  }
   const port = await claimPort(previous?.port);
   const pid = startPreview(port, input, image);
   const listenUrl = previewListenUrl(port);
@@ -386,7 +400,11 @@ async function launch(input: DeployRequest, previous: DeploymentRecord | undefin
     await killProcess(pid);
     if (docker) {
       await removeContainer(port + 1000);
-      if (builtImage(image) && image !== old) await removeImage(image);
+      const built = builtImage(image);
+      if (built && image !== old) {
+        const file = await loadDeployments();
+        if (!imageUsedElsewhere(file.deployments, built, deploymentId)) await removeImage(built);
+      }
     }
     throw error;
   }
@@ -414,7 +432,8 @@ async function removeDeployment(deploymentId: string) {
   if (existing?.pid && gateAlive(existing.pid)) await killProcess(existing.pid);
   if (previewRuntime() === "docker" && existing?.port) await removeContainer(existing.port + 1000);
   const image = builtImage(existing?.image);
-  if (image) await removeImage(image);
+  // Shared by tag across previews for the same PR+commit — only remove when nothing else still uses it.
+  if (image && !imageUsedElsewhere(file.deployments, image, deploymentId)) await removeImage(image);
   file.deployments = file.deployments.filter((item) => item.deploymentId !== deploymentId);
   await writeJson(deployFile(), file);
 }
