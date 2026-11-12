@@ -3,7 +3,12 @@ import type { PullRequestEvent } from "./types";
 
 const HANDLED_ACTIONS = new Set(["opened", "synchronize", "closed", "reopened"]);
 
-export function verifyGithubSignature(rawBody: string, signatureHeader: string | null, secret: string): boolean {
+/** HMAC over the exact request bytes (string or Buffer). GitHub signs the raw body, not a re-parsed JSON form. */
+export function verifyGithubSignature(
+  rawBody: string | Buffer,
+  signatureHeader: string | null,
+  secret: string,
+): boolean {
   if (!signatureHeader?.startsWith("sha256=")) return false;
   const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
   const received = signatureHeader.slice("sha256=".length);
@@ -11,6 +16,20 @@ export function verifyGithubSignature(rawBody: string, signatureHeader: string |
   const receivedBuffer = Buffer.from(received, "utf8");
   if (expectedBuffer.length !== receivedBuffer.length) return false;
   return timingSafeEqual(expectedBuffer, receivedBuffer);
+}
+
+/** Parse JSON or form-encoded `payload=` webhook bodies after the signature has been checked. */
+export function readPayload(raw: string, contentType: string | null): unknown {
+  if (!raw) return {};
+  const type = contentType ?? "";
+  if (type.includes("application/json") || raw.trimStart().startsWith("{")) {
+    return JSON.parse(raw);
+  }
+  const payload = new URLSearchParams(raw).get("payload");
+  if (!payload) {
+    throw new Error("Set the webhook content type to application/json.");
+  }
+  return JSON.parse(payload);
 }
 
 export function parseGithubWebhook(
