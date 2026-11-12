@@ -357,7 +357,7 @@ export function AdminPanel() {
         <div className="ledger-head">
           <div>
             <h2>Previews</h2>
-            <p className="help">Live previews. Destroy asks before it removes one.</p>
+            <p className="help">Live and failed previews. Destroy asks before it removes one (including failed).</p>
           </div>
         </div>
         {loadError ? <p className="error" role="alert">{loadError}</p> : null}
