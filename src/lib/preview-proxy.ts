@@ -40,7 +40,7 @@ function headerValue(headers: IncomingHttpHeaders, name: string): string | undef
  * then sandbox real preview app responses (Mayfly's own waking page is exempt).
  * Mutates a plain Node header object in place — one copy for Express and (formerly) Next.
  */
-export function finalizePreviewHeaders(headers: IncomingHttpHeaders) {
+function finalizePreviewHeaders(headers: IncomingHttpHeaders) {
   const mayflyPage = headerValue(headers, MAYFLY_PAGE_HEADER);
   delete headers[MAYFLY_PAGE_HEADER];
 

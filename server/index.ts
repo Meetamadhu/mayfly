@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+import type { Server } from "node:http";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { adminRouter } from "./routes/admin";
 import { environmentsRouter } from "./routes/environments";
@@ -9,6 +11,58 @@ import { sendJson } from "./lib/respond";
 const port = Number(process.env.PORT) || 3000;
 const host = process.env.HOST || "0.0.0.0";
 const dev = process.argv.includes("--dev");
+
+function removePreviewContainers() {
+  const stdout = execFileSync("docker", ["ps", "-q", "--filter", "label=mayfly.preview=1"], {
+    timeout: 2000,
+    encoding: "utf8",
+    windowsHide: true,
+  });
+  const ids = stdout.trim().split(/\s+/).filter(Boolean);
+  if (ids.length === 0) return;
+  execFileSync("docker", ["rm", "-f", ...ids], { timeout: 2500, windowsHide: true });
+}
+
+function listenForShutdown(httpServer: Server) {
+  const marker = globalThis as unknown as { __mayflyShutdown?: boolean };
+  if (marker.__mayflyShutdown) return;
+  marker.__mayflyShutdown = true;
+
+  let stopping = false;
+  const shutdown = () => {
+    if (stopping) return;
+    stopping = true;
+    if (process.env.PREVIEW_RUNTIME === "docker") {
+      try {
+        removePreviewContainers();
+      } catch (error) {
+        console.error("Could not remove preview containers", error instanceof Error ? error.message : error);
+      }
+    }
+    httpServer.close(() => {
+      process.exit(0);
+    });
+    setTimeout(() => {
+      process.exit(0);
+    }, 5000).unref();
+  };
+
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
+}
+
+async function startBackgroundWork() {
+  // Skip a second run if tsx/HMR reloads this module in --dev.
+  const marker = globalThis as unknown as { __mayflyBooted?: boolean };
+  if (marker.__mayflyBooted) return;
+  marker.__mayflyBooted = true;
+
+  const { removeOrphanPreviewContainers, restorePreviews } = await import("@/lib/lifecycle");
+  const { startReaperLoop } = await import("@/lib/reaper-loop");
+  await removeOrphanPreviewContainers();
+  await restorePreviews();
+  startReaperLoop();
+}
 
 async function main() {
   // Production must not depend on the host having set NODE_ENV.
@@ -60,11 +114,14 @@ async function main() {
     void handle(req, res);
   });
 
-  await new Promise<void>((resolve, reject) => {
-    const httpServer = server.listen(port, host, () => resolve());
-    httpServer.on("error", reject);
+  await startBackgroundWork();
+
+  const httpServer = await new Promise<Server>((resolve, reject) => {
+    const listening = server.listen(port, host, () => resolve(listening));
+    listening.on("error", reject);
   });
 
+  listenForShutdown(httpServer);
   console.log(`Mayfly ready on http://${host}:${port} (${dev ? "dev" : "production"})`);
 }
 

@@ -2,6 +2,8 @@
 
 Mayfly gives every pull request a preview that sleeps when nobody is using it, wakes on the next visit, and is deleted when the pull request closes. It is a prototype. Each preview is a placeholder Node app that shows the repository, branch, and commit. It does not build or run the pull request's real code.
 
+**Stack:** Next.js (pages) + Express (API, webhooks, preview proxy) + MongoDB.
+
 ## How it works
 
 Each preview is two Node processes. A gate listens on a private port on this machine (`127.0.0.1`), and the app process runs behind it. Nobody reaches the gate directly: Mayfly serves every preview at `/p/<owner>/<name>/<pr>` and forwards to it. After `PREVIEW_SLEEP_SECONDS` with no request, the gate stops the app. The next visit gets a "Waking up" page immediately, the gate starts the app, and the page loads itself. The reaper deletes a preview when its lifetime is over, when it is stuck, or when the pull request closes or merges. An idle preview is slept, and is left in place while the pull request is open. When `GITHUB_TOKEN` is set, Mayfly also comments on the pull request.
@@ -17,7 +19,7 @@ npm ci
 npm run dev
 ```
 
-The same two commands run in PowerShell. The app listens at http://localhost:3000.
+`npm run dev` starts Express with Next in development mode (hot reload for pages). The same two commands run in PowerShell. The app listens at http://localhost:3000 (or set `HOST` / `PORT`).
 
 ## Run with Docker
 
@@ -70,7 +72,7 @@ Copy `.env.example` to `.env.local`. `.env.local` stays on this machine.
 | `PREVIEW_MEMORY`, `PREVIEW_CPUS` | Container limits for docker previews. Defaults `256m` (no swap) and `0.5` CPU, plus 100 processes, user `1000:1000`, all capabilities dropped, no new privileges, read-only filesystem, and a 16 MB `/tmp`. |
 | `PREVIEW_FAKE_DELAY_MS` | Artificial delay for the fake deployer. Example: `700`. |
 | `PREVIEW_BASE_URL` | Origin used in preview links. Example: `http://localhost:3000`. |
-| `DATABASE_URL` | Optional. Neon (or Postgres) connection string. When set, board/admin environment state is stored in Postgres (`mayfly_state`) instead of `data/state.json`. Use Neon's pooled URL. Empty keeps the JSON file. |
+| `MONGODB_URI` | Optional. MongoDB connection string. When set, board/admin environment state is stored in MongoDB (`mayfly.state` plus locks) instead of `data/state.json`. Empty keeps the JSON file. |
 | `GITHUB_WEBHOOK_SECRET` | Required in production. In development, an empty value accepts unsigned deliveries. |
 | `GITHUB_TOKEN` | Optional. Posts a **Mayfly — Preview** commit check and a PR comment. Needs commit status write and pull-request comment access. Put it in `.env.local` (Docker Compose does not pass Codespace secrets into the container). `MAYFLY_GITHUB_TOKEN` is accepted too. |
 | `MAYFLY_ADMIN_TOKEN` | Required for every action that changes things. Send it as `Authorization: Bearer <token>` or `x-mayfly-admin: <token>`, or paste it into the board's **Admin** field. When empty, those actions are always refused with 401. Generate one with `openssl rand -hex 32`. |
@@ -83,8 +85,10 @@ On a Linux server, build and run in production mode (not `npm run dev`):
 ```bash
 npm ci
 npm run build
-npm start -- -H 0.0.0.0
+npm start
 ```
+
+`npm start` runs `dist/server.js`, which listens on `0.0.0.0:3000` by default. Override with `HOST` and `PORT` if needed.
 
 Set at least these on the server: `MAYFLY_ADMIN_TOKEN`, `GITHUB_WEBHOOK_SECRET`, `PREVIEW_BASE_URL` (the public address people open), and `PREVIEW_TTL_HOURS=168`. The simulator is off in production unless `ALLOW_SIMULATOR=true`.
 
@@ -112,13 +116,13 @@ To demo the time limit, set TTL minutes to `0`, choose **Open**, then choose **R
 
 ## Security
 
-`MAYFLY_ADMIN_TOKEN` protects `POST /api/environments/<id>?action=destroy`, `action=sleep`, and `action=activity`, plus `POST /api/reaper` and `POST /api/events`. With no token configured those routes refuse every request; there is no exception for "local" requests, because the `Host` header is chosen by the sender. Scripts send the token as `Authorization: Bearer <token>` or `x-mayfly-admin`. People sign in on `/admin/login` and get a `mayfly_admin` cookie that holds an expiry and a signature, never the token. The cookie is `HttpOnly` and `SameSite=Strict` (and `Secure` in production), and lasts 8 hours. A request that changes anything and is authenticated by the cookie must also come from this host's own `Origin`, or it gets 403. The public board at `/board` is read-only. In production, webhook deliveries must be signed with `GITHUB_WEBHOOK_SECRET`.
+`MAYFLY_ADMIN_TOKEN` protects `POST /api/environments/<id>?action=destroy`, `action=sleep`, `action=activity`, and `action=extend`, plus `POST /api/reaper` and `POST /api/events`. With no token configured those routes refuse every request; there is no exception for "local" requests, because the `Host` header is chosen by the sender. Scripts send the token as `Authorization: Bearer <token>` or `x-mayfly-admin`. People sign in on `/admin/login` and get a `mayfly_admin` cookie that holds an expiry and a signature, never the token. The cookie is `HttpOnly` and `SameSite=Lax` (and `Secure` in production), and lasts 8 hours. A request that changes anything and is authenticated by the cookie must also come from this host's own `Origin`, or it gets 403. The public board at `/board` is read-only. In production, webhook deliveries must be signed with `GITHUB_WEBHOOK_SECRET`.
 
 Preview processes receive only `PATH`, `NODE_ENV` and `PREVIEW_*` variables (plus the Windows system variables Node needs). `GITHUB_TOKEN`, `MAYFLY_GITHUB_TOKEN`, `GITHUB_WEBHOOK_SECRET` and `MAYFLY_ADMIN_TOKEN` never reach them.
 
 ## Known limitations
 
-Mayfly runs on one machine. Environment state is a JSON file by default, or Neon/Postgres when `DATABASE_URL` is set. Local deployment records (`data/deployments.json`) stay on disk. On this machine each preview app can run in its own Docker container. Render has no Docker daemon, so it keeps the plain Node app. On Vercel the deployer is a simulation: it writes records and does not start preview processes, and that state is ephemeral unless `DATABASE_URL` is set. Mayfly does not save preview logs; the app's output is discarded. Process-mode and demo previews are still placeholder apps; Docker mode with `PREVIEW_REPOS` builds the pull request's own Dockerfile.
+Mayfly runs on one machine. Environment state is a JSON file by default, or MongoDB when `MONGODB_URI` is set. Local deployment records (`data/deployments.json`) stay on disk. On this machine each preview app can run in its own Docker container. Render has no Docker daemon, so it keeps the plain Node app. Mayfly does not save preview logs; the app's output is discarded. Process-mode and demo previews are still placeholder apps; Docker mode with `PREVIEW_REPOS` builds the pull request's own Dockerfile.
 
 ## Name
 

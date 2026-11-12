@@ -7,6 +7,7 @@ export function startReaperLoop() {
   if (marker.__previewReaper) return;
   if (process.env.NEXT_PHASE === "phase-production-build") return;
   marker.__previewReaper = true;
+  console.log("Reaper loop started.");
 
   const tick = async () => {
     try {

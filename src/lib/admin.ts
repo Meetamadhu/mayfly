@@ -1,5 +1,4 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { json } from "./http";
 
 export const ADMIN_COOKIE = "mayfly_admin";
 const SESSION_SECONDS = 8 * 60 * 60;
@@ -10,7 +9,7 @@ function configuredToken() {
 }
 
 /** Compare as fixed-length digests so neither the token's length nor its content leaks through timing. */
-export function sameToken(given: string, expected: string) {
+function sameToken(given: string, expected: string) {
   const a = createHash("sha256").update(given).digest();
   const b = createHash("sha256").update(expected).digest();
   return timingSafeEqual(a, b);
@@ -47,7 +46,7 @@ function macFor(expiryEpoch: string, token: string) {
   return createHmac("sha256", sessionKey(token)).update(expiryEpoch).digest("hex");
 }
 
-export function issueSessionValue(token: string, nowMs = Date.now()) {
+function issueSessionValue(token: string, nowMs = Date.now()) {
   const expiryEpoch = String(Math.floor(nowMs / 1000) + SESSION_SECONDS);
   return `${expiryEpoch}.${macFor(expiryEpoch, token)}`;
 }
@@ -89,7 +88,7 @@ export function sessionCookie(value: string, maxAge: number) {
 export const SESSION_MAX_AGE = SESSION_SECONDS;
 
 /**
- * Framework-free admin guard. One implementation for Express and Next.
+ * Framework-free admin guard. One implementation for Express and anything else that presents headers.
  * Accepts MAYFLY_ADMIN_TOKEN as Authorization Bearer or x-mayfly-admin, or a valid mayfly_admin cookie.
  * Cookie-authenticated non-GET requests must send Origin matching Host.
  * Returns null when allowed, or a status + JSON body to send. Never echoes the token.
@@ -112,26 +111,9 @@ export function checkAdmin(input: AdminRequestView): null | { status: number; bo
   return { status: 401, body: { ok: false, code: "unauthorized", error: "Admin token required." } };
 }
 
-/**
- * Next.js adapter used by /api/events until step 3. Delegates to checkAdmin — no second copy of the rules.
- */
-export function requireAdmin(request: Request): Response | null {
-  const denied = checkAdmin({
-    method: request.method,
-    header: (name) => request.headers.get(name),
-  });
-  if (!denied) return null;
-  return json(denied.body, denied.status);
-}
-
 /** Shared delay before refusing a wrong sign-in (timing pad). */
 export async function delayWrongSignIn() {
   await new Promise((resolve) => setTimeout(resolve, 500));
-}
-
-export async function rejectSignIn() {
-  await delayWrongSignIn();
-  return json({ ok: false, code: "unauthorized", error: "Wrong token." }, 401);
 }
 
 export function signIn(token: string) {

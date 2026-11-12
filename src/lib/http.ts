@@ -1,24 +1,4 @@
 import { getConfig } from "./config";
-import type { LifecycleResult } from "./types";
-
-export function json(body: unknown, status = 200) {
-  return Response.json(body, {
-    status,
-    headers: { "Cache-Control": "no-store" },
-  });
-}
-
-export function resultResponse(result: LifecycleResult) {
-  if (result.ok) return json(result);
-  const status = {
-    invalid: 400,
-    not_found: 404,
-    cap: 409,
-    conflict: 409,
-    deploy_failed: 502,
-  }[result.code];
-  return json(result, status);
-}
 
 const GITHUB_API = {
   Accept: "application/vnd.github+json",
