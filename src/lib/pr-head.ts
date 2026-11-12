@@ -31,7 +31,7 @@ async function pullRequestHeadViaApi(repository: string, prNumber: number): Prom
     "User-Agent": "mayfly",
     "X-GitHub-Api-Version": "2022-11-28",
   };
-  const token = (process.env.GITHUB_TOKEN ?? "").trim();
+  const token = (process.env.GITHUB_TOKEN ?? process.env.MAYFLY_GITHUB_TOKEN ?? "").trim();
   if (token) headers.Authorization = `Bearer ${token}`;
 
   try {

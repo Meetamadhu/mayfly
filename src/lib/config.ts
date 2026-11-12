@@ -143,7 +143,8 @@ export function getConfig(): OrchestratorConfig {
     sleepMs: sleepSeconds * 1000,
     deployer: process.env.VERCEL || process.env.DEPLOYER === "fake" ? "fake" : "process",
     webhookSecret: process.env.GITHUB_WEBHOOK_SECRET ?? "",
-    githubToken: process.env.GITHUB_TOKEN ?? "",
+    // Repo secrets cannot be named GITHUB_*; Codespaces/Actions use MAYFLY_GITHUB_TOKEN.
+    githubToken: (process.env.GITHUB_TOKEN ?? process.env.MAYFLY_GITHUB_TOKEN ?? "").trim(),
     previewBaseUrl: previewBase(),
     demo: demoPreview(),
   };
