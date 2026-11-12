@@ -523,19 +523,23 @@ async function finishDestroy(envId: string, deploymentId: string | null): Promis
       await getDeployer().destroy({ deploymentId });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Destroy failed";
-      const failed = await exclusive(async () => {
-        const state = await loadState();
-        const env = state.environments.find((item) => item.id === envId);
-        if (!env) return null;
-        if (env.status === "destroying") {
-          env.error = message;
-          env.updatedAt = iso();
-          await saveState(state);
-        }
-        return clone(env);
-      });
-      if (failed) return failed;
-      throw error;
+      // Leftover process/container may already be gone (common for failed previews).
+      const missing = /not found|no such|ENOENT|does not exist|already removed/i.test(message);
+      if (!missing) {
+        const failed = await exclusive(async () => {
+          const state = await loadState();
+          const env = state.environments.find((item) => item.id === envId);
+          if (!env) return null;
+          if (env.status === "destroying") {
+            env.error = message;
+            env.updatedAt = iso();
+            await saveState(state);
+          }
+          return clone(env);
+        });
+        if (failed) return failed;
+        throw error;
+      }
     }
   }
 
@@ -577,14 +581,7 @@ export async function destroyEnvironment(
     if (env.status === "destroyed") {
       return { ok: true as const, action: "unchanged" as const, environment: clone(env) };
     }
-    if (env.status === "failed") {
-      return {
-        ok: false as const,
-        code: "conflict" as const,
-        error: "This preview already failed.",
-        environment: clone(env),
-      };
-    }
+    // Failed previews can still be removed: clean up any leftover deploy for this id, then mark destroyed.
     if (env.status !== "destroying") {
       env.status = "destroying";
       env.destroyReason = reason;
@@ -880,6 +877,10 @@ export async function reap(): Promise<ReapResult> {
       if (env.status === "provisioning" || env.status === "updating" || env.status === "destroying") {
         // A build has its own time limit. Waiting for a build slot is not being stuck.
         if (age > config.stuckMs && !isBuilding(env.id)) targets.push({ id: env.id, reason: "stuck" });
+        continue;
+      }
+      if (env.status === "failed") {
+        if (!isDemo(env) && age > config.stuckMs) targets.push({ id: env.id, reason: "failed" });
         continue;
       }
       if (env.status !== "ready") continue;

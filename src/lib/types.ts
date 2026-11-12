@@ -6,7 +6,7 @@ export type EnvironmentStatus =
   | "destroyed"
   | "failed";
 
-export type DestroyReason = "closed" | "merged" | "idle" | "expired" | "manual" | "stuck";
+export type DestroyReason = "closed" | "merged" | "idle" | "expired" | "manual" | "stuck" | "failed";
 
 export type LifecycleAction =
   | "created"
