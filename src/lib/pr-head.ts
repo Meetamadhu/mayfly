@@ -121,3 +121,62 @@ export async function pullRequestHead(repository: string, prNumber: number): Pro
     null
   );
 }
+
+async function pullRequestCommitShasViaApi(repository: string, prNumber: number): Promise<string[]> {
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github+json",
+    "User-Agent": "mayfly",
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
+  const token = (process.env.GITHUB_TOKEN ?? process.env.MAYFLY_GITHUB_TOKEN ?? "").trim();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  try {
+    const response = await fetch(`https://api.github.com/repos/${repository}/pulls/${prNumber}/commits?per_page=100`, {
+      headers,
+      signal: AbortSignal.timeout(LOOKUP_LIMIT_MS),
+    });
+    if (!response.ok) return [];
+    const body = (await response.json()) as { sha?: string }[];
+    if (!Array.isArray(body)) return [];
+    return body.map((item) => validSha(item.sha)).filter((sha): sha is string => Boolean(sha));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Expand a short SHA (under 40 hex chars) to the full commit on this pull request.
+ * Prefers the PR head (API or git ls-remote), then other PR commits from the API.
+ * Returns a clear error when nothing matches or more than one commit matches.
+ */
+export async function expandPullRequestSha(
+  repository: string,
+  prNumber: number,
+  partial: string,
+): Promise<{ ok: true; sha: string } | { ok: false; error: string }> {
+  const prefix = partial.trim().toLowerCase();
+  if (!/^[0-9a-f]{7,39}$/.test(prefix)) {
+    return { ok: false, error: "SHA must be empty or 7 to 64 hex characters." };
+  }
+
+  const candidates = new Set<string>();
+  const head = await pullRequestHead(repository, prNumber);
+  if (head) candidates.add(head);
+  for (const sha of await pullRequestCommitShasViaApi(repository, prNumber)) {
+    candidates.add(sha);
+  }
+
+  const matches = [...candidates].filter((sha) => sha.startsWith(prefix));
+  if (matches.length === 1) return { ok: true, sha: matches[0] };
+  if (matches.length === 0) {
+    return {
+      ok: false,
+      error: `Commit ${prefix} is not on PR #${prNumber} in ${repository}.`,
+    };
+  }
+  return {
+    ok: false,
+    error: `Commit ${prefix} matches more than one commit on PR #${prNumber}; use a longer SHA.`,
+  };
+}
