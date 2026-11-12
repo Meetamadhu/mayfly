@@ -15,7 +15,8 @@ async function livePreview(repository: string, prNumber: number) {
 
 /**
  * Fill empty sha / branch from the pull request's current head on GitHub so statuses and comments
- * attach to a real commit and branch. Short typed SHAs are expanded to the full commit on the PR.
+ * attach to a real commit and branch. Short typed SHAs are expanded to the full commit on the PR
+ * before any fallback — invented / looked-up SHAs are never expanded.
  * Closing never requires a branch or SHA lookup against GitHub.
  */
 export async function resolveSimulatorRefs(
@@ -36,6 +37,13 @@ export async function resolveSimulatorRefs(
       }
     }
     return { ok: true, sha, branch };
+  }
+
+  // Expand only a commit the user typed — before GitHub / random fallbacks invent a SHA.
+  if (sha.length > 0 && sha.length < 40) {
+    const expanded = await expandPullRequestSha(event.repository, event.prNumber, sha);
+    if (!expanded.ok) return expanded;
+    sha = expanded.sha;
   }
 
   const demo = getConfig().demo;
@@ -66,12 +74,6 @@ export async function resolveSimulatorRefs(
     } else {
       sha = randomBytes(8).toString("hex");
     }
-  }
-
-  if (sha.length > 0 && sha.length < 40) {
-    const expanded = await expandPullRequestSha(event.repository, event.prNumber, sha);
-    if (!expanded.ok) return expanded;
-    sha = expanded.sha;
   }
 
   if (!branch) {
