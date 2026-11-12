@@ -9,12 +9,12 @@ const LIVE = new Set<EnvironmentStatus>(["provisioning", "ready", "updating", "d
 const FAST_POLL_MS = 500;
 const LIVE_POLL_MS = 5000;
 
-// Hints and starting values for the simulator form: the sample app's pull request. The commit starts empty, which
-// means the pull request's latest commit, so a stale default can never roll a live preview back.
+// Hints and starting values for the simulator form: the sample app's pull request. Commit and branch start empty
+// so Mayfly resolves them from the PR head on GitHub (a stale branch from another PR cannot stick around).
 const SAMPLE = {
   repository: "meetamadhu/mayfly-sample-app",
   prNumber: "1",
-  branch: "feature/new-heading",
+  branch: "",
   sha: "",
 };
 
@@ -172,9 +172,10 @@ export function AdminPanel() {
   const [branch, setBranch] = useState(SAMPLE.branch);
   const [sha, setSha] = useState(SAMPLE.sha);
   const repositoryEdited = useRef(false);
-  const [ttlMinutes, setTtlMinutes] = useState("480");
+  const [ttlMinutes, setTtlMinutes] = useState("");
   const [extendHours, setExtendHours] = useState("4");
   const [now, setNow] = useState(() => Date.now());
+  const defaultTtlLabel = overview ? formatLifetime(overview.config.ttlHours) : "server default";
 
   const reload = useCallback(async () => {
     const response = await fetch("/api/environments", { cache: "no-store", credentials: "include" });
@@ -231,20 +232,23 @@ export function AdminPanel() {
     setError(null);
     setNotice(null);
     try {
+      const body: Record<string, unknown> = {
+        action,
+        repository,
+        prNumber: Number(prNumber),
+        sha: overrides?.sha ?? sha,
+        branch,
+        merged: overrides?.merged ?? false,
+        wait: true,
+      };
+      if (ttlMinutes.trim() !== "") {
+        body.ttlMinutes = Number(ttlMinutes);
+      }
       const response = await fetch("/api/events", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action,
-          repository,
-          prNumber: Number(prNumber),
-          sha: overrides?.sha ?? sha,
-          branch,
-          merged: overrides?.merged ?? false,
-          ttlMinutes: Number(ttlMinutes),
-          wait: true,
-        }),
+        body: JSON.stringify(body),
       });
       await readBody(response);
       setNotice(action === "opened" ? "Preview opened." : null);
@@ -456,7 +460,7 @@ export function AdminPanel() {
                 <h3>
                   #{prNumber || SAMPLE.prNumber}
                   <span className="sim-pr-sep"> · </span>
-                  <span className="mono">{branch || SAMPLE.branch}</span>
+                  <span className="mono">{branch.trim() || "PR head"}</span>
                 </h3>
               </div>
             </header>
@@ -464,7 +468,7 @@ export function AdminPanel() {
               <p className="meta meta-facts">
                 <span className="fact-pill" data-fact="branch">
                   <span className="fact-label">Branch</span>
-                  <span className="fact-value mono">{branch || SAMPLE.branch}</span>
+                  <span className="fact-value mono">{branch.trim() || "PR head"}</span>
                 </span>
                 <span className="fact-pill" data-fact="visit">
                   <span className="fact-label">Commit</span>
@@ -472,7 +476,9 @@ export function AdminPanel() {
                 </span>
                 <span className="fact-pill" data-fact="expires">
                   <span className="fact-label">TTL</span>
-                  <span className="fact-value">{ttlMinutes === "0" ? "expire now" : `${ttlMinutes || "–"} m`}</span>
+                  <span className="fact-value">
+                    {ttlMinutes === "0" ? "expire now" : ttlMinutes.trim() ? `${ttlMinutes} m` : defaultTtlLabel}
+                  </span>
                 </span>
               </p>
               <form
@@ -506,7 +512,10 @@ export function AdminPanel() {
                   Pull request
                   <input
                     value={prNumber}
-                    onChange={(event) => setPrNumber(event.target.value)}
+                    onChange={(event) => {
+                      setPrNumber(event.target.value);
+                      setBranch("");
+                    }}
                     placeholder={SAMPLE.prNumber}
                     inputMode="numeric"
                     required
@@ -514,7 +523,11 @@ export function AdminPanel() {
                 </label>
                 <label>
                   Branch
-                  <input value={branch} onChange={(event) => setBranch(event.target.value)} placeholder={SAMPLE.branch} required />
+                  <input
+                    value={branch}
+                    onChange={(event) => setBranch(event.target.value)}
+                    placeholder="Empty = PR head branch"
+                  />
                 </label>
                 <label>
                   Commit
@@ -533,10 +546,10 @@ export function AdminPanel() {
                     inputMode="numeric"
                     min={0}
                     max={10080}
-                    required
+                    placeholder={`default: ${defaultTtlLabel}`}
                   />
                 </label>
-                <p className="help">Use 0 to expire as soon as the preview is ready, then run the reaper.</p>
+                <p className="help">Leave empty for PREVIEW_TTL_HOURS. Use 0 to expire as soon as the preview is ready, then run the reaper.</p>
                 <div className="actions">
                   <button type="submit" disabled={busy}>Open PR</button>
                   <button

@@ -29,8 +29,9 @@ export function parseSimulatorEvent(
   if (sha && !/^[0-9a-f]{7,64}$/.test(sha)) {
     return { ok: false, error: "SHA must be empty or 7 to 64 hex characters." };
   }
-  if (!branch || branch.length > 200 || /\s/.test(branch)) {
-    return { ok: false, error: "Branch must be a single token up to 200 characters." };
+  // Empty means "the pull request's head branch"; the simulator route fills it in.
+  if (branch && (branch.length > 200 || /\s/.test(branch))) {
+    return { ok: false, error: "Branch must be empty or a single token up to 200 characters." };
   }
 
   let ttlMinutes: number | undefined;

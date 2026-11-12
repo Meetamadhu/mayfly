@@ -1,7 +1,7 @@
 import express, { Router } from "express";
 import { parseSimulatorEvent } from "@/lib/events";
 import { applyPullRequestEvent } from "@/lib/lifecycle";
-import { resolveSimulatorSha } from "@/lib/simulator";
+import { resolveSimulatorRefs } from "@/lib/simulator";
 import { requireAdmin } from "../middleware/require-admin";
 import { asyncHandler, sendJson, sendLifecycle } from "../lib/respond";
 
@@ -43,12 +43,13 @@ eventsRouter.post(
     }
 
     const event = parsed.event;
-    const resolved = await resolveSimulatorSha(event);
+    const resolved = await resolveSimulatorRefs(event);
     if (!resolved.ok) {
       sendJson(res, { ok: false, code: "invalid", error: resolved.error }, 400);
       return;
     }
     event.sha = resolved.sha;
+    event.branch = resolved.branch;
     sendLifecycle(res, await applyPullRequestEvent(event, { wait: parsed.wait }));
   }),
 );
