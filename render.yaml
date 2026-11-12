@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     buildCommand: npm ci && npm run build
-    startCommand: npm start -- -H 0.0.0.0
+    startCommand: npm start
     envVars:
       - key: NODE_VERSION
         value: "22"
