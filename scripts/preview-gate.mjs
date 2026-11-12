@@ -142,10 +142,14 @@ function gateState() {
   return "asleep";
 }
 
+/** Last successful wake duration in milliseconds (null until the first wake). */
+let lastWakeMs = null;
+
 function boot() {
   if (booting) return booting;
   if (alive() && listening) return Promise.resolve();
   booting = (async () => {
+    const wakeStarted = Date.now();
     try {
       // Starting a boot counts as activity so the idle reaper cannot kill a slow-starting app.
       lastActive = Date.now();
@@ -225,6 +229,7 @@ function boot() {
       });
       await waitForApp();
       listening = true;
+      lastWakeMs = Math.max(0, Date.now() - wakeStarted);
       lastActive = Date.now();
     } catch (error) {
       stopApp();
@@ -468,7 +473,13 @@ const server = createServer((req, res) => {
   // Status must stay non-waking and must not count as activity.
   if (pathOnly === "/__preview_status") {
     res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
-    res.end(JSON.stringify({ state: gateState(), sleepSeconds: idleMs / 1000 }));
+    res.end(
+      JSON.stringify({
+        state: gateState(),
+        sleepSeconds: idleMs / 1000,
+        lastWakeMs: lastWakeMs == null ? null : lastWakeMs,
+      }),
+    );
     return;
   }
   if (req.method === "POST" && pathOnly === "/__preview_sleep") {

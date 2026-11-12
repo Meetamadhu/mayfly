@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { isBuilding } from "./builder";
 import { buildsPullRequests, getConfig, previewCostPerHour, previewRepos, previewRuntime } from "./config";
 import { getDeployer, previewUrl, publicPreviewUrl, type Deployment } from "./deployer";
-import { publishPullRequestComment } from "./http";
+import { publishCommitStatus, publishPullRequestComment } from "./http";
 import { exclusive, loadState, saveState } from "./store";
 import {
   isLiveStatus,
@@ -40,11 +40,42 @@ function findLive(environments: Environment[], repository: string, prNumber: num
 
 function readyComment(env: Environment, refreshed: boolean) {
   const verb = refreshed ? "updated" : "ready";
-  return `Preview ${verb}: ${env.url}\nCommit \`${env.sha}\`. Expires ${env.expiresAt}. It is removed when the pull request closes or it reaches its time limit. When nobody is using it, the app sleeps and wakes on the next visit.`;
+  const build =
+    typeof env.buildMs === "number" && env.buildMs >= 0
+      ? `\nBuilt in ${formatDurationMs(env.buildMs)}.`
+      : "";
+  return [
+    `**Mayfly preview ${verb}**`,
+    "",
+    env.url ? `[Open preview](${env.url})` : "Preview URL is not available yet.",
+    "",
+    `Commit \`${env.sha.slice(0, 8)}\` on \`${env.branch}\`. Expires ${env.expiresAt}.${build}`,
+    "",
+    "The preview sleeps when idle and wakes on the next visit. It is removed when the pull request closes or its lifetime ends.",
+  ].join("\n");
+}
+
+function failedComment(env: Environment, message: string) {
+  return [
+    "**Mayfly preview failed**",
+    "",
+    message.slice(0, 500),
+    "",
+    `Commit \`${env.sha.slice(0, 8)}\` on \`${env.branch}\`. Fix the build and push again, or destroy this preview from Admin.`,
+  ].join("\n");
 }
 
 function destroyedComment(env: Environment) {
-  return `Preview destroyed (${env.destroyReason}). The deployment is gone.`;
+  return `**Mayfly preview destroyed** (${env.destroyReason}). The deployment is gone.`;
+}
+
+function formatDurationMs(ms: number) {
+  if (!Number.isFinite(ms) || ms < 0) return "–";
+  if (ms < 1000) return `${(ms / 1000).toFixed(1)} s`;
+  if (ms < 60_000) return `${Math.round(ms / 1000)} s`;
+  const mins = Math.floor(ms / 60_000);
+  const secs = Math.round((ms % 60_000) / 1000);
+  return secs ? `${mins} min ${secs} s` : `${mins} min`;
 }
 
 async function commentQuietly(env: Environment, body: string) {
@@ -52,6 +83,26 @@ async function commentQuietly(env: Environment, body: string) {
     await publishPullRequestComment(env.repository, env.prNumber, body);
   } catch (error) {
     console.error("Pull request comment failed", error);
+  }
+}
+
+async function statusQuietly(
+  env: Environment,
+  input: {
+    state: "error" | "failure" | "pending" | "success";
+    description: string;
+    targetUrl?: string | null;
+  },
+) {
+  try {
+    await publishCommitStatus(env.repository, env.sha, {
+      state: input.state,
+      description: input.description,
+      targetUrl: input.targetUrl,
+      context: "Mayfly — Preview",
+    });
+  } catch (error) {
+    console.error("Pull request status failed", error);
   }
 }
 
@@ -120,22 +171,35 @@ export async function getPreview(repository: string, prNumber: number) {
  * and never boots the app or touches its idle clock, so polling does not wake a preview.
  * The port comes from the deployment record, never from a request URL.
  */
-async function readSleep(env: Environment, deployments: DeploymentRecord[]): Promise<SleepState> {
-  if (getConfig().deployer === "fake") return "unknown";
-  if (!isLiveStatus(env.status) || !env.deploymentId) return "unknown";
+async function readGate(
+  env: Environment,
+  deployments: DeploymentRecord[],
+): Promise<{ sleep: SleepState; lastWakeMs: number | null }> {
+  if (getConfig().deployer === "fake") return { sleep: "unknown", lastWakeMs: null };
+  if (!isLiveStatus(env.status) || !env.deploymentId) return { sleep: "unknown", lastWakeMs: null };
   const port = deployments.find((item) => item.deploymentId === env.deploymentId)?.port;
-  if (!port) return "unknown";
+  if (!port) return { sleep: "unknown", lastWakeMs: null };
   try {
     const response = await fetch(`http://127.0.0.1:${port}/__preview_status`, {
       cache: "no-store",
       signal: AbortSignal.timeout(500),
     });
-    if (!response.ok) return "unknown";
-    const body = (await response.json()) as { state?: unknown };
-    return body.state === "awake" || body.state === "waking" || body.state === "asleep" ? body.state : "unknown";
+    if (!response.ok) return { sleep: "unknown", lastWakeMs: null };
+    const body = (await response.json()) as { state?: unknown; lastWakeMs?: unknown };
+    const sleep: SleepState =
+      body.state === "awake" || body.state === "waking" || body.state === "asleep" ? body.state : "unknown";
+    const lastWakeMs =
+      typeof body.lastWakeMs === "number" && Number.isFinite(body.lastWakeMs) && body.lastWakeMs >= 0
+        ? Math.round(body.lastWakeMs)
+        : null;
+    return { sleep, lastWakeMs };
   } catch {
-    return "unknown";
+    return { sleep: "unknown", lastWakeMs: null };
   }
+}
+
+async function readSleep(env: Environment, deployments: DeploymentRecord[]): Promise<SleepState> {
+  return (await readGate(env, deployments)).sleep;
 }
 
 /**
@@ -179,7 +243,10 @@ export async function getOverview(): Promise<Overview> {
     return Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
   });
   const environments: Environment[] = await Promise.all(
-    sorted.map(async (env) => ({ ...env, sleep: await readSleep(env, deployments) })),
+    sorted.map(async (env) => {
+      const gate = await readGate(env, deployments);
+      return { ...env, sleep: gate.sleep, lastWakeMs: gate.lastWakeMs };
+    }),
   );
 
   const usage = usageForMonth(state.usage, Date.now());
@@ -229,6 +296,7 @@ async function applyDeployment(
   generation: number,
   deployment: Deployment,
   comment: (env: Environment) => string,
+  buildMs: number | null,
 ): Promise<{ stale: boolean; environment: Environment | null; commentBody?: string }> {
   return exclusive(async () => {
     const state = await loadState();
@@ -244,6 +312,7 @@ async function applyDeployment(
     env.url = deployment.url;
     env.error = null;
     env.updatedAt = now;
+    env.buildMs = buildMs;
     const body = comment(env);
     if (refreshed) {
       env.comments.push({ at: now, body });
@@ -263,6 +332,7 @@ async function markDeployFailed(envId: string, generation: number, message: stri
     env.status = "failed";
     env.error = message;
     env.updatedAt = iso();
+    env.comments.push({ at: env.updatedAt, body: failedComment(env, message) });
     await saveState(state);
     return clone(env);
   });
@@ -274,12 +344,26 @@ async function runDeploy(
   action: "created" | "updated",
 ): Promise<LifecycleResult> {
   const generation = env.updateGeneration;
+  await statusQuietly(env, {
+    state: "pending",
+    description: action === "updated" ? "Updating preview…" : "Building preview…",
+  });
+
+  const started = Date.now();
   let deployment: Deployment;
   try {
     deployment = await work();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Deploy failed";
     const failed = await markDeployFailed(env.id, generation, message);
+    if (failed) {
+      await statusQuietly(failed, {
+        state: "failure",
+        description: "Mayfly — Preview failed",
+      });
+      const failBody = failed.comments.at(-1)?.body;
+      if (failBody) await commentQuietly(failed, failBody);
+    }
     return {
       ok: false,
       code: "deploy_failed",
@@ -288,7 +372,14 @@ async function runDeploy(
     };
   }
 
-  const applied = await applyDeployment(env.id, generation, deployment, (current) => readyComment(current, true));
+  const buildMs = Math.max(0, Date.now() - started);
+  const applied = await applyDeployment(
+    env.id,
+    generation,
+    deployment,
+    (current) => readyComment(current, true),
+    buildMs,
+  );
   if (applied.stale) {
     await getDeployer().destroy({ deploymentId: deployment.deploymentId }).catch((error) => {
       console.error("Failed to roll back a stale deployment", error);
@@ -299,8 +390,13 @@ async function runDeploy(
     return { ok: true, action: "unchanged", environment: applied.environment };
   }
 
-  if (applied.environment && applied.commentBody) {
-    await commentQuietly(applied.environment, applied.commentBody);
+  if (applied.environment) {
+    await statusQuietly(applied.environment, {
+      state: "success",
+      description: "Mayfly — Preview ready",
+      targetUrl: applied.environment.url,
+    });
+    if (applied.commentBody) await commentQuietly(applied.environment, applied.commentBody);
   }
 
   return { ok: true, action, environment: applied.environment as Environment };

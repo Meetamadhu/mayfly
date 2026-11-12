@@ -44,6 +44,10 @@ export interface Environment {
   error: string | null;
   updateGeneration: number;
   comments: PreviewComment[];
+  /** Wall time from deploy start to ready, in milliseconds. */
+  buildMs?: number | null;
+  /** Last wake duration from the gate, in milliseconds. Overview-only; not persisted. */
+  lastWakeMs?: number | null;
 }
 
 export interface DeploymentRecord {

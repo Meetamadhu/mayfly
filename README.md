@@ -52,7 +52,7 @@ $secret = ((Get-Content .env.local | Where-Object { $_ -like "GITHUB_WEBHOOK_SEC
   ConvertTo-Json -Depth 5 | gh api repos/<owner>/<repo>/hooks --method POST --input -
 ```
 
-On Linux or macOS, build the same JSON with `jq` and pipe it to `gh api ... --input -`. The content type must be `application/json`. A request with a missing or wrong signature gets `401` and creates nothing. Check deliveries with `gh api repos/<owner>/<repo>/hooks/<id>/deliveries`. Set `GITHUB_TOKEN` to have Mayfly also comment on the pull request; without it Mayfly skips the comment. Quick tunnels and other temporary addresses change, so update the hook's URL when the address changes.
+On Linux or macOS, build the same JSON with `jq` and pipe it to `gh api ... --input -`. The content type must be `application/json`. A request with a missing or wrong signature gets `401` and creates nothing. Check deliveries with `gh api repos/<owner>/<repo>/hooks/<id>/deliveries`. Set `GITHUB_TOKEN` (needs commit status write and pull request comments) so Mayfly posts a **Mayfly — Preview** check and a PR comment with the preview link; without it both are skipped. Quick tunnels and other temporary addresses change, so update the hook's URL when the address changes.
 
 Copy `.env.example` to `.env.local`. `.env.local` stays on this machine.
 
@@ -72,7 +72,7 @@ Copy `.env.example` to `.env.local`. `.env.local` stays on this machine.
 | `PREVIEW_BASE_URL` | Origin used in preview links. Example: `http://localhost:3000`. |
 | `DATABASE_URL` | Optional. Neon (or Postgres) connection string. When set, board/admin environment state is stored in Postgres (`mayfly_state`) instead of `data/state.json`. Use Neon's pooled URL. Empty keeps the JSON file. |
 | `GITHUB_WEBHOOK_SECRET` | Required in production. In development, an empty value accepts unsigned deliveries. |
-| `GITHUB_TOKEN` | Optional. When set, preview comments are also posted on the pull request. |
+| `GITHUB_TOKEN` | Optional. Posts a **Mayfly — Preview** commit check and a PR comment with the preview link (or failure details). Needs commit status write and pull-request comment access. |
 | `MAYFLY_ADMIN_TOKEN` | Required for every action that changes things. Send it as `Authorization: Bearer <token>` or `x-mayfly-admin: <token>`, or paste it into the board's **Admin** field. When empty, those actions are always refused with 401. Generate one with `openssl rand -hex 32`. |
 | `DEMO_PREVIEW` | Optional. Keep one preview alive for visitors. Quote it, because `#` starts a comment: `DEMO_PREVIEW="acme/web#1"`. Empty turns it off. The branch is `demo` and the commit is `d3m0d3m0`. It is not deleted when its time limit passes, and the card does not show an expiry. |
 

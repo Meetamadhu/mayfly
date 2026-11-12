@@ -26,22 +26,27 @@ export async function POST(request: Request) {
   const parsed = parseSimulatorEvent(payload);
   if (!parsed.ok) return json({ ok: false, code: "invalid", error: parsed.error }, 400);
 
-  // No commit given: a real build uses the pull request's latest commit on GitHub, so the simulator never rolls a
-  // preview back to an old one. The placeholder app has no real commits, so it gets a new random one, like a push.
+  // No commit given: prefer the pull request's current head on GitHub so commit statuses and comments
+  // attach to a real SHA. Docker builds require that head; process/placeholder mode still uses it when
+  // lookup works, and only invents a random SHA when GitHub cannot be reached (or for the demo).
   const event = parsed.event;
   if (!event.sha) {
     const demo = getConfig().demo;
     const isDemo = Boolean(demo && demo.repository === event.repository && demo.prNumber === event.prNumber);
-    const realBuild = event.action !== "closed" && buildsPullRequests() && !isDemo && repositoryAllowed(event.repository);
-    if (realBuild) {
+    const needsRealHead =
+      event.action !== "closed" && !isDemo && (!buildsPullRequests() || repositoryAllowed(event.repository));
+    if (needsRealHead) {
       const head = await pullRequestHead(event.repository, event.prNumber);
-      if (!head) {
+      if (head) {
+        event.sha = head;
+      } else if (buildsPullRequests() && repositoryAllowed(event.repository)) {
         return json(
           { ok: false, code: "invalid", error: `Could not find the head of PR #${event.prNumber} in ${event.repository}.` },
           400,
         );
+      } else {
+        event.sha = randomBytes(8).toString("hex");
       }
-      event.sha = head;
     } else {
       event.sha = randomBytes(8).toString("hex");
     }
