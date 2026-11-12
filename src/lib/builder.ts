@@ -32,7 +32,9 @@ export function imageTag(repository: string, prNumber: number, sha: string) {
  */
 export function childEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env, GIT_TERMINAL_PROMPT: "0", DOCKER_BUILDKIT: "0" };
-  for (const name of ["MAYFLY_ADMIN_TOKEN", "GITHUB_WEBHOOK_SECRET", "GITHUB_TOKEN"]) delete env[name];
+  for (const name of ["MAYFLY_ADMIN_TOKEN", "GITHUB_WEBHOOK_SECRET", "GITHUB_TOKEN", "MAYFLY_GITHUB_TOKEN"]) {
+    delete env[name];
+  }
   return env;
 }
 

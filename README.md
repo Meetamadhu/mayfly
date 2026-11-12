@@ -52,7 +52,7 @@ $secret = ((Get-Content .env.local | Where-Object { $_ -like "GITHUB_WEBHOOK_SEC
   ConvertTo-Json -Depth 5 | gh api repos/<owner>/<repo>/hooks --method POST --input -
 ```
 
-On Linux or macOS, build the same JSON with `jq` and pipe it to `gh api ... --input -`. The content type must be `application/json`. A request with a missing or wrong signature gets `401` and creates nothing. Check deliveries with `gh api repos/<owner>/<repo>/hooks/<id>/deliveries`. Set `GITHUB_TOKEN` (needs commit status write and pull request comments) so Mayfly posts a **Mayfly — Preview** check and a PR comment with the preview link; without it both are skipped. Quick tunnels and other temporary addresses change, so update the hook's URL when the address changes.
+On Linux or macOS, build the same JSON with `jq` and pipe it to `gh api ... --input -`. The content type must be `application/json`. A request with a missing or wrong signature gets `401` and creates nothing. Check deliveries with `gh api repos/<owner>/<repo>/hooks/<id>/deliveries`. Set `GITHUB_TOKEN` (or `MAYFLY_GITHUB_TOKEN`) in `.env.local` so Mayfly posts a **Mayfly — Preview** check and a PR comment with the preview link; without it both are skipped. The token needs commit status write and pull request comments. Docker Compose does not pass Codespace secrets into the container, so the value must be in `.env.local` even in a Codespace. Quick tunnels and other temporary addresses change, so update the hook's URL when the address changes.
 
 Copy `.env.example` to `.env.local`. `.env.local` stays on this machine.
 
@@ -72,7 +72,7 @@ Copy `.env.example` to `.env.local`. `.env.local` stays on this machine.
 | `PREVIEW_BASE_URL` | Origin used in preview links. Example: `http://localhost:3000`. |
 | `DATABASE_URL` | Optional. Neon (or Postgres) connection string. When set, board/admin environment state is stored in Postgres (`mayfly_state`) instead of `data/state.json`. Use Neon's pooled URL. Empty keeps the JSON file. |
 | `GITHUB_WEBHOOK_SECRET` | Required in production. In development, an empty value accepts unsigned deliveries. |
-| `GITHUB_TOKEN` | Optional. Posts a **Mayfly — Preview** commit check and a PR comment with the preview link (or failure details). Needs commit status write and pull-request comment access. |
+| `GITHUB_TOKEN` | Optional. Posts a **Mayfly — Preview** commit check and a PR comment. Needs commit status write and pull-request comment access. Put it in `.env.local` (Docker Compose does not pass Codespace secrets into the container). `MAYFLY_GITHUB_TOKEN` is accepted too. |
 | `MAYFLY_ADMIN_TOKEN` | Required for every action that changes things. Send it as `Authorization: Bearer <token>` or `x-mayfly-admin: <token>`, or paste it into the board's **Admin** field. When empty, those actions are always refused with 401. Generate one with `openssl rand -hex 32`. |
 | `DEMO_PREVIEW` | Optional. Keep one preview alive for visitors. Quote it, because `#` starts a comment: `DEMO_PREVIEW="acme/web#1"`. Empty turns it off. The branch is `demo` and the commit is `d3m0d3m0`. It is not deleted when its time limit passes, and the card does not show an expiry. |
 
@@ -114,7 +114,7 @@ To demo the time limit, set TTL minutes to `0`, choose **Open**, then choose **R
 
 `MAYFLY_ADMIN_TOKEN` protects `POST /api/environments/<id>?action=destroy`, `action=sleep`, and `action=activity`, plus `POST /api/reaper` and `POST /api/events`. With no token configured those routes refuse every request; there is no exception for "local" requests, because the `Host` header is chosen by the sender. Scripts send the token as `Authorization: Bearer <token>` or `x-mayfly-admin`. People sign in on `/admin/login` and get a `mayfly_admin` cookie that holds an expiry and a signature, never the token. The cookie is `HttpOnly` and `SameSite=Strict` (and `Secure` in production), and lasts 8 hours. A request that changes anything and is authenticated by the cookie must also come from this host's own `Origin`, or it gets 403. The public board at `/board` is read-only. In production, webhook deliveries must be signed with `GITHUB_WEBHOOK_SECRET`.
 
-Preview processes receive only `PATH`, `NODE_ENV` and `PREVIEW_*` variables (plus the Windows system variables Node needs). `GITHUB_TOKEN`, `GITHUB_WEBHOOK_SECRET` and `MAYFLY_ADMIN_TOKEN` never reach them.
+Preview processes receive only `PATH`, `NODE_ENV` and `PREVIEW_*` variables (plus the Windows system variables Node needs). `GITHUB_TOKEN`, `MAYFLY_GITHUB_TOKEN`, `GITHUB_WEBHOOK_SECRET` and `MAYFLY_ADMIN_TOKEN` never reach them.
 
 ## Known limitations
 

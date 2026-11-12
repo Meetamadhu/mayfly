@@ -236,7 +236,7 @@ async function claimPort(preferred?: number) {
 
 /**
  * The only server variables a preview process may see: PATH, NODE_ENV and PREVIEW_*.
- * Everything else (GITHUB_TOKEN, GITHUB_WEBHOOK_SECRET, MAYFLY_ADMIN_TOKEN, ...) stays out of previews.
+ * Everything else (GITHUB_TOKEN, MAYFLY_GITHUB_TOKEN, GITHUB_WEBHOOK_SECRET, MAYFLY_ADMIN_TOKEN, ...) stays out of previews.
  * On Windows a few system variables are also passed, because Node's networking fails in a child without them.
  */
 // DOCKER_HOST is how the gate reaches a Docker socket proxy. It is not an app secret, and apps run in containers.
