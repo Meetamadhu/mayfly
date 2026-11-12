@@ -98,6 +98,12 @@ function EnvironmentCard({
         <p className="meta">
           {demo ? null : <span className="chip mono">{env.sha.slice(0, 8)}</span>}
           {fromCode ? <span className="chip code-chip">Built from PR code</span> : null}
+          {typeof env.buildMs === "number" && env.buildMs >= 0 ? (
+            <span className="chip timing-chip">Built in {formatDurationMs(env.buildMs)}</span>
+          ) : null}
+          {typeof env.lastWakeMs === "number" && env.lastWakeMs >= 0 ? (
+            <span className="chip timing-chip">Last wake {formatDurationMs(env.lastWakeMs)}</span>
+          ) : null}
         </p>
         {path && env.url ? (
           <p className="url">
@@ -333,6 +339,42 @@ function formatContainerHours(seconds: number) {
   return hours.toFixed(2);
 }
 
+function formatDurationMs(ms: number) {
+  if (!Number.isFinite(ms) || ms < 0) return "–";
+  if (ms < 1000) return `${(ms / 1000).toFixed(1)} s`;
+  if (ms < 60_000) return `${Math.round(ms / 1000)} s`;
+  const mins = Math.floor(ms / 60_000);
+  const secs = Math.round((ms % 60_000) / 1000);
+  return secs ? `${mins} min ${secs} s` : `${mins} min`;
+}
+
+type BoardFilter = "all" | "awake" | "asleep" | "expiring";
+
+const EXPIRING_SOON_MS = 24 * 60 * 60 * 1000;
+
+function matchesBoardFilter(env: Environment, filter: BoardFilter, now: number) {
+  if (filter === "all") return true;
+  if (filter === "awake") return env.sleep === "awake" || env.sleep === "waking";
+  if (filter === "asleep") return env.sleep === "asleep";
+  if (filter === "expiring") {
+    if (!env.expiresAt) return false;
+    const left = Date.parse(env.expiresAt) - now;
+    return Number.isFinite(left) && left > 0 && left <= EXPIRING_SOON_MS;
+  }
+  return true;
+}
+
+function matchesBoardSearch(env: Environment, query: string) {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return (
+    env.repository.toLowerCase().includes(q) ||
+    env.branch.toLowerCase().includes(q) ||
+    String(env.prNumber).includes(q) ||
+    env.sha.toLowerCase().includes(q)
+  );
+}
+
 export function Dashboard() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -341,6 +383,8 @@ export function Dashboard() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [polledAt, setPolledAt] = useState<number | null>(null);
+  const [boardFilter, setBoardFilter] = useState<BoardFilter>("all");
+  const [boardQuery, setBoardQuery] = useState("");
 
   const reload = useCallback(async () => {
     const response = await fetch("/api/environments", { cache: "no-store" });
@@ -389,6 +433,9 @@ export function Dashboard() {
 
   const config = overview?.config;
   const current = overview?.environments.filter((env) => env.status !== "destroyed") ?? [];
+  const visible = current.filter(
+    (env) => matchesBoardFilter(env, boardFilter, now) && matchesBoardSearch(env, boardQuery),
+  );
   const removed = overview?.environments.filter((env) => env.status === "destroyed") ?? [];
   // The overview lists allowed repositories only when Mayfly builds pull request code, which is the Docker runtime.
   const dockerRuntime = config?.allowedRepositories != null;
@@ -480,6 +527,38 @@ export function Dashboard() {
             </div>
           </div>
 
+          <div className="board-filters">
+            <div className="board-filter-pills" role="group" aria-label="Filter previews">
+              {(
+                [
+                  ["all", "All"],
+                  ["awake", "Awake"],
+                  ["asleep", "Asleep"],
+                  ["expiring", "Expiring soon"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className="board-filter-pill"
+                  aria-pressed={boardFilter === id}
+                  onClick={() => setBoardFilter(id)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <label className="board-search">
+              <span className="visually-hidden">Search by repo or branch</span>
+              <input
+                type="search"
+                value={boardQuery}
+                onChange={(event) => setBoardQuery(event.target.value)}
+                placeholder="Search repo or branch"
+              />
+            </label>
+          </div>
+
           {loadError ? <p className="error" role="alert">{loadError}</p> : null}
           {!overview && !loadError ? <p className="empty">Loading the ledger…</p> : null}
 
@@ -487,7 +566,10 @@ export function Dashboard() {
             {overview && current.length === 0 ? (
               <p className="empty">No live previews. Open a pull request and it will show up here.</p>
             ) : null}
-            {current.map((env) => (
+            {overview && current.length > 0 && visible.length === 0 ? (
+              <p className="empty">No previews match this filter.</p>
+            ) : null}
+            {visible.map((env) => (
               <EnvironmentCard
                 key={env.id}
                 env={env}
