@@ -3,6 +3,7 @@
  * Run: node scripts/test-pr-comment-upsert.mjs
  * Expects dist/server.js already built.
  */
+import { randomBytes } from "node:crypto";
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -14,7 +15,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MOCK_PORT = 18765;
 const MAYFLY_PORT = 13000;
 const TOKEN = "test-mayfly-token";
-const ADMIN = "0972199b358ac9bc7fe9d24e879096190694f3f51c87c7b8ca07dda1768c36cd";
+const ADMIN = randomBytes(32).toString("hex");
 const REPO = "acme/comments";
 const PR = 42;
 
