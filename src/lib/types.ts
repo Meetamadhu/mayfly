@@ -116,6 +116,10 @@ export interface OrchestratorConfigView {
   allowedRepositories: string[] | null;
   /** True when Mayfly runs on Render, where settings live in the Render dashboard. */
   onRender: boolean;
+  /** True when GITHUB_TOKEN or MAYFLY_GITHUB_TOKEN is set. Never includes the token. */
+  githubConnected: boolean;
+  /** Currency symbol for estimated savings (from PREVIEW_CURRENCY). */
+  currency: string;
 }
 
 /** One UTC day's estimated awake/asleep totals. */
@@ -150,6 +154,8 @@ export interface Overview {
   costPerHour: number;
   /** asleepSeconds/3600 * costPerHour for the current month. */
   savedEstimate: number;
+  /** Currency symbol for savedEstimate display. */
+  currency: string;
 }
 
 export type LifecycleResult =

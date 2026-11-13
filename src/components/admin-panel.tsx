@@ -608,7 +608,7 @@ export function AdminPanel() {
       </section>
 
       <div className="workspace">
-        <details className="panel simulator" open>
+        <details id="simulator" className="panel simulator" open>
           <summary>Simulate a pull request</summary>
           <p className="help">
             This talks to Mayfly directly. GitHub can send the same actions to <span className="mono">/api/webhooks/github</span>.

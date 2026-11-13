@@ -118,6 +118,18 @@ export function previewCostPerHour() {
   return positiveNumber("PREVIEW_COST_PER_HOUR", 0.05) || 0.05;
 }
 
+/** Currency symbol for estimated savings on the board. Default "$". */
+export function previewCurrency() {
+  const raw = (process.env.PREVIEW_CURRENCY ?? "").trim();
+  if (!raw || raw.length > 4) return "$";
+  return raw;
+}
+
+/** True when a GitHub token is configured (never expose the token itself). */
+export function githubConfigured() {
+  return Boolean((process.env.GITHUB_TOKEN ?? process.env.MAYFLY_GITHUB_TOKEN ?? "").trim());
+}
+
 let sleepRulesCacheKey: string | null = null;
 let sleepRulesCache = new Map<string, number>();
 

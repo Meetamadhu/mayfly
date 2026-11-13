@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { AdminHeader } from "@/components/admin-header";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { MayflyMark } from "@/components/admin-header";
+import { ThemeToggle } from "@/components/theme-toggle";
 import type { Environment, EnvironmentStatus, Overview, UsageDay, UsageMonth } from "@/lib/types";
 
 const TRANSITIONAL = new Set<EnvironmentStatus>(["provisioning", "updating", "destroying"]);
@@ -17,6 +18,7 @@ function EnvironmentCard({
   demo,
   buildsCode,
   costPerHour,
+  currency,
   onCopy,
 }: {
   env: Environment;
@@ -27,6 +29,7 @@ function EnvironmentCard({
   /** True when this Mayfly builds each pull request's own Dockerfile (Docker runtime), not the placeholder app. */
   buildsCode: boolean;
   costPerHour: number;
+  currency: string;
   onCopy: () => void;
 }) {
   if (env.status === "destroyed") {
@@ -125,7 +128,7 @@ function EnvironmentCard({
           <p className="url url-empty" aria-hidden="true" />
         )}
         {env.status === "failed" && env.error ? <pre className="fail-box">{env.error}</pre> : null}
-        <p className="card-usage">{formatPreviewUsage(env, costPerHour, demo)}</p>
+        <p className="card-usage">{formatPreviewUsage(env, costPerHour, demo, currency)}</p>
       </div>
       <footer className="card-foot">
         {showOpen ? (
@@ -344,9 +347,9 @@ function formatMoney(amount: number) {
   return amount.toFixed(2);
 }
 
-function formatSaved(amount: number) {
-  if (amount < 0.01) return "< $0.01";
-  return `≈ $${amount.toFixed(2)}`;
+function formatSaved(amount: number, currency = "$") {
+  if (amount < 0.01) return `< ${currency}0.01`;
+  return `≈ ${currency}${amount.toFixed(2)}`;
 }
 
 function formatContainerHours(seconds: number) {
@@ -368,18 +371,18 @@ function estimatedCost(seconds: number, costPerHour: number) {
   return (seconds / 3600) * costPerHour;
 }
 
-function formatEstMoney(amount: number) {
-  if (!Number.isFinite(amount) || amount < 0.01) return "< $0.01";
-  return `$${amount.toFixed(2)}`;
+function formatEstMoney(amount: number, currency = "$") {
+  if (!Number.isFinite(amount) || amount < 0.01) return `< ${currency}0.01`;
+  return `${currency}${amount.toFixed(2)}`;
 }
 
-function formatPreviewUsage(env: Environment, costPerHour: number, demo: boolean) {
+function formatPreviewUsage(env: Environment, costPerHour: number, demo: boolean, currency = "$") {
   if (demo) return "—";
   if (!env.usage) return "—";
   const awake = env.usage.awakeSeconds ?? 0;
   const asleep = env.usage.asleepSeconds ?? 0;
   const saved = estimatedCost(asleep, costPerHour);
-  return `Awake ${formatUsageDuration(awake)} · Asleep ${formatUsageDuration(asleep)} · Est. saved ${formatEstMoney(saved)}`;
+  return `Awake ${formatUsageDuration(awake)} · Asleep ${formatUsageDuration(asleep)} · Est. saved ${formatEstMoney(saved, currency)}`;
 }
 
 function last14DayKeys(now = Date.now()) {
@@ -411,9 +414,11 @@ function formatDayParts(isoDay: string) {
 function CostDayChart({
   usage,
   costPerHour,
+  currency = "$",
 }: {
   usage: UsageMonth | undefined;
   costPerHour: number;
+  currency?: string;
 }) {
   const keys = last14DayKeys();
   const points = keys.map((key) => {
@@ -424,7 +429,7 @@ function CostDayChart({
   });
   const maxValue = Math.max(0, ...points.map((p) => p.always));
   const scaleMax = maxValue > 0 ? maxValue : 0.01;
-  const maxLabel = maxValue <= 0 ? "$0.00" : formatEstMoney(maxValue);
+  const maxLabel = maxValue <= 0 ? `${currency}0.00` : formatEstMoney(maxValue, currency);
 
   return (
     <figure className="cost-chart" aria-label="Estimated daily cost, last 14 days">
@@ -508,6 +513,34 @@ function matchesBoardSearch(env: Environment, query: string) {
   );
 }
 
+type BoardActivity = { at: string; repository: string; prNumber: number; text: string };
+
+function boardRecentActivity(environments: Environment[]): BoardActivity[] {
+  const events: BoardActivity[] = [];
+  for (const env of environments) {
+    events.push({ at: env.createdAt, repository: env.repository, prNumber: env.prNumber, text: "Created" });
+    if (env.lastActiveAt && env.lastActiveAt !== env.createdAt) {
+      events.push({ at: env.lastActiveAt, repository: env.repository, prNumber: env.prNumber, text: "Last visit" });
+    }
+    if (env.updatedAt && env.updatedAt !== env.createdAt && env.updatedAt !== env.lastActiveAt) {
+      events.push({ at: env.updatedAt, repository: env.repository, prNumber: env.prNumber, text: "Updated" });
+    }
+    if (env.destroyedAt) {
+      const reason = env.destroyReason ? `Removed (${env.destroyReason})` : "Removed";
+      events.push({ at: env.destroyedAt, repository: env.repository, prNumber: env.prNumber, text: reason });
+    }
+    for (const event of env.events ?? []) {
+      events.push({
+        at: event.at,
+        repository: env.repository,
+        prNumber: env.prNumber,
+        text: event.type.replace(/_/g, " "),
+      });
+    }
+  }
+  return events.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 12);
+}
+
 export function Dashboard() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -518,6 +551,10 @@ export function Dashboard() {
   const [polledAt, setPolledAt] = useState<number | null>(null);
   const [boardFilter, setBoardFilter] = useState<BoardFilter>("all");
   const [boardQuery, setBoardQuery] = useState("");
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [signedIn, setSignedIn] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const reload = useCallback(async () => {
     const response = await fetch("/api/environments", { cache: "no-store" });
@@ -527,6 +564,36 @@ export function Dashboard() {
     setLoadError(null);
     setPolledAt(Date.now());
     return body;
+  }, []);
+
+  useEffect(() => {
+    setTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light");
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/admin/session", { credentials: "include", cache: "no-store" })
+      .then((res) => res.json())
+      .then((body: { signedIn?: boolean }) => {
+        if (!cancelled) setSignedIn(Boolean(body.signedIn));
+      })
+      .catch(() => {
+        if (!cancelled) setSignedIn(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   useEffect(() => {
@@ -564,18 +631,37 @@ export function Dashboard() {
     return () => window.clearInterval(tick);
   }, []);
 
+  function chooseTheme(next: "light" | "dark") {
+    document.documentElement.dataset.theme = next;
+    try {
+      localStorage.setItem("mayfly-theme", next);
+    } catch {
+      // Storage can be blocked.
+    }
+    setTheme(next);
+  }
+
+  async function signOut() {
+    await fetch("/api/admin/session", { method: "DELETE", credentials: "include" });
+    setSignedIn(false);
+  }
+
   const config = overview?.config;
+  const currency = overview?.currency ?? config?.currency ?? "$";
   const current = overview?.environments.filter((env) => env.status !== "destroyed") ?? [];
   const demoKey = config?.demo ?? null;
   const visible = current.filter(
     (env) => matchesBoardFilter(env, boardFilter, now, demoKey) && matchesBoardSearch(env, boardQuery),
   );
   const removed = overview?.environments.filter((env) => env.status === "destroyed") ?? [];
-  // The overview lists allowed repositories only when Mayfly builds pull request code, which is the Docker runtime.
   const dockerRuntime = config?.allowedRepositories != null;
   const liveCount = overview?.summary.live ?? 0;
   const capacity = config?.maxConcurrent ?? 0;
   const capacityRatio = capacity > 0 ? Math.min(1, liveCount / capacity) : 0;
+  const buildingCount = current.filter(
+    (env) => env.status === "provisioning" || env.status === "updating",
+  ).length;
+  const activity = overview ? boardRecentActivity(overview.environments) : [];
 
   async function copyUrl(id: string, url: string) {
     try {
@@ -589,223 +675,329 @@ export function Dashboard() {
   }
 
   return (
-    <main className="shell">
-      {config?.deployer === "fake" ? (
-        <p className="notice" role="status">
-          Simulation mode: previews are recorded, not run.
-          {process.env.NEXT_PUBLIC_LIVE_DEMO_URL ? (
-            <>
-              {" "}
-              <a href={process.env.NEXT_PUBLIC_LIVE_DEMO_URL}>Open the live demo</a>
-            </>
+    <div className="board-app" data-nav={navOpen ? "open" : "closed"}>
+      <aside className="board-sidebar" aria-label="Mayfly">
+        <div className="board-sidebar-brand">
+          <a className="board-brand" href="/">
+            <MayflyMark className="board-mark" />
+            <span>
+              <span className="board-wordmark">Mayfly</span>
+              <span className="board-tagline">Ephemeral Environments</span>
+            </span>
+          </a>
+          <button
+            type="button"
+            className="board-nav-toggle"
+            aria-expanded={navOpen}
+            aria-controls="board-side-nav"
+            onClick={() => setNavOpen((open) => !open)}
+          >
+            Menu
+          </button>
+        </div>
+        <nav id="board-side-nav" className="board-side-nav">
+          <a href="/board" aria-current="page">
+            Dashboard
+          </a>
+          <a href="#cost" onClick={() => setNavOpen(false)}>
+            Cost &amp; savings
+          </a>
+          <a href="#activity" onClick={() => setNavOpen(false)}>
+            Activity
+          </a>
+          <a href="/admin">Admin</a>
+        </nav>
+        <p className="board-promo">Spin up PR previews on demand. Sleep when idle. Save on cloud costs.</p>
+      </aside>
+
+      <div className="board-main">
+        <header className="board-topbar">
+          <label className="board-search board-search-top">
+            <span className="visually-hidden">Search by repo or branch</span>
+            <input
+              ref={searchRef}
+              type="search"
+              value={boardQuery}
+              onChange={(event) => setBoardQuery(event.target.value)}
+              placeholder="Search repo or branch"
+            />
+            <kbd className="board-search-kbd">Ctrl K</kbd>
+          </label>
+          <div className="board-topbar-actions">
+            {config?.githubConnected ? (
+              <span className="board-github-pill" title="GitHub token is configured">
+                GitHub connected
+              </span>
+            ) : null}
+            <ThemeToggle theme={theme} onChange={chooseTheme} />
+            {signedIn ? (
+              <button type="button" className="secondary board-auth-btn" onClick={() => void signOut()}>
+                Sign out
+              </button>
+            ) : (
+              <a className="btn secondary board-auth-btn" href="/admin/login">
+                Admin sign-in
+              </a>
+            )}
+          </div>
+        </header>
+
+        <main className="board-content">
+          {config?.deployer === "fake" ? (
+            <p className="notice" role="status">
+              Simulation mode: previews are recorded, not run.
+              {process.env.NEXT_PUBLIC_LIVE_DEMO_URL ? (
+                <>
+                  {" "}
+                  <a href={process.env.NEXT_PUBLIC_LIVE_DEMO_URL}>Open the live demo</a>
+                </>
+              ) : null}
+            </p>
           ) : null}
-        </p>
-      ) : null}
-      <AdminHeader />
 
-      <section className="savings-hero" aria-label="Estimated savings this month">
-        <p className="savings-figure">
-          {overview ? (
-            <>
-              {formatSaved(overview.savedEstimate)}
-              <span> estimated saved this month</span>
-            </>
-          ) : (
-            "–"
-          )}
-        </p>
-        <p className="savings-sub">
-          {overview
-            ? `Awake ${formatContainerHours(overview.usage?.awakeSeconds ?? 0)} h · Asleep ${formatContainerHours(overview.usage?.asleepSeconds ?? 0)} h · at $${formatMoney(overview.costPerHour ?? 0.05)}/h estimated`
-            : "Waiting for the first reaper sample…"}
-        </p>
-        {overview ? (
-          <CostDayChart usage={overview.usage} costPerHour={overview.costPerHour ?? 0.05} />
-        ) : null}
-      </section>
-
-      <p className="board-settings">
-        {config
-          ? `Sleeps after ${formatSleep(config.sleepSeconds)} · Max lifetime ${formatLifetime(config.ttlHours)}`
-          : "Sleeps after – · Max lifetime –"}
-      </p>
-
-      <dl className="stats">
-        <div data-stat="live">
-          <dt>Live</dt>
-          <dd>
-            {overview ? liveCount : "–"}
-            <span>/{capacity || "–"}</span>
-          </dd>
-          <div className="meter" aria-hidden="true">
-            <span data-hot={capacityRatio >= 0.8 ? "true" : "false"} style={{ width: `${capacityRatio * 100}%` }} />
-          </div>
-        </div>
-        <div data-stat="awake">
-          <dt>Awake</dt>
-          <dd>{overview?.summary.awake ?? "–"}</dd>
-        </div>
-        <div data-stat="asleep">
-          <dt>Asleep</dt>
-          <dd>{overview?.summary.asleep ?? "–"}</dd>
-        </div>
-        <div data-stat="removed">
-          <dt>Removed</dt>
-          <dd>{overview?.summary.destroyed ?? "–"}</dd>
-        </div>
-      </dl>
-
-      <div className="workspace">
-        <section className="live-column">
-          <div className="ledger-head">
+          <section className="board-welcome">
             <div>
-              <h2>Live</h2>
-              <p className="help">Previews that are still running.</p>
+              <h1>Welcome to Mayfly</h1>
+              <p className="lede">
+                Ephemeral preview environments for every pull request — build, preview, sleep and destroy
+                automatically.
+              </p>
             </div>
-          </div>
+            {signedIn ? (
+              <a className="btn secondary" href="/admin#simulator">
+                Simulate PR
+              </a>
+            ) : null}
+          </section>
 
-          <div className="board-filters">
-            <div className="board-filter-pills" role="group" aria-label="Filter previews">
-              {(
-                [
-                  ["all", "All"],
-                  ["awake", "Awake"],
-                  ["asleep", "Asleep"],
-                  ["expiring", "Expiring soon"],
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  key={id}
-                  type="button"
-                  className="board-filter-pill"
-                  aria-pressed={boardFilter === id}
-                  onClick={() => setBoardFilter(id)}
-                >
-                  {label}
-                </button>
-              ))}
+          <dl className="stats board-stats">
+            <div data-stat="live">
+              <dt>Live</dt>
+              <dd>
+                {overview ? liveCount : "–"}
+                <span>/{capacity || "–"}</span>
+              </dd>
+              <div className="meter" aria-hidden="true">
+                <span data-hot={capacityRatio >= 0.8 ? "true" : "false"} style={{ width: `${capacityRatio * 100}%` }} />
+              </div>
             </div>
-            <label className="board-search">
-              <span className="visually-hidden">Search by repo or branch</span>
-              <input
-                type="search"
-                value={boardQuery}
-                onChange={(event) => setBoardQuery(event.target.value)}
-                placeholder="Search repo or branch"
-              />
-            </label>
-          </div>
+            <div data-stat="awake">
+              <dt>Running</dt>
+              <dd>{overview?.summary.awake ?? "–"}</dd>
+            </div>
+            <div data-stat="asleep">
+              <dt>Sleeping</dt>
+              <dd>{overview?.summary.asleep ?? "–"}</dd>
+            </div>
+            <div data-stat="building">
+              <dt>Building</dt>
+              <dd>{overview ? buildingCount : "–"}</dd>
+            </div>
+            <div data-stat="savings">
+              <dt>Estimated</dt>
+              <dd>{overview ? formatSaved(overview.savedEstimate, currency) : "–"}</dd>
+            </div>
+          </dl>
 
-          {loadError ? <p className="error" role="alert">{loadError}</p> : null}
-          {!overview && !loadError ? <p className="empty">Loading the ledger…</p> : null}
+          <p className="board-settings">
+            {config
+              ? `Sleeps after ${formatSleep(config.sleepSeconds)} · Max lifetime ${formatLifetime(config.ttlHours)}`
+              : "Sleeps after – · Max lifetime –"}
+          </p>
 
-          <div className="stack">
-            {overview && current.length === 0 ? (
-              <p className="empty">No live previews. Open a pull request and it will show up here.</p>
-            ) : null}
-            {overview && current.length > 0 && visible.length === 0 ? (
-              <p className="empty">No previews match this filter.</p>
-            ) : null}
-            {visible.map((env) => (
-              <EnvironmentCard
-                key={env.id}
-                env={env}
-                copied={copiedId === env.id}
-                sleepSeconds={config?.sleepSeconds ?? 20}
-                now={now}
-                demo={demoKey === `${env.repository}#${env.prNumber}`}
-                buildsCode={dockerRuntime}
-                costPerHour={overview?.costPerHour ?? 0.05}
-                onCopy={() => void copyUrl(env.id, env.url ?? previewPath(""))}
-              />
-            ))}
-          </div>
+          <div className="board-workspace">
+            <section className="live-column">
+              <div className="ledger-head">
+                <div>
+                  <h2>Active environments</h2>
+                  <p className="help">Previews that are still running.</p>
+                </div>
+              </div>
 
-          <div className="board-toolbar">
-            <div className="board-toolbar-main">
-              <details className="advanced">
-                <summary>
-                  {dockerRuntime ? "Advanced: containers" : "Advanced: processes"}
-                  {overview && overview.deployments.length > 0 ? (
-                    <span className="advanced-count">{overview.deployments.length}</span>
-                  ) : null}
-                </summary>
-                <p className="advanced-help">
-                  {dockerRuntime
-                    ? "Containers that are still listening on this machine."
-                    : "Gate and app processes that are still listening on this machine."}
-                </p>
-                <div className="stack advanced-list">
-                  {overview && overview.deployments.length === 0 ? (
-                    <p className="empty">Nothing is listening. Closed, idle, and expired previews are gone.</p>
-                  ) : null}
-                  {overview?.deployments.map((deployment) => (
-                    <article className="deployment" key={deployment.deploymentId}>
-                      <div className="deployment-main">
-                        <strong>
-                          {deployment.repository}
-                          <span> #{deployment.prNumber}</span>
-                        </strong>
-                        <p className="meta">
-                          <span className="chip mono">{deployment.sha.slice(0, 8)}</span>
-                          {deployment.port ? (
-                            <span className="chip port-chip">port {deployment.port}</span>
-                          ) : null}
-                        </p>
-                      </div>
-                      {config?.deployer === "fake" ? null : (
-                        <a className="open-preview secondary" href={previewPath(deployment.url)}>
-                          Open
-                        </a>
-                      )}
-                    </article>
+              <div className="board-filters">
+                <div className="board-filter-pills" role="group" aria-label="Filter previews">
+                  {(
+                    [
+                      ["all", "All"],
+                      ["awake", "Awake"],
+                      ["asleep", "Asleep"],
+                      ["expiring", "Expiring soon"],
+                    ] as const
+                  ).map(([id, label]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      className="board-filter-pill"
+                      aria-pressed={boardFilter === id}
+                      onClick={() => setBoardFilter(id)}
+                    >
+                      {label}
+                    </button>
                   ))}
                 </div>
-              </details>
-              {polledAt != null ? (
-                <p className="updated">Updated {Math.max(0, Math.floor((now - polledAt) / 1000))} s ago</p>
-              ) : null}
-            </div>
+              </div>
 
-            {overview && removed.length > 0 ? (
-              <button
-                type="button"
-                className="history-toggle secondary"
-                aria-expanded={showRemoved}
-                onClick={() => setShowRemoved((open) => !open)}
-              >
-                {showRemoved ? "Hide removed" : "Show removed"}
-                <span>{removed.length}</span>
-              </button>
-            ) : null}
+              {loadError ? <p className="error" role="alert">{loadError}</p> : null}
+              {!overview && !loadError ? <p className="empty">Loading the ledger…</p> : null}
+
+              <div className="stack">
+                {overview && current.length === 0 ? (
+                  <p className="empty">No live previews. Open a pull request and it will show up here.</p>
+                ) : null}
+                {overview && current.length > 0 && visible.length === 0 ? (
+                  <p className="empty">No previews match this filter.</p>
+                ) : null}
+                {visible.map((env) => (
+                  <EnvironmentCard
+                    key={env.id}
+                    env={env}
+                    copied={copiedId === env.id}
+                    sleepSeconds={config?.sleepSeconds ?? 20}
+                    now={now}
+                    demo={demoKey === `${env.repository}#${env.prNumber}`}
+                    buildsCode={dockerRuntime}
+                    costPerHour={overview?.costPerHour ?? 0.05}
+                    currency={currency}
+                    onCopy={() => void copyUrl(env.id, env.url ?? previewPath(""))}
+                  />
+                ))}
+              </div>
+
+              <div className="board-toolbar">
+                <div className="board-toolbar-main">
+                  <details className="advanced">
+                    <summary>
+                      {dockerRuntime ? "Advanced: containers" : "Advanced: processes"}
+                      {overview && overview.deployments.length > 0 ? (
+                        <span className="advanced-count">{overview.deployments.length}</span>
+                      ) : null}
+                    </summary>
+                    <p className="advanced-help">
+                      {dockerRuntime
+                        ? "Containers that are still listening on this machine."
+                        : "Gate and app processes that are still listening on this machine."}
+                    </p>
+                    <div className="stack advanced-list">
+                      {overview && overview.deployments.length === 0 ? (
+                        <p className="empty">Nothing is listening. Closed, idle, and expired previews are gone.</p>
+                      ) : null}
+                      {overview?.deployments.map((deployment) => (
+                        <article className="deployment" key={deployment.deploymentId}>
+                          <div className="deployment-main">
+                            <strong>
+                              {deployment.repository}
+                              <span> #{deployment.prNumber}</span>
+                            </strong>
+                            <p className="meta">
+                              <span className="chip mono">{deployment.sha.slice(0, 8)}</span>
+                              {deployment.port ? (
+                                <span className="chip port-chip">port {deployment.port}</span>
+                              ) : null}
+                            </p>
+                          </div>
+                          {config?.deployer === "fake" ? null : (
+                            <a className="open-preview secondary" href={previewPath(deployment.url)}>
+                              Open
+                            </a>
+                          )}
+                        </article>
+                      ))}
+                    </div>
+                  </details>
+                  {polledAt != null ? (
+                    <p className="updated">Updated {Math.max(0, Math.floor((now - polledAt) / 1000))} s ago</p>
+                  ) : null}
+                </div>
+
+                {overview && removed.length > 0 ? (
+                  <button
+                    type="button"
+                    className="history-toggle secondary"
+                    aria-expanded={showRemoved}
+                    onClick={() => setShowRemoved((open) => !open)}
+                  >
+                    {showRemoved ? "Hide removed" : "Show removed"}
+                    <span>{removed.length}</span>
+                  </button>
+                ) : null}
+              </div>
+
+              {showRemoved && removed.length > 0 ? (
+                <div className="stack">
+                  {removed.map((env) => (
+                    <EnvironmentCard
+                      key={env.id}
+                      env={env}
+                      copied={copiedId === env.id}
+                      sleepSeconds={config?.sleepSeconds ?? 20}
+                      now={now}
+                      demo={config?.demo === `${env.repository}#${env.prNumber}`}
+                      buildsCode={dockerRuntime}
+                      costPerHour={overview?.costPerHour ?? 0.05}
+                      currency={currency}
+                      onCopy={() => void copyUrl(env.id, env.url ?? previewPath(""))}
+                    />
+                  ))}
+                </div>
+              ) : null}
+              {error ? <p className="error" role="alert">{error}</p> : null}
+            </section>
+
+            <aside className="board-rail">
+              <section id="cost" className="savings-hero board-rail-card" aria-label="Estimated savings this month">
+                <h2 className="board-rail-title">Cost &amp; savings</h2>
+                <p className="savings-figure">
+                  {overview ? (
+                    <>
+                      {formatSaved(overview.savedEstimate, currency)}
+                      <span> estimated this month</span>
+                    </>
+                  ) : (
+                    "–"
+                  )}
+                </p>
+                <p className="savings-sub">
+                  {overview
+                    ? `Awake ${formatContainerHours(overview.usage?.awakeSeconds ?? 0)} h · Asleep ${formatContainerHours(overview.usage?.asleepSeconds ?? 0)} h · at ${currency}${formatMoney(overview.costPerHour ?? 0.05)}/h estimated`
+                    : "Waiting for the first reaper sample…"}
+                </p>
+                {overview ? (
+                  <CostDayChart
+                    usage={overview.usage}
+                    costPerHour={overview.costPerHour ?? 0.05}
+                    currency={currency}
+                  />
+                ) : null}
+              </section>
+
+              <section id="activity" className="board-rail-card board-activity" aria-label="Recent activity">
+                <h2 className="board-rail-title">Activity</h2>
+                {activity.length === 0 ? (
+                  <p className="empty">No activity yet.</p>
+                ) : (
+                  <ol className="board-activity-list">
+                    {activity.map((item, index) => (
+                      <li key={`${item.at}-${item.repository}-${item.prNumber}-${index}`}>
+                        <strong>
+                          {item.repository} #{item.prNumber}
+                        </strong>
+                        <span>{item.text}</span>
+                        <time dateTime={item.at}>{formatAgo(item.at, now)}</time>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </section>
+            </aside>
           </div>
 
-          {showRemoved && removed.length > 0 ? (
-            <div className="stack">
-              {removed.map((env) => (
-                <EnvironmentCard
-                  key={env.id}
-                  env={env}
-                  copied={copiedId === env.id}
-                  sleepSeconds={config?.sleepSeconds ?? 20}
-                  now={now}
-                  demo={config?.demo === `${env.repository}#${env.prNumber}`}
-                  buildsCode={dockerRuntime}
-                  costPerHour={overview?.costPerHour ?? 0.05}
-                  onCopy={() => void copyUrl(env.id, env.url ?? previewPath(""))}
-                />
-              ))}
-            </div>
+          {config?.deployer === "fake" ? (
+            <p className="footer">
+              This site keeps the record. The preview itself runs on the computer where Mayfly is running.
+            </p>
           ) : null}
-          {error ? <p className="error" role="alert">{error}</p> : null}
-        </section>
+        </main>
       </div>
-
-      {config?.deployer === "fake" ? (
-        <p className="footer">
-          This site keeps the record. The preview itself runs on the computer where Mayfly is running.
-        </p>
-      ) : null}
-    </main>
+    </div>
   );
 }
