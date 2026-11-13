@@ -87,14 +87,23 @@ export function timelineTone(type: string): TimelineTone {
   }
 }
 
-export function timelineNewestFirst(events: EnvironmentEvent[] | undefined) {
-  if (!events?.length) return [];
-  return [...events].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
-}
-
+/**
+ * Oldest first, without restart noise: a "slept" right after another "slept" (nothing in between)
+ * comes from Mayfly restarting, not from anyone using the preview.
+ */
 export function timelineOldestFirst(events: EnvironmentEvent[] | undefined) {
   if (!events?.length) return [];
-  return [...events].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  const sorted = [...events].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  const kept: EnvironmentEvent[] = [];
+  for (const event of sorted) {
+    if (event.type === "slept" && kept[kept.length - 1]?.type === "slept") continue;
+    kept.push(event);
+  }
+  return kept;
+}
+
+export function timelineNewestFirst(events: EnvironmentEvent[] | undefined) {
+  return timelineOldestFirst(events).reverse();
 }
 
 export function formatEventTime(iso: string) {
