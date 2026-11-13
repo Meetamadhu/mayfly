@@ -485,7 +485,8 @@ function CostUsageChart({
   const lastLabel = keys.length > 1 ? formatDayLabel(keys[keys.length - 1]) : "";
   const single = points.length < 2;
   const day = points[points.length - 1];
-  const barMax = Math.max(day?.always ?? 0, day?.mayfly ?? 0) || 1;
+  // Leave 16px above the tallest bar for its value label.
+  const barMax = (Math.max(day?.always ?? 0, day?.mayfly ?? 0) || 1) * (innerH / Math.max(1, innerH - 16));
   const barW = 56;
   const barGap = 28;
   const barLeft = padL + innerW / 2 - barW - barGap / 2;
@@ -681,7 +682,7 @@ function boardRecentActivity(environments: Environment[], demoKey: string | null
   const raw: { at: string; env: Environment; type: string; demo: boolean }[] = [];
   for (const env of environments) {
     const demo = `${env.repository}#${env.prNumber}` === demoKey;
-    for (const event of env.events ?? []) raw.push({ at: event.at, env, type: event.type, demo });
+    for (const event of timelineOldestFirst(env.events)) raw.push({ at: event.at, env, type: event.type, demo });
   }
   raw.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
 
