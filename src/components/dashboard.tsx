@@ -10,28 +10,49 @@ const LIVE = new Set<EnvironmentStatus>(["provisioning", "ready", "updating", "d
 const FAST_POLL_MS = 500;
 const LIVE_POLL_MS = 5000;
 
+type CardState = "running" | "sleeping" | "building" | "failed" | "destroying";
+
+function cardState(env: Environment): CardState {
+  if (env.status === "failed") return "failed";
+  if (env.status === "destroying") return "destroying";
+  if (env.status === "provisioning" || env.status === "updating") return "building";
+  if (env.sleep === "asleep") return "sleeping";
+  return "running";
+}
+
+function statePillLabel(state: CardState) {
+  switch (state) {
+    case "running":
+      return "Running";
+    case "sleeping":
+      return "Sleeping";
+    case "building":
+      return "Building";
+    case "failed":
+      return "Failed";
+    case "destroying":
+      return "Destroying";
+  }
+}
+
 function EnvironmentCard({
   env,
-  copied,
-  sleepSeconds,
   now,
   demo,
-  buildsCode,
-  costPerHour,
-  currency,
-  onCopy,
+  signedIn,
+  busy,
+  onAdminAction,
 }: {
   env: Environment;
-  copied: boolean;
-  sleepSeconds: number;
   now: number;
   demo: boolean;
-  /** True when this Mayfly builds each pull request's own Dockerfile (Docker runtime), not the placeholder app. */
-  buildsCode: boolean;
-  costPerHour: number;
-  currency: string;
-  onCopy: () => void;
+  signedIn: boolean;
+  busy: boolean;
+  onAdminAction: (env: Environment, action: "sleep" | "extend" | "destroy") => void;
 }) {
+  const [showError, setShowError] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
   if (env.status === "destroyed") {
     const reason = env.destroyReason ?? "removed";
     return (
@@ -48,159 +69,132 @@ function EnvironmentCard({
     );
   }
 
-  const view = cardView(env);
-  const path = env.url ? previewPath(env.url) : null;
-  const idleSeconds = typeof env.sleepSeconds === "number" ? env.sleepSeconds : sleepSeconds;
-  const remain = secondsUntilSleep(env, idleSeconds, now);
-  const awakeUntil =
-    env.keepAwakeUntil && Date.parse(env.keepAwakeUntil) > now ? env.keepAwakeUntil : null;
-  // A real pull request on a Docker Mayfly runs its own code; the demo and placeholder previews do not.
-  const fromCode = buildsCode && !demo;
-  const building = env.status === "provisioning" || env.status === "updating";
-  const note =
-    view.tone === "awake" && awakeUntil
-      ? `Kept awake until ${formatAwakeUntil(awakeUntil)}.`
-      : view.tone === "awake"
-        ? `Sleeps in ${remain} s if nobody visits.`
-        : fromCode && building
-          ? "Building from the PR's Dockerfile…"
-          : view.note;
-  const showOpen = env.status !== "failed" && env.status !== "destroying";
-  const openDisabled = env.status === "provisioning" || !env.url;
-  const expiresValue = demo ? "Always on" : formatExpiresValue(env.expiresAt, now);
+  const state = cardState(env);
+  const href = previewHref(env.url);
+  const canOpen = Boolean(href) && state !== "building" && state !== "destroying";
 
   return (
-    <article className={env.status === "ready" ? "env featured" : "env"} data-status={env.status}>
-      <header className="state-band" data-state={view.tone}>
-        <div>
-          <p className="state-word">
-            <StateIcon name={view.icon} />
-            {view.word}
-          </p>
-          <p className="explainer">{note}</p>
-          {env.status === "ready" && env.sleep === "awake" && !awakeUntil ? (
-            <div className="sleep-meter" aria-hidden="true">
-              <span style={{ width: `${idleSeconds > 0 ? (remain / idleSeconds) * 100 : 0}%` }} />
-            </div>
-          ) : null}
+    <article className="env env-card" data-state={state} data-status={env.status}>
+      <header className="env-card-head">
+        <div className="env-card-titles">
+          <h3>
+            PR #{env.prNumber}
+            {demo ? <span className="env-card-demo"> · demo</span> : null}
+          </h3>
+          <p className="card-repo">{env.repository}</p>
         </div>
-        {demo ? <span className="chip demo-chip">Demo</span> : null}
-        {awakeUntil ? <span className="chip">Awake until {formatAwakeUntil(awakeUntil)}</span> : null}
+        <span className="state-pill" data-state={state}>
+          {statePillLabel(state)}
+        </span>
       </header>
-      <div className="card-body">
-        <p className="card-repo">{env.repository}</p>
-        <h3>{demo ? <>#{env.prNumber} · demo</> : <>#{env.prNumber}</>}</h3>
-        <p className="meta meta-facts">
-          {demo ? null : (
-            <span className="fact-pill" data-fact="branch">
-              <span className="fact-label">Branch</span>
-              <span className="fact-value mono">{env.branch}</span>
-            </span>
-          )}
-          <span className="fact-pill" data-fact="visit">
-            <span className="fact-label">Last visit</span>
-            <span className="fact-value">{formatAgo(env.lastActiveAt, now)}</span>
+      <div className="card-body env-card-body">
+        <p className="env-card-meta">
+          <span>
+            <span className="fact-label">Branch</span>{" "}
+            <span className="mono">{demo ? "demo" : env.branch}</span>
           </span>
-          <span className="fact-pill" data-fact="expires">
-            <span className="fact-label">Expires</span>
-            <span className="fact-value">{expiresValue}</span>
+          <span>
+            <span className="fact-label">Commit</span>{" "}
+            <span className="mono">{env.sha.slice(0, 8)}</span>
+          </span>
+          <span>
+            <span className="fact-label">Built in</span>{" "}
+            {typeof env.buildMs === "number" && env.buildMs >= 0 ? formatDurationMs(env.buildMs) : "–"}
+          </span>
+          <span>
+            <span className="fact-label">Last visit</span> {formatAgo(env.lastActiveAt, now)}
           </span>
         </p>
-        <p className="meta">
-          {demo ? null : <span className="chip mono">{env.sha.slice(0, 8)}</span>}
-          <span className="chip">Sleeps after {idleSeconds} s</span>
-          {fromCode ? <span className="chip code-chip">Built from PR code</span> : null}
-          {typeof env.buildMs === "number" && env.buildMs >= 0 ? (
-            <span className="chip timing-chip">Built in {formatDurationMs(env.buildMs)}</span>
-          ) : null}
-          {typeof env.lastWakeMs === "number" && env.lastWakeMs >= 0 ? (
-            <span className="chip timing-chip">Last wake {formatDurationMs(env.lastWakeMs)}</span>
-          ) : null}
-        </p>
-        {path && env.url ? (
-          <p className="url">
-            <a href={previewHref(env.url)}>{path}</a>
-            <button type="button" className="copy-icon" onClick={onCopy} aria-label={copied ? "Copied" : "Copy link"} title={copied ? "Copied" : "Copy link"}>
-              {copied ? <CheckIcon /> : <ClipboardIcon />}
-            </button>
-          </p>
-        ) : (
-          <p className="url url-empty" aria-hidden="true" />
-        )}
-        {env.status === "failed" && env.error ? <pre className="fail-box">{env.error}</pre> : null}
-        <p className="card-usage">{formatPreviewUsage(env, costPerHour, demo, currency)}</p>
+        {showError && env.error ? <pre className="fail-box">{env.error}</pre> : null}
       </div>
-      <footer className="card-foot">
-        {showOpen ? (
-          openDisabled ? (
-            <button type="button" className="open-preview" disabled>
-              Open preview
-            </button>
-          ) : (
-            <a className="open-preview" href={previewHref(env.url)}>
-              Open preview
+      <footer className="card-foot env-card-foot">
+        {state === "failed" ? (
+          <button type="button" className="open-preview secondary" onClick={() => setShowError((open) => !open)}>
+            {showError ? "Hide error" : "View error"}
+          </button>
+        ) : state === "sleeping" ? (
+          canOpen ? (
+            <a className="open-preview" href={href}>
+              Wake up
             </a>
+          ) : (
+            <button type="button" className="open-preview" disabled>
+              Wake up
+            </button>
           )
+        ) : state === "building" || state === "destroying" ? (
+          <button type="button" className="open-preview" disabled>
+            {state === "building" ? "Building…" : "Destroying…"}
+          </button>
+        ) : canOpen ? (
+          <a className="open-preview" href={href}>
+            Open preview
+          </a>
+        ) : (
+          <button type="button" className="open-preview" disabled>
+            Open preview
+          </button>
+        )}
+        {signedIn && !demo ? (
+          <div className="env-card-menu">
+            <button
+              type="button"
+              className="env-card-menu-btn secondary"
+              aria-expanded={menuOpen}
+              aria-haspopup="menu"
+              disabled={busy || state === "destroying"}
+              onClick={() => setMenuOpen((open) => !open)}
+            >
+              …
+            </button>
+            {menuOpen ? (
+              <div className="env-card-menu-panel" role="menu">
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={busy || state !== "running"}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onAdminAction(env, "sleep");
+                  }}
+                >
+                  Sleep
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={busy}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onAdminAction(env, "extend");
+                  }}
+                >
+                  Extend
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="danger"
+                  disabled={busy}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onAdminAction(env, "destroy");
+                  }}
+                >
+                  Destroy
+                </button>
+              </div>
+            ) : null}
+          </div>
         ) : (
           <span />
-        )}
-        {demo ? null : (
-          <a
-            className="gh-link"
-            href={`https://github.com/${env.repository}/pull/${env.prNumber}`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            View PR on GitHub
-          </a>
         )}
       </footer>
     </article>
   );
 }
 
-function cardView(env: Environment) {
-  if (env.status === "provisioning" || env.status === "updating") {
-    return {
-      word: env.status === "updating" ? "Updating" : "Provisioning",
-      tone: env.status,
-      icon: "clock" as const,
-      note: "Setting up the preview for this commit. The link works once it is ready.",
-    };
-  }
-  if (env.status === "destroying") {
-    return { word: "Destroying", tone: "destroying", icon: "clock" as const, note: "Removing this preview." };
-  }
-  if (env.status === "failed") {
-    return {
-      word: "Failed",
-      tone: "failed",
-      icon: "alert" as const,
-      note: "The preview did not start. Destroy it, then push a new commit.",
-    };
-  }
-  if (env.sleep === "asleep") {
-    return { word: "Asleep", tone: "asleep", icon: "moon" as const, note: "App stopped. Wakes on the next visit." };
-  }
-  if (env.sleep === "waking") {
-    return { word: "Waking", tone: "waking", icon: "clock" as const, note: "Starting up…" };
-  }
-  return { word: "Awake", tone: "awake", icon: "sun" as const, note: "" };
-}
-
-function secondsUntilSleep(env: Environment, sleepSeconds: number, now: number) {
-  const elapsed = Math.floor((now - Date.parse(env.lastActiveAt)) / 1000);
-  if (!Number.isFinite(elapsed)) return sleepSeconds;
-  return Math.max(0, sleepSeconds - elapsed);
-}
-
-function formatAwakeUntil(iso: string) {
-  const ms = Date.parse(iso);
-  if (Number.isNaN(ms)) return iso;
-  return new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-}
-
-function StateIcon({ name }: { name: "moon" | "sun" | "clock" | "alert" }) {
+function StateIcon({ name }: { name: "moon" | "sun" | "clock" | "alert" | "check" | "trash" }) {
   const props = {
     width: 18,
     height: 18,
@@ -235,26 +229,24 @@ function StateIcon({ name }: { name: "moon" | "sun" | "clock" | "alert" }) {
       </svg>
     );
   }
+  if (name === "check") {
+    return (
+      <svg {...props}>
+        <circle cx="12" cy="12" r="9" />
+        <path d="m8 12 2.5 2.5L16 9" />
+      </svg>
+    );
+  }
+  if (name === "trash") {
+    return (
+      <svg {...props}>
+        <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+      </svg>
+    );
+  }
   return (
     <svg {...props}>
       <path d="M12 3 2 21h20L12 3z" />
-    </svg>
-  );
-}
-
-function ClipboardIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="9" y="9" width="13" height="13" rx="2" />
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M20 6 9 17l-5-5" />
     </svg>
   );
 }
@@ -315,21 +307,6 @@ function formatAgo(iso: string, now: number) {
   return `${minutes} m ago`;
 }
 
-function formatExpiresValue(iso: string, now: number) {
-  const delta = Date.parse(iso) - now;
-  if (Number.isNaN(delta)) return iso;
-  if (delta <= 0) return "Expired";
-  const totalMin = Math.floor(delta / 60000);
-  const hours = Math.floor(totalMin / 60);
-  const mins = totalMin % 60;
-  if (hours >= 48) {
-    const days = Math.floor(hours / 24);
-    return `in ${days} d ${hours % 24} h`;
-  }
-  if (hours > 0) return `in ${hours} h ${mins} m`;
-  return `in ${Math.max(1, mins)} m`;
-}
-
 function formatSleep(seconds: number) {
   if (seconds >= 60) return `${Math.round(seconds / 60)} min`;
   return `${seconds} s`;
@@ -343,28 +320,9 @@ function formatLifetime(hours: number) {
   return `${hours} h`;
 }
 
-function formatMoney(amount: number) {
-  return amount.toFixed(2);
-}
-
 function formatSaved(amount: number, currency = "$") {
   if (amount < 0.01) return `< ${currency}0.01`;
   return `≈ ${currency}${amount.toFixed(2)}`;
-}
-
-function formatContainerHours(seconds: number) {
-  const hours = seconds / 3600;
-  if (hours >= 10) return hours.toFixed(1);
-  return hours.toFixed(2);
-}
-
-/** Card durations: "< 1 min", "4 min", or "1.2 h". */
-function formatUsageDuration(seconds: number) {
-  if (!Number.isFinite(seconds) || seconds < 60) return "< 1 min";
-  if (seconds < 3600) return `${Math.max(1, Math.round(seconds / 60))} min`;
-  const hours = seconds / 3600;
-  if (hours < 10) return `${hours.toFixed(1)} h`;
-  return `${Math.round(hours)} h`;
 }
 
 function estimatedCost(seconds: number, costPerHour: number) {
@@ -376,23 +334,6 @@ function formatEstMoney(amount: number, currency = "$") {
   return `${currency}${amount.toFixed(2)}`;
 }
 
-function formatPreviewUsage(env: Environment, costPerHour: number, demo: boolean, currency = "$") {
-  if (demo) return "—";
-  if (!env.usage) return "—";
-  const awake = env.usage.awakeSeconds ?? 0;
-  const asleep = env.usage.asleepSeconds ?? 0;
-  const saved = estimatedCost(asleep, costPerHour);
-  return `Awake ${formatUsageDuration(awake)} · Asleep ${formatUsageDuration(asleep)} · Est. saved ${formatEstMoney(saved, currency)}`;
-}
-
-function last14DayKeys(now = Date.now()) {
-  const keys: string[] = [];
-  for (let i = 13; i >= 0; i -= 1) {
-    keys.push(new Date(now - i * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
-  }
-  return keys;
-}
-
 function dayTotals(days: Record<string, UsageDay> | undefined, key: string): UsageDay {
   const day = days?.[key];
   return {
@@ -401,17 +342,18 @@ function dayTotals(days: Record<string, UsageDay> | undefined, key: string): Usa
   };
 }
 
-function formatDayParts(isoDay: string) {
-  const ms = Date.parse(`${isoDay}T00:00:00.000Z`);
-  if (Number.isNaN(ms)) return { day: isoDay, month: "" };
-  const date = new Date(ms);
-  return {
-    day: date.toLocaleDateString("en-GB", { day: "numeric", timeZone: "UTC" }),
-    month: date.toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" }),
-  };
+function monthDayKeys(usage: UsageMonth | undefined) {
+  const month = usage?.month ?? new Date().toISOString().slice(0, 7);
+  const keys = Object.keys(usage?.days ?? {})
+    .filter((key) => key.startsWith(`${month}-`))
+    .sort();
+  if (keys.length > 0) return keys;
+  // Still draw an empty baseline for the current UTC day so the chart has shape.
+  return [`${month}-${String(new Date().getUTCDate()).padStart(2, "0")}`];
 }
 
-function CostDayChart({
+/** Cumulative estimated spend: always-awake vs with Mayfly, from usage.days. */
+function CostUsageChart({
   usage,
   costPerHour,
   currency = "$",
@@ -420,56 +362,85 @@ function CostDayChart({
   costPerHour: number;
   currency?: string;
 }) {
-  const keys = last14DayKeys();
+  const keys = monthDayKeys(usage);
+  let alwaysCum = 0;
+  let mayflyCum = 0;
   const points = keys.map((key) => {
     const day = dayTotals(usage?.days, key);
-    const always = estimatedCost(day.awakeSeconds + day.asleepSeconds, costPerHour);
-    const actual = estimatedCost(day.awakeSeconds, costPerHour);
-    return { key, always, actual, ...formatDayParts(key) };
+    alwaysCum += estimatedCost(day.awakeSeconds + day.asleepSeconds, costPerHour);
+    mayflyCum += estimatedCost(day.awakeSeconds, costPerHour);
+    return { key, always: alwaysCum, mayfly: mayflyCum };
   });
-  const maxValue = Math.max(0, ...points.map((p) => p.always));
-  const scaleMax = maxValue > 0 ? maxValue : 0.01;
-  const maxLabel = maxValue <= 0 ? `${currency}0.00` : formatEstMoney(maxValue, currency);
+
+  const alwaysTotal = estimatedCost((usage?.awakeSeconds ?? 0) + (usage?.asleepSeconds ?? 0), costPerHour);
+  const mayflyTotal = estimatedCost(usage?.awakeSeconds ?? 0, costPerHour);
+  const maxValue = Math.max(alwaysTotal, mayflyCum, alwaysCum, 0.01);
+
+  const width = 320;
+  const height = 140;
+  const padL = 8;
+  const padR = 8;
+  const padT = 10;
+  const padB = 18;
+  const innerW = width - padL - padR;
+  const innerH = height - padT - padB;
+
+  function xAt(index: number) {
+    if (points.length <= 1) return padL + innerW / 2;
+    return padL + (index / (points.length - 1)) * innerW;
+  }
+  function yAt(value: number) {
+    return padT + innerH - (value / maxValue) * innerH;
+  }
+
+  function linePath(pick: "always" | "mayfly") {
+    return points
+      .map((point, index) => {
+        const x = xAt(index);
+        const y = yAt(pick === "always" ? point.always : point.mayfly);
+        return `${index === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`;
+      })
+      .join(" ");
+  }
+
+  const firstLabel = keys[0]?.slice(8) ?? "";
+  const lastLabel = keys[keys.length - 1]?.slice(8) ?? "";
 
   return (
-    <figure className="cost-chart" aria-label="Estimated daily cost, last 14 days">
-      <div className="cost-chart-plot">
-        <div className="cost-chart-axis" aria-hidden="true">
-          <span className="cost-chart-max">{maxLabel}</span>
-          <span className="cost-chart-axis-line" />
+    <figure className="cost-line-chart" aria-label="Estimated cumulative spend this month">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-hidden="true">
+        <line
+          className="cost-line-axis"
+          x1={padL}
+          y1={padT + innerH}
+          x2={padL + innerW}
+          y2={padT + innerH}
+        />
+        <path className="cost-line cost-line-always" d={linePath("always")} fill="none" />
+        <path className="cost-line cost-line-mayfly" d={linePath("mayfly")} fill="none" />
+        <text className="cost-line-edge" x={padL} y={height - 2}>
+          {firstLabel}
+        </text>
+        <text className="cost-line-edge" x={padL + innerW} y={height - 2} textAnchor="end">
+          {lastLabel}
+        </text>
+      </svg>
+      <dl className="cost-line-totals">
+        <div>
+          <dt>Estimated if always awake</dt>
+          <dd>{formatEstMoney(alwaysTotal, currency)}</dd>
         </div>
-        <div className="cost-chart-bars" role="img" aria-hidden="true">
-          {points.map((point, index) => {
-            const alwaysPct = Math.min(100, (point.always / scaleMax) * 100);
-            const actualPct = Math.min(100, (point.actual / scaleMax) * 100);
-            const showLabel = index % 2 === 0 || index === points.length - 1;
-            return (
-              <div key={point.key} className="cost-day" data-label={showLabel ? "show" : "hide"}>
-                <div className="cost-day-bars">
-                  <span
-                    className="cost-bar cost-bar-always"
-                    style={{ height: point.always > 0 ? `${Math.max(alwaysPct, 3)}%` : "0%" }}
-                  />
-                  <span
-                    className="cost-bar cost-bar-actual"
-                    style={{ height: point.actual > 0 ? `${Math.max(actualPct, 3)}%` : "0%" }}
-                  />
-                </div>
-                <span className="cost-day-label">
-                  <span className="cost-day-dom">{point.day}</span>
-                  <span className="cost-day-mon">{point.month}</span>
-                </span>
-              </div>
-            );
-          })}
+        <div>
+          <dt>Estimated with Mayfly</dt>
+          <dd>{formatEstMoney(mayflyTotal, currency)}</dd>
         </div>
-      </div>
+      </dl>
       <figcaption className="cost-chart-legend">
         <span>
-          <i className="cost-swatch cost-swatch-always" aria-hidden="true" /> If always awake
+          <i className="cost-swatch cost-swatch-always" aria-hidden="true" /> Estimated always awake
         </span>
         <span>
-          <i className="cost-swatch cost-swatch-actual" aria-hidden="true" /> Estimated actual
+          <i className="cost-swatch cost-swatch-actual" aria-hidden="true" /> Estimated with Mayfly
         </span>
       </figcaption>
     </figure>
@@ -513,32 +484,91 @@ function matchesBoardSearch(env: Environment, query: string) {
   );
 }
 
-type BoardActivity = { at: string; repository: string; prNumber: number; text: string };
+type BoardActivity = {
+  at: string;
+  repository: string;
+  prNumber: number;
+  type: string;
+  label: string;
+  icon: "moon" | "sun" | "clock" | "alert" | "check" | "trash";
+};
 
+function activityLabel(type: string) {
+  switch (type) {
+    case "build_started":
+      return "build started";
+    case "keep_awake":
+      return "keep awake";
+    case "keep_awake_off":
+      return "keep awake off";
+    case "slept":
+      return "slept";
+    case "woke":
+      return "woke";
+    default:
+      return type.replace(/_/g, " ");
+  }
+}
+
+function activityIcon(type: string): BoardActivity["icon"] {
+  switch (type) {
+    case "slept":
+      return "moon";
+    case "woke":
+    case "ready":
+    case "opened":
+      return "check";
+    case "build_started":
+    case "built":
+    case "updated":
+    case "extended":
+    case "keep_awake":
+      return "clock";
+    case "failed":
+      return "alert";
+    case "destroyed":
+      return "trash";
+    default:
+      return "sun";
+  }
+}
+
+/** Newest timeline events across all previews (real env.events only). */
 function boardRecentActivity(environments: Environment[]): BoardActivity[] {
   const events: BoardActivity[] = [];
   for (const env of environments) {
-    events.push({ at: env.createdAt, repository: env.repository, prNumber: env.prNumber, text: "Created" });
-    if (env.lastActiveAt && env.lastActiveAt !== env.createdAt) {
-      events.push({ at: env.lastActiveAt, repository: env.repository, prNumber: env.prNumber, text: "Last visit" });
-    }
-    if (env.updatedAt && env.updatedAt !== env.createdAt && env.updatedAt !== env.lastActiveAt) {
-      events.push({ at: env.updatedAt, repository: env.repository, prNumber: env.prNumber, text: "Updated" });
-    }
-    if (env.destroyedAt) {
-      const reason = env.destroyReason ? `Removed (${env.destroyReason})` : "Removed";
-      events.push({ at: env.destroyedAt, repository: env.repository, prNumber: env.prNumber, text: reason });
-    }
     for (const event of env.events ?? []) {
       events.push({
         at: event.at,
         repository: env.repository,
         prNumber: env.prNumber,
-        text: event.type.replace(/_/g, " "),
+        type: event.type,
+        label: activityLabel(event.type),
+        icon: activityIcon(event.type),
       });
     }
   }
-  return events.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 12);
+  return events.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 8);
+}
+
+const VIEW_STORAGE_KEY = "mayfly-board-view";
+
+function readStoredView(): "grid" | "list" {
+  try {
+    const raw = localStorage.getItem(VIEW_STORAGE_KEY);
+    if (raw === "grid" || raw === "list") return raw;
+  } catch {
+    // Storage can be blocked.
+  }
+  return "grid";
+}
+
+function writeStoredView(view: "grid" | "list") {
+  try {
+    localStorage.setItem(VIEW_STORAGE_KEY, view);
+  } catch {
+    // Storage can be blocked.
+  }
 }
 
 export function Dashboard() {
@@ -546,7 +576,6 @@ export function Dashboard() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showRemoved, setShowRemoved] = useState(false);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [polledAt, setPolledAt] = useState<number | null>(null);
   const [boardFilter, setBoardFilter] = useState<BoardFilter>("all");
@@ -554,6 +583,8 @@ export function Dashboard() {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [signedIn, setSignedIn] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const [cardView, setCardView] = useState<"grid" | "list">("grid");
+  const [busy, setBusy] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const reload = useCallback(async () => {
@@ -568,6 +599,7 @@ export function Dashboard() {
 
   useEffect(() => {
     setTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light");
+    setCardView(readStoredView());
   }, []);
 
   useEffect(() => {
@@ -584,6 +616,35 @@ export function Dashboard() {
       cancelled = true;
     };
   }, []);
+
+  function chooseCardView(next: "grid" | "list") {
+    setCardView(next);
+    writeStoredView(next);
+  }
+
+  async function adminAction(env: Environment, action: "sleep" | "extend" | "destroy") {
+    if (action === "destroy" && !window.confirm(`Destroy ${env.repository} #${env.prNumber}?`)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const path =
+        action === "destroy"
+          ? `/api/environments/${env.id}?action=destroy&wait=1`
+          : action === "sleep"
+            ? `/api/environments/${env.id}?action=sleep`
+            : `/api/environments/${env.id}?action=extend&hours=4`;
+      const response = await fetch(path, { method: "POST", credentials: "include" });
+      const body = (await response.json()) as { ok?: boolean; error?: string };
+      if (!response.ok || body.ok === false) {
+        throw new Error(body.error || `${action} failed.`);
+      }
+      await reload();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Request failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -662,17 +723,11 @@ export function Dashboard() {
     (env) => env.status === "provisioning" || env.status === "updating",
   ).length;
   const activity = overview ? boardRecentActivity(overview.environments) : [];
-
-  async function copyUrl(id: string, url: string) {
-    try {
-      const share = url.startsWith("/") ? `${window.location.origin}${url}` : url;
-      await navigator.clipboard.writeText(share);
-      setCopiedId(id);
-      window.setTimeout(() => setCopiedId((currentId) => (currentId === id ? null : currentId)), 1500);
-    } catch {
-      setError("Could not copy the preview URL.");
-    }
-  }
+  const costPerHour = overview?.costPerHour ?? 0.05;
+  const alwaysAwakeEstimate = overview
+    ? estimatedCost((overview.usage?.awakeSeconds ?? 0) + (overview.usage?.asleepSeconds ?? 0), costPerHour)
+    : 0;
+  const withMayflyEstimate = overview ? estimatedCost(overview.usage?.awakeSeconds ?? 0, costPerHour) : 0;
 
   return (
     <div className="board-app" data-nav={navOpen ? "open" : "closed"}>
@@ -812,6 +867,14 @@ export function Dashboard() {
                   <h2>Active environments</h2>
                   <p className="help">Previews that are still running.</p>
                 </div>
+                <div className="board-view-toggle" role="group" aria-label="Card layout">
+                  <button type="button" aria-pressed={cardView === "grid"} onClick={() => chooseCardView("grid")}>
+                    Grid
+                  </button>
+                  <button type="button" aria-pressed={cardView === "list"} onClick={() => chooseCardView("list")}>
+                    List
+                  </button>
+                </div>
               </div>
 
               <div className="board-filters">
@@ -840,7 +903,7 @@ export function Dashboard() {
               {loadError ? <p className="error" role="alert">{loadError}</p> : null}
               {!overview && !loadError ? <p className="empty">Loading the ledger…</p> : null}
 
-              <div className="stack">
+              <div className="stack env-card-stack" data-view={cardView}>
                 {overview && current.length === 0 ? (
                   <p className="empty">No live previews. Open a pull request and it will show up here.</p>
                 ) : null}
@@ -851,14 +914,11 @@ export function Dashboard() {
                   <EnvironmentCard
                     key={env.id}
                     env={env}
-                    copied={copiedId === env.id}
-                    sleepSeconds={config?.sleepSeconds ?? 20}
                     now={now}
                     demo={demoKey === `${env.repository}#${env.prNumber}`}
-                    buildsCode={dockerRuntime}
-                    costPerHour={overview?.costPerHour ?? 0.05}
-                    currency={currency}
-                    onCopy={() => void copyUrl(env.id, env.url ?? previewPath(""))}
+                    signedIn={signedIn}
+                    busy={busy}
+                    onAdminAction={(item, action) => void adminAction(item, action)}
                   />
                 ))}
               </div>
@@ -923,19 +983,16 @@ export function Dashboard() {
               </div>
 
               {showRemoved && removed.length > 0 ? (
-                <div className="stack">
+                <div className="stack env-card-stack" data-view="list">
                   {removed.map((env) => (
                     <EnvironmentCard
                       key={env.id}
                       env={env}
-                      copied={copiedId === env.id}
-                      sleepSeconds={config?.sleepSeconds ?? 20}
                       now={now}
                       demo={config?.demo === `${env.repository}#${env.prNumber}`}
-                      buildsCode={dockerRuntime}
-                      costPerHour={overview?.costPerHour ?? 0.05}
-                      currency={currency}
-                      onCopy={() => void copyUrl(env.id, env.url ?? previewPath(""))}
+                      signedIn={signedIn}
+                      busy={busy}
+                      onAdminAction={(item, action) => void adminAction(item, action)}
                     />
                   ))}
                 </div>
@@ -944,45 +1001,36 @@ export function Dashboard() {
             </section>
 
             <aside className="board-rail">
-              <section id="cost" className="savings-hero board-rail-card" aria-label="Estimated savings this month">
-                <h2 className="board-rail-title">Cost &amp; savings</h2>
-                <p className="savings-figure">
-                  {overview ? (
-                    <>
-                      {formatSaved(overview.savedEstimate, currency)}
-                      <span> estimated this month</span>
-                    </>
-                  ) : (
-                    "–"
-                  )}
-                </p>
+              <section id="cost" className="board-rail-card" aria-label="Estimated cost and usage">
+                <h2 className="board-rail-title">Cost &amp; Usage</h2>
                 <p className="savings-sub">
                   {overview
-                    ? `Awake ${formatContainerHours(overview.usage?.awakeSeconds ?? 0)} h · Asleep ${formatContainerHours(overview.usage?.asleepSeconds ?? 0)} h · at ${currency}${formatMoney(overview.costPerHour ?? 0.05)}/h estimated`
+                    ? `Estimated always awake ${formatEstMoney(alwaysAwakeEstimate, currency)} · Estimated with Mayfly ${formatEstMoney(withMayflyEstimate, currency)}`
                     : "Waiting for the first reaper sample…"}
                 </p>
                 {overview ? (
-                  <CostDayChart
-                    usage={overview.usage}
-                    costPerHour={overview.costPerHour ?? 0.05}
-                    currency={currency}
-                  />
+                  <CostUsageChart usage={overview.usage} costPerHour={costPerHour} currency={currency} />
                 ) : null}
               </section>
 
               <section id="activity" className="board-rail-card board-activity" aria-label="Recent activity">
-                <h2 className="board-rail-title">Activity</h2>
+                <h2 className="board-rail-title">Recent activity</h2>
                 {activity.length === 0 ? (
                   <p className="empty">No activity yet.</p>
                 ) : (
                   <ol className="board-activity-list">
                     {activity.map((item, index) => (
-                      <li key={`${item.at}-${item.repository}-${item.prNumber}-${index}`}>
-                        <strong>
-                          {item.repository} #{item.prNumber}
-                        </strong>
-                        <span>{item.text}</span>
-                        <time dateTime={item.at}>{formatAgo(item.at, now)}</time>
+                      <li key={`${item.at}-${item.repository}-${item.prNumber}-${item.type}-${index}`} data-tone={item.icon}>
+                        <span className="board-activity-icon" aria-hidden="true">
+                          <StateIcon name={item.icon} />
+                        </span>
+                        <div>
+                          <strong>
+                            PR #{item.prNumber} {item.label}
+                          </strong>
+                          <span className="board-activity-repo">{item.repository}</span>
+                          <time dateTime={item.at}>{formatAgo(item.at, now)}</time>
+                        </div>
                       </li>
                     ))}
                   </ol>
