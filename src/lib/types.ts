@@ -22,6 +22,13 @@ export interface PreviewComment {
   body: string;
 }
 
+/** Lifecycle timeline entry for a preview. Keep the last 50 on the environment. */
+export interface EnvironmentEvent {
+  at: string;
+  type: string;
+  detail?: string;
+}
+
 export type SleepState = "awake" | "waking" | "asleep" | "unknown";
 
 export interface Environment {
@@ -48,6 +55,8 @@ export interface Environment {
   buildMs?: number | null;
   /** Last wake duration from the gate, in milliseconds. Overview-only; not persisted. */
   lastWakeMs?: number | null;
+  /** Lifecycle timeline; newest entries at the end. Keep the last 50. */
+  events?: EnvironmentEvent[];
 }
 
 export interface DeploymentRecord {

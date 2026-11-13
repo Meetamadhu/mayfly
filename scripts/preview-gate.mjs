@@ -37,6 +37,12 @@ let lastActive = 0;
 let booting = null;
 let listening = false;
 let stopping = null;
+/** ISO time of the last transition into asleep (null until the app has slept once). */
+let sleptAt = null;
+/** ISO time of the last wake from sleep (null until a wake after a sleep). */
+let wokeAt = null;
+/** Last successful wake duration in milliseconds (null until the first wake). */
+let lastWakeMs = null;
 
 function alive() {
   return Boolean(child && child.exitCode === null && child.signalCode === null);
@@ -64,7 +70,9 @@ function dockerExec(args) {
 }
 
 function stopApp() {
+  const wasUp = Boolean(booting) || (alive() && listening) || Boolean(child);
   listening = false;
+  if (wasUp) sleptAt = new Date().toISOString();
   if (useDocker) {
     const pid = child?.pid;
     child = null;
@@ -142,14 +150,13 @@ function gateState() {
   return "asleep";
 }
 
-/** Last successful wake duration in milliseconds (null until the first wake). */
-let lastWakeMs = null;
-
 function boot() {
   if (booting) return booting;
   if (alive() && listening) return Promise.resolve();
   booting = (async () => {
     const wakeStarted = Date.now();
+    // A wake after sleep — first boot after deploy leaves wokeAt unset.
+    const wakingFromSleep = Boolean(sleptAt);
     try {
       // Starting a boot counts as activity so the idle reaper cannot kill a slow-starting app.
       lastActive = Date.now();
@@ -230,6 +237,7 @@ function boot() {
       await waitForApp();
       listening = true;
       lastWakeMs = Math.max(0, Date.now() - wakeStarted);
+      if (wakingFromSleep) wokeAt = new Date().toISOString();
       lastActive = Date.now();
     } catch (error) {
       stopApp();
@@ -478,6 +486,8 @@ const server = createServer((req, res) => {
         state: gateState(),
         sleepSeconds: idleMs / 1000,
         lastWakeMs: lastWakeMs == null ? null : lastWakeMs,
+        sleptAt,
+        wokeAt,
       }),
     );
     return;
