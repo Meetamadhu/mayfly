@@ -4,7 +4,9 @@ import { imageTag, isBuilding } from "./builder";
 import {
   buildsPullRequests,
   getConfig,
+  githubConfigured,
   previewCostPerHour,
+  previewCurrency,
   previewRepos,
   previewRuntime,
   sleepSecondsForRepo,
@@ -350,6 +352,7 @@ export async function getOverview(): Promise<Overview> {
   );
 
   const usage = usageForMonth(state.usage, Date.now());
+  const currency = previewCurrency();
   return {
     environments,
     deployments: deployments.map((item) => {
@@ -368,6 +371,8 @@ export async function getOverview(): Promise<Overview> {
       demo: config.demo ? `${config.demo.repository}#${config.demo.prNumber}` : null,
       allowedRepositories: buildsPullRequests() ? previewRepos() : null,
       onRender: Boolean(process.env.RENDER),
+      githubConnected: githubConfigured(),
+      currency,
     },
     summary: {
       live: environments.filter((env) => isLiveStatus(env.status)).length,
@@ -380,6 +385,7 @@ export async function getOverview(): Promise<Overview> {
     usage,
     costPerHour,
     savedEstimate: (usage.asleepSeconds / 3600) * costPerHour,
+    currency,
   };
 }
 
