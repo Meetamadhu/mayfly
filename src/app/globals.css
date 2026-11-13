@@ -3324,3 +3324,15 @@ html:not([data-theme="dark"]) .board-mark {
     border-radius: 16px 16px 0 0;
   }
 }
+
+/* Desktop sidebar: lift the cube art 100px so it rises out of the top of the card. */
+@media (min-width: 901px) {
+  .board-promo {
+    overflow: visible;
+    margin-top: auto;
+  }
+
+  .board-promo-art {
+    margin-top: -100px;
+  }
+}
