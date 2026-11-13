@@ -1088,6 +1088,15 @@ export async function restorePreviews() {
   }
 }
 
+/** The most recent event on this preview, by time. */
+function newestEvent(env: Environment): EnvironmentEvent | null {
+  let newest: EnvironmentEvent | null = null;
+  for (const event of env.events ?? []) {
+    if (!newest || Date.parse(event.at) >= Date.parse(newest.at)) newest = event;
+  }
+  return newest;
+}
+
 export async function reap(): Promise<ReapResult> {
   const config = getConfig();
   const now = Date.now();
@@ -1174,7 +1183,21 @@ export async function reap(): Promise<ReapResult> {
         }
       }
       pending.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
-      for (const event of pending) pushEnvironmentEvent(env, event);
+      // A sleep right after another sleep, with nothing in between (no visit, wake or build), is a Mayfly
+      // restart: the gate starts the app again and it idles straight back to sleep. Don't record it.
+      // Also never record a sleep/wake older than the newest event, so a skipped restart sleep isn't
+      // picked up again on a later tick, after a wake.
+      const newest = newestEvent(env);
+      let lastType = newest?.type ?? null;
+      let lastMs = newest ? Date.parse(newest.at) : 0;
+      for (const event of pending) {
+        const at = Date.parse(event.at);
+        if (at <= lastMs) continue;
+        if (event.type === "slept" && lastType === "slept") continue;
+        pushEnvironmentEvent(env, event);
+        lastType = event.type;
+        lastMs = at;
+      }
     }
 
     await saveState(state);
