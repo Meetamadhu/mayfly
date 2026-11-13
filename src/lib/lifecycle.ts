@@ -72,12 +72,17 @@ function findLive(environments: Environment[], repository: string, prNumber: num
   );
 }
 
+function lastUpdatedLine(at = iso()) {
+  return `Last updated ${at}`;
+}
+
 function readyComment(env: Environment, refreshed: boolean) {
   const verb = refreshed ? "updated" : "ready";
   const build =
     typeof env.buildMs === "number" && env.buildMs >= 0
       ? `\nBuilt in ${formatDurationMs(env.buildMs)}.`
       : "";
+  const at = iso();
   return [
     `**Mayfly preview ${verb}**`,
     "",
@@ -86,6 +91,8 @@ function readyComment(env: Environment, refreshed: boolean) {
     `Commit \`${env.sha.slice(0, 8)}\` on \`${env.branch}\`. Expires ${env.expiresAt}.${build}`,
     "",
     "The preview sleeps when idle and wakes on the next visit. It is removed when the pull request closes or its lifetime ends.",
+    "",
+    lastUpdatedLine(at),
   ].join("\n");
 }
 
@@ -96,11 +103,18 @@ function failedComment(env: Environment, message: string) {
     message.slice(0, 500),
     "",
     `Commit \`${env.sha.slice(0, 8)}\` on \`${env.branch}\`. Fix the build and push again, or destroy this preview from Admin.`,
+    "",
+    lastUpdatedLine(),
   ].join("\n");
 }
 
 function destroyedComment(env: Environment) {
-  return `**Mayfly preview destroyed** (${env.destroyReason}). The deployment is gone.`;
+  const reason = env.destroyReason ?? "removed";
+  return [
+    `**Mayfly preview removed** (${reason}). The deployment is gone.`,
+    "",
+    lastUpdatedLine(),
+  ].join("\n");
 }
 
 function formatDurationMs(ms: number) {
@@ -112,9 +126,28 @@ function formatDurationMs(ms: number) {
   return secs ? `${mins} min ${secs} s` : `${mins} min`;
 }
 
+async function rememberGithubCommentId(envId: string, commentId: number) {
+  await exclusive(async () => {
+    const state = await loadState();
+    const env = state.environments.find((item) => item.id === envId);
+    if (!env || env.githubCommentId === commentId) return;
+    env.githubCommentId = commentId;
+    await saveState(state);
+  });
+}
+
 async function commentQuietly(env: Environment, body: string) {
   try {
-    await publishPullRequestComment(env.repository, env.prNumber, body);
+    const commentId = await publishPullRequestComment(
+      env.repository,
+      env.prNumber,
+      body,
+      env.githubCommentId,
+    );
+    if (typeof commentId === "number") {
+      env.githubCommentId = commentId;
+      await rememberGithubCommentId(env.id, commentId);
+    }
   } catch (error) {
     console.error("Pull request comment failed", error);
   }

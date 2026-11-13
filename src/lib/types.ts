@@ -51,6 +51,8 @@ export interface Environment {
   error: string | null;
   updateGeneration: number;
   comments: PreviewComment[];
+  /** GitHub issue comment id for the single Mayfly preview comment on this PR. */
+  githubCommentId?: number | null;
   /** Wall time from deploy start to ready, in milliseconds. */
   buildMs?: number | null;
   /** Last wake duration from the gate, in milliseconds. Overview-only; not persisted. */
