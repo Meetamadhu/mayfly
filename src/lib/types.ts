@@ -59,6 +59,14 @@ export interface Environment {
   lastWakeMs?: number | null;
   /** Lifecycle timeline; newest entries at the end. Keep the last 50. */
   events?: EnvironmentEvent[];
+  /** Estimated awake/asleep time for this preview (demo excluded). Absent on older previews. */
+  usage?: PreviewUsage;
+}
+
+/** Per-preview estimated awake/asleep accumulators. */
+export interface PreviewUsage {
+  awakeSeconds: number;
+  asleepSeconds: number;
 }
 
 export interface DeploymentRecord {
@@ -104,12 +112,20 @@ export interface OrchestratorConfigView {
   onRender: boolean;
 }
 
+/** One UTC day's estimated awake/asleep totals. */
+export interface UsageDay {
+  awakeSeconds: number;
+  asleepSeconds: number;
+}
+
 /** Accumulators for preview awake/asleep time in the current calendar month (UTC). */
 export interface UsageMonth {
   month: string;
   asleepSeconds: number;
   awakeSeconds: number;
   lastSampleAt: string;
+  /** Daily totals keyed by UTC YYYY-MM-DD; keep the last 31 days. */
+  days?: Record<string, UsageDay>;
 }
 
 export interface Overview {

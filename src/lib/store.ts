@@ -41,6 +41,29 @@ function stateFile() {
   return path.join(dataDir(), "state.json");
 }
 
+function asUsageDay(value: unknown): import("./types").UsageDay | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  if (typeof raw.asleepSeconds !== "number" || !Number.isFinite(raw.asleepSeconds) || raw.asleepSeconds < 0) {
+    return null;
+  }
+  if (typeof raw.awakeSeconds !== "number" || !Number.isFinite(raw.awakeSeconds) || raw.awakeSeconds < 0) {
+    return null;
+  }
+  return { asleepSeconds: raw.asleepSeconds, awakeSeconds: raw.awakeSeconds };
+}
+
+function asUsageDays(value: unknown): Record<string, import("./types").UsageDay> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const days: Record<string, import("./types").UsageDay> = {};
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) continue;
+    const day = asUsageDay(entry);
+    if (day) days[key] = day;
+  }
+  return days;
+}
+
 function asUsage(value: unknown): import("./types").UsageMonth | undefined {
   if (!value || typeof value !== "object") return undefined;
   const raw = value as Record<string, unknown>;
@@ -52,11 +75,13 @@ function asUsage(value: unknown): import("./types").UsageMonth | undefined {
     return undefined;
   }
   if (typeof raw.lastSampleAt !== "string" || !Number.isFinite(Date.parse(raw.lastSampleAt))) return undefined;
+  const days = asUsageDays(raw.days);
   return {
     month: raw.month,
     asleepSeconds: raw.asleepSeconds,
     awakeSeconds: raw.awakeSeconds,
     lastSampleAt: raw.lastSampleAt,
+    ...(days ? { days } : {}),
   };
 }
 

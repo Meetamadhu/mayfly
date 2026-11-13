@@ -255,6 +255,67 @@ h1 {
   line-height: 1.4;
 }
 
+.cost-chart {
+  margin: 0.85rem 0 0;
+  max-width: 32rem;
+}
+
+.cost-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.cost-bar-always {
+  fill: color-mix(in srgb, var(--muted) 42%, transparent);
+}
+
+.cost-bar-actual {
+  fill: var(--success);
+}
+
+.cost-chart-label {
+  fill: var(--muted);
+  font-size: 7px;
+}
+
+.cost-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.cost-chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.cost-swatch {
+  display: inline-block;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 2px;
+}
+
+.cost-swatch-always {
+  background: color-mix(in srgb, var(--muted) 42%, transparent);
+}
+
+.cost-swatch-actual {
+  background: var(--success);
+}
+
+.card-usage {
+  margin: 0.55rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
 .board-settings {
   margin: 0 0 1rem;
   color: var(--muted);
