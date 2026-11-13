@@ -263,6 +263,74 @@ function StateIcon({ name }: { name: "moon" | "sun" | "clock" | "alert" | "check
   );
 }
 
+type Point = [number, number];
+
+/** One isometric box: top face plus the two front faces, from its top-back corner. */
+function isoBox(ox: number, oy: number, w: number, d: number, h: number) {
+  const u: Point = [0.866, 0.5];
+  const v: Point = [-0.866, 0.5];
+  const at = (a: number, b: number, down = 0): Point => [ox + a * u[0] + b * v[0], oy + a * u[1] + b * v[1] + down];
+  const pts = (list: Point[]) => list.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  return {
+    top: pts([at(0, 0), at(w, 0), at(w, d), at(0, d)]),
+    left: pts([at(0, d), at(w, d), at(w, d, h), at(0, d, h)]),
+    right: pts([at(w, 0), at(w, d), at(w, d, h), at(w, 0, h)]),
+  };
+}
+
+/** Original decorative art for the sidebar card: glowing isometric "preview" boxes on a platform. */
+function PromoArt() {
+  const base: Point = [100, 66];
+  const onPlatform = (a: number, b: number, size: number): [number, number, number, number, number] => [
+    base[0] + a * 0.866 - b * 0.866,
+    base[1] + a * 0.5 + b * 0.5 - size,
+    size,
+    size,
+    size,
+  ];
+  const platform = isoBox(base[0], base[1], 62, 62, 9);
+  const boxes = [onPlatform(8, 6, 36), onPlatform(6, 36, 21), onPlatform(40, 30, 15)].map((args) => isoBox(...args));
+  return (
+    <svg className="board-promo-art" viewBox="0 0 200 142" aria-hidden="true" focusable="false">
+      <defs>
+        <radialGradient id="promo-glow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#3dd6a5" stopOpacity="0.55" />
+          <stop offset="100%" stopColor="#3dd6a5" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id="promo-top" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#a7f3d0" />
+          <stop offset="100%" stopColor="#4ade9f" />
+        </linearGradient>
+        <linearGradient id="promo-left" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#22c58b" />
+          <stop offset="100%" stopColor="#0b7a57" />
+        </linearGradient>
+        <linearGradient id="promo-right" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#0f8f6b" />
+          <stop offset="100%" stopColor="#064e3b" />
+        </linearGradient>
+        <linearGradient id="promo-slab" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#1f6f57" />
+          <stop offset="100%" stopColor="#0d3b30" />
+        </linearGradient>
+      </defs>
+      <ellipse cx="100" cy="104" rx="96" ry="38" fill="url(#promo-glow)" />
+      <g className="board-promo-slab">
+        <polygon points={platform.top} fill="url(#promo-slab)" />
+        <polygon points={platform.left} fill="#0b2f27" />
+        <polygon points={platform.right} fill="#082520" />
+      </g>
+      {boxes.map((box, index) => (
+        <g key={index} className="board-promo-box">
+          <polygon points={box.left} fill="url(#promo-left)" />
+          <polygon points={box.right} fill="url(#promo-right)" />
+          <polygon points={box.top} fill="url(#promo-top)" />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 function previewPath(url: string) {
   try {
     return new URL(url).pathname;
@@ -946,7 +1014,10 @@ export function Dashboard() {
           </a>
           <a href="/admin">Admin</a>
         </nav>
-        <p className="board-promo">Spin up PR previews on demand. Sleep when idle. Save on cloud costs.</p>
+        <div className="board-promo">
+          <PromoArt />
+          <p>Spin up PR previews on demand. Sleep when idle. Save on cloud costs.</p>
+        </div>
       </aside>
 
       <div className="board-main">

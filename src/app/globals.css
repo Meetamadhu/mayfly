@@ -2609,13 +2609,37 @@ html:not([data-theme="dark"]) .board-mark {
 
 .board-promo {
   margin-top: auto;
-  padding: 0.85rem 0.9rem;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--sidebar-ink) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--sidebar-ink) 14%, transparent);
-  color: var(--sidebar-muted);
-  font-size: 0.82rem;
+  padding: 0.4rem 1rem 1.1rem;
+  border-radius: 16px;
+  background:
+    radial-gradient(120% 70% at 50% 30%, rgba(61, 214, 165, 0.18), transparent 70%),
+    color-mix(in srgb, var(--sidebar-ink) 6%, transparent);
+  border: 1px solid color-mix(in srgb, #3dd6a5 35%, transparent);
+  color: var(--sidebar-ink);
+  overflow: hidden;
+}
+
+.board-promo p {
+  margin: 0.2rem 0 0;
+  font-size: 0.95rem;
+  font-weight: 500;
   line-height: 1.4;
+}
+
+.board-promo-art {
+  display: block;
+  width: 100%;
+  max-width: 200px;
+  margin: 0 auto;
+  height: auto;
+  filter: drop-shadow(0 6px 14px rgba(16, 185, 129, 0.35));
+}
+
+.board-promo-box polygon,
+.board-promo-slab polygon {
+  stroke: rgba(209, 250, 229, 0.35);
+  stroke-width: 0.6;
+  stroke-linejoin: round;
 }
 
 .board-main {
