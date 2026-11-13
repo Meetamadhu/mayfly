@@ -27,8 +27,8 @@ function withMarker(body: string) {
   return `${MAYFLY_COMMENT_MARKER}\n${body.trim()}`;
 }
 
-/** Cached login for the configured token. undefined = not fetched yet. */
-let cachedLogin: string | null | undefined;
+/** Cached login for the configured token. undefined = not cached yet (failures are not cached). */
+let cachedLogin: string | undefined;
 
 /** Test helper: clear the cached /user login. */
 export function resetGithubLoginCache() {
@@ -42,15 +42,14 @@ async function ownLogin(token: string): Promise<string | null> {
       headers: githubHeaders(token),
       signal: AbortSignal.timeout(8000),
     });
-    if (!response.ok) {
-      cachedLogin = null;
-      return null;
-    }
+    if (!response.ok) return null;
     const body = (await response.json()) as { login?: unknown };
-    cachedLogin = typeof body.login === "string" && body.login.trim() ? body.login.trim() : null;
+    const login = typeof body.login === "string" ? body.login.trim() : "";
+    // Only cache a real login — a brief network/API failure must not stick.
+    if (!login) return null;
+    cachedLogin = login;
     return cachedLogin;
   } catch {
-    cachedLogin = null;
     return null;
   }
 }
