@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AdminHeader } from "@/components/admin-header";
-import type { Environment, EnvironmentStatus, Overview } from "@/lib/types";
+import type { Environment, EnvironmentEvent, EnvironmentStatus, Overview } from "@/lib/types";
 
 const TRANSITIONAL = new Set<EnvironmentStatus>(["provisioning", "updating", "destroying"]);
 const LIVE = new Set<EnvironmentStatus>(["provisioning", "ready", "updating", "destroying"]);
@@ -103,6 +103,56 @@ function formatExpiresValue(iso: string, now: number) {
   }
   if (hours > 0) return `in ${hours} h ${mins} m`;
   return `in ${Math.max(1, mins)} m`;
+}
+
+function formatLocalTime(iso: string) {
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return iso;
+  return new Date(ms).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function formatExtendDay(iso: string) {
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return iso;
+  return new Date(ms).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
+function timelineLabel(event: EnvironmentEvent): string {
+  switch (event.type) {
+    case "opened":
+      return "Opened";
+    case "build_started":
+      return "Build started";
+    case "built":
+      return event.detail ? `Built in ${event.detail} s` : "Built";
+    case "ready":
+      return "Ready";
+    case "updated":
+      return event.detail ? `Updated to ${event.detail}` : "Updated";
+    case "slept":
+      return "Slept after no visits";
+    case "woke":
+      return event.detail ? `Woken by a visit (${event.detail} s)` : "Woken by a visit";
+    case "extended":
+      return event.detail ? `Extended to ${formatExtendDay(event.detail)}` : "Extended";
+    case "failed":
+      return event.detail || "Failed";
+    case "destroyed":
+      return event.detail ? `Destroyed (${event.detail})` : "Destroyed";
+    default:
+      return event.detail ? `${event.type}: ${event.detail}` : event.type;
+  }
+}
+
+function timelineNewestFirst(events: EnvironmentEvent[] | undefined) {
+  if (!events?.length) return [];
+  return [...events].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
 }
 
 function webhookMode(mode: Overview["config"]["webhookVerification"]) {
@@ -370,6 +420,7 @@ export function AdminPanel() {
               const canSleep = env.status === "ready" && env.sleep === "awake";
               const tone = stateTone(env);
               const expiresValue = demo ? "Always on" : formatExpiresValue(env.expiresAt, now);
+              const timeline = timelineNewestFirst(env.events);
               return (
                 <li key={env.id} className={env.status === "ready" ? "env featured" : "env"}>
                   <header className="state-band" data-state={tone}>
@@ -403,6 +454,21 @@ export function AdminPanel() {
                         <span className="chip mono">{env.sha.slice(0, 8)}</span>
                       </p>
                     )}
+                    <details className="env-timeline">
+                      <summary>Timeline</summary>
+                      {timeline.length === 0 ? (
+                        <p className="env-timeline-empty">No history yet</p>
+                      ) : (
+                        <ol className="env-timeline-list">
+                          {timeline.map((event, index) => (
+                            <li key={`${event.at}-${event.type}-${index}`}>
+                              <time dateTime={event.at}>{formatLocalTime(event.at)}</time>
+                              <span>{timelineLabel(event)}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                    </details>
                   </div>
                   <footer className="card-foot card-foot-admin">
                     {env.url ? (

@@ -10,6 +10,7 @@ import {
   type DeploymentRecord,
   type DestroyReason,
   type Environment,
+  type EnvironmentEvent,
   type LifecycleResult,
   type Overview,
   type PullRequestEvent,
@@ -18,12 +19,45 @@ import {
   type UsageMonth,
 } from "./types";
 
+const MAX_ENVIRONMENT_EVENTS = 50;
+
 function clone<T>(value: T): T {
   return structuredClone(value);
 }
 
 function iso(time = Date.now()) {
   return new Date(time).toISOString();
+}
+
+/** Append a timeline event and keep only the last 50. */
+export function pushEnvironmentEvent(
+  env: Environment,
+  event: EnvironmentEvent,
+): void {
+  const next = [...(env.events ?? []), event];
+  env.events = next.length > MAX_ENVIRONMENT_EVENTS ? next.slice(-MAX_ENVIRONMENT_EVENTS) : next;
+}
+
+function secondsDetail(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return "0";
+  if (ms < 1000) return (ms / 1000).toFixed(1);
+  return String(Math.round(ms / 1000));
+}
+
+function firstLine(message: string): string {
+  return message.split(/\r?\n/, 1)[0]?.trim() || message.trim();
+}
+
+function lastEventAt(env: Environment, type: string): number {
+  const events = env.events;
+  if (!events?.length) return 0;
+  for (let i = events.length - 1; i >= 0; i -= 1) {
+    if (events[i].type === type) {
+      const at = Date.parse(events[i].at);
+      return Number.isFinite(at) ? at : 0;
+    }
+  }
+  return 0;
 }
 
 function ttlMsFor(event: PullRequestEvent) {
@@ -166,40 +200,58 @@ export async function getPreview(repository: string, prNumber: number) {
   };
 }
 
+type GateStatus = {
+  sleep: SleepState;
+  lastWakeMs: number | null;
+  sleptAt: string | null;
+  wokeAt: string | null;
+};
+
+const UNKNOWN_GATE: GateStatus = { sleep: "unknown", lastWakeMs: null, sleptAt: null, wokeAt: null };
+
+function asIsoTimestamp(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return Number.isFinite(Date.parse(trimmed)) ? trimmed : null;
+}
+
 /**
  * Ask the preview gate whether its app is running. The gate answers this path itself
  * and never boots the app or touches its idle clock, so polling does not wake a preview.
  * The port comes from the deployment record, never from a request URL.
  */
-async function readGate(
-  env: Environment,
-  deployments: DeploymentRecord[],
-): Promise<{ sleep: SleepState; lastWakeMs: number | null }> {
-  if (getConfig().deployer === "fake") return { sleep: "unknown", lastWakeMs: null };
-  if (!isLiveStatus(env.status) || !env.deploymentId) return { sleep: "unknown", lastWakeMs: null };
+async function readGate(env: Environment, deployments: DeploymentRecord[]): Promise<GateStatus> {
+  if (getConfig().deployer === "fake") return UNKNOWN_GATE;
+  if (!isLiveStatus(env.status) || !env.deploymentId) return UNKNOWN_GATE;
   const port = deployments.find((item) => item.deploymentId === env.deploymentId)?.port;
-  if (!port) return { sleep: "unknown", lastWakeMs: null };
+  if (!port) return UNKNOWN_GATE;
   try {
     const response = await fetch(`http://127.0.0.1:${port}/__preview_status`, {
       cache: "no-store",
       signal: AbortSignal.timeout(500),
     });
-    if (!response.ok) return { sleep: "unknown", lastWakeMs: null };
-    const body = (await response.json()) as { state?: unknown; lastWakeMs?: unknown };
+    if (!response.ok) return UNKNOWN_GATE;
+    const body = (await response.json()) as {
+      state?: unknown;
+      lastWakeMs?: unknown;
+      sleptAt?: unknown;
+      wokeAt?: unknown;
+    };
     const sleep: SleepState =
       body.state === "awake" || body.state === "waking" || body.state === "asleep" ? body.state : "unknown";
     const lastWakeMs =
       typeof body.lastWakeMs === "number" && Number.isFinite(body.lastWakeMs) && body.lastWakeMs >= 0
         ? Math.round(body.lastWakeMs)
         : null;
-    return { sleep, lastWakeMs };
+    return {
+      sleep,
+      lastWakeMs,
+      sleptAt: asIsoTimestamp(body.sleptAt),
+      wokeAt: asIsoTimestamp(body.wokeAt),
+    };
   } catch {
-    return { sleep: "unknown", lastWakeMs: null };
+    return UNKNOWN_GATE;
   }
-}
-
-async function readSleep(env: Environment, deployments: DeploymentRecord[]): Promise<SleepState> {
-  return (await readGate(env, deployments)).sleep;
 }
 
 /**
@@ -313,6 +365,10 @@ async function applyDeployment(
     env.error = null;
     env.updatedAt = now;
     env.buildMs = buildMs;
+    if (typeof buildMs === "number") {
+      pushEnvironmentEvent(env, { at: now, type: "built", detail: secondsDetail(buildMs) });
+    }
+    pushEnvironmentEvent(env, { at: now, type: "ready" });
     const body = comment(env);
     if (refreshed) {
       env.comments.push({ at: now, body });
@@ -332,6 +388,7 @@ async function markDeployFailed(envId: string, generation: number, message: stri
     env.status = "failed";
     env.error = message;
     env.updatedAt = iso();
+    pushEnvironmentEvent(env, { at: env.updatedAt, type: "failed", detail: firstLine(message) });
     env.comments.push({ at: env.updatedAt, body: failedComment(env, message) });
     await saveState(state);
     return clone(env);
@@ -344,6 +401,14 @@ async function runDeploy(
   action: "created" | "updated",
 ): Promise<LifecycleResult> {
   const generation = env.updateGeneration;
+  await exclusive(async () => {
+    const state = await loadState();
+    const current = state.environments.find((item) => item.id === env.id);
+    if (!current || current.updateGeneration !== generation) return;
+    if (current.status === "destroying" || current.status === "destroyed") return;
+    pushEnvironmentEvent(current, { at: iso(), type: "build_started" });
+    await saveState(state);
+  });
   await statusQuietly(env, {
     state: "pending",
     description: action === "updated" ? "Updating preview…" : "Building preview…",
@@ -429,6 +494,7 @@ async function reserve(event: PullRequestEvent): Promise<LifecycleResult> {
       existing.expiresAt = iso(Math.max(Date.parse(existing.expiresAt), Date.parse(expiresAt)));
       existing.error = null;
       existing.updateGeneration += 1;
+      pushEnvironmentEvent(existing, { at: now, type: "updated", detail: normalized.sha.slice(0, 8) });
       await saveState(state);
       return { ok: true, action: "updated", environment: clone(existing) };
     }
@@ -461,6 +527,7 @@ async function reserve(event: PullRequestEvent): Promise<LifecycleResult> {
       error: null,
       updateGeneration: 1,
       comments: [],
+      events: [{ at: now, type: "opened" }],
     };
     state.environments.push(created);
     await saveState(state);
@@ -553,6 +620,11 @@ async function finishDestroy(envId: string, deploymentId: string | null): Promis
     env.destroyedAt = now;
     env.updatedAt = now;
     env.error = null;
+    pushEnvironmentEvent(env, {
+      at: now,
+      type: "destroyed",
+      detail: env.destroyReason ?? undefined,
+    });
     const body = destroyedComment(env);
     env.comments.push({ at: now, body });
     await saveState(state);
@@ -681,6 +753,7 @@ export async function extendEnvironment(id: string, hours: number): Promise<Life
     const next = Math.min(base + hours * 60 * 60 * 1000, cap);
     env.expiresAt = iso(next);
     env.updatedAt = iso(nowMs);
+    pushEnvironmentEvent(env, { at: env.updatedAt, type: "extended", detail: env.expiresAt });
     await saveState(state);
     return { ok: true, action: "updated", environment: clone(env) };
   });
@@ -842,14 +915,12 @@ export async function reap(): Promise<ReapResult> {
 
   const sampled = await exclusive(async () => {
     const state = await loadState();
-    return state.environments
-      .filter((env) => isLiveStatus(env.status) && !isDemo(env))
-      .map((env) => clone(env));
+    return state.environments.filter((env) => isLiveStatus(env.status)).map((env) => clone(env));
   });
-  const sleepById = new Map<string, SleepState>();
+  const gateById = new Map<string, GateStatus>();
   await Promise.all(
     sampled.map(async (env) => {
-      sleepById.set(env.id, await readSleep(env, deployments));
+      gateById.set(env.id, await readGate(env, deployments));
     }),
   );
 
@@ -868,7 +939,7 @@ export async function reap(): Promise<ReapResult> {
       if (elapsed > 0) {
         for (const env of state.environments) {
           if (!isLiveStatus(env.status) || isDemo(env)) continue;
-          const sleep = sleepById.get(env.id);
+          const sleep = gateById.get(env.id)?.sleep;
           if (sleep === "asleep") usage.asleepSeconds += elapsed;
           else if (sleep === "awake") usage.awakeSeconds += elapsed;
         }
@@ -876,6 +947,34 @@ export async function reap(): Promise<ReapResult> {
       usage.lastSampleAt = iso(now);
     }
     state.usage = usage;
+
+    // Record slept/woke from the gate's own timestamps (not the sample time). Both can land in one tick.
+    for (const env of state.environments) {
+      if (!isLiveStatus(env.status)) continue;
+      const gate = gateById.get(env.id);
+      if (!gate) continue;
+      const pending: EnvironmentEvent[] = [];
+      if (gate.sleptAt) {
+        const sleptMs = Date.parse(gate.sleptAt);
+        if (Number.isFinite(sleptMs) && sleptMs > lastEventAt(env, "slept")) {
+          pending.push({ at: gate.sleptAt, type: "slept" });
+        }
+      }
+      if (gate.wokeAt) {
+        const wokeMs = Date.parse(gate.wokeAt);
+        if (Number.isFinite(wokeMs) && wokeMs > lastEventAt(env, "woke")) {
+          pending.push({
+            at: gate.wokeAt,
+            type: "woke",
+            detail:
+              gate.lastWakeMs == null ? undefined : secondsDetail(gate.lastWakeMs),
+          });
+        }
+      }
+      pending.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+      for (const event of pending) pushEnvironmentEvent(env, event);
+    }
+
     await saveState(state);
 
     const targets: { id: string; reason: DestroyReason }[] = [];
