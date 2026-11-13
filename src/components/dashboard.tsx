@@ -4,6 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { MayflyMark } from "@/components/admin-header";
 import { ThemeToggle } from "@/components/theme-toggle";
 import type { Environment, EnvironmentStatus, Overview, UsageDay, UsageMonth } from "@/lib/types";
+import {
+  formatAgoRounded,
+  formatEventTime,
+  timelineLabel,
+  timelineOldestFirst,
+  timelineTone,
+} from "@/lib/timeline";
 
 const TRANSITIONAL = new Set<EnvironmentStatus>(["provisioning", "updating", "destroying"]);
 const LIVE = new Set<EnvironmentStatus>(["provisioning", "ready", "updating", "destroying"]);
@@ -42,6 +49,7 @@ function EnvironmentCard({
   signedIn,
   busy,
   onAdminAction,
+  onShowLifecycle,
 }: {
   env: Environment;
   now: number;
@@ -49,6 +57,7 @@ function EnvironmentCard({
   signedIn: boolean;
   busy: boolean;
   onAdminAction: (env: Environment, action: "sleep" | "extend" | "destroy") => void;
+  onShowLifecycle?: (env: Environment) => void;
 }) {
   const [showError, setShowError] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -135,6 +144,11 @@ function EnvironmentCard({
             Open preview
           </button>
         )}
+        {onShowLifecycle ? (
+          <button type="button" className="secondary env-card-lifecycle" onClick={() => onShowLifecycle(env)}>
+            Lifecycle
+          </button>
+        ) : null}
         {signedIn && !demo ? (
           <div className="env-card-menu">
             <button
@@ -186,9 +200,7 @@ function EnvironmentCard({
               </div>
             ) : null}
           </div>
-        ) : (
-          <span />
-        )}
+        ) : null}
       </footer>
     </article>
   );
@@ -296,15 +308,13 @@ function formatDelta(iso: string) {
 }
 
 function formatAgo(iso: string, now: number) {
-  const delta = now - Date.parse(iso);
-  if (Number.isNaN(delta)) return iso;
-  const minutes = Math.round(Math.abs(delta) / 60000);
-  if (minutes < 1) return "just now";
-  const hours = Math.floor(Math.abs(delta) / 3600000);
-  const rest = minutes % 60;
-  if (hours >= 48) return `${Math.floor(hours / 24)} d ${hours % 24} h ago`;
-  if (hours > 0) return `${hours} h ${rest} m ago`;
-  return `${minutes} m ago`;
+  return formatAgoRounded(iso, now);
+}
+
+function formatDayLabel(key: string) {
+  const ms = Date.parse(`${key}T00:00:00Z`);
+  if (Number.isNaN(ms)) return key;
+  return new Date(ms).toLocaleDateString(undefined, { day: "numeric", month: "short", timeZone: "UTC" });
 }
 
 function formatSleep(seconds: number) {
@@ -403,11 +413,51 @@ function CostUsageChart({
       .join(" ");
   }
 
-  const firstLabel = keys[0]?.slice(8) ?? "";
-  const lastLabel = keys[keys.length - 1]?.slice(8) ?? "";
+  const firstLabel = keys[0] ? formatDayLabel(keys[0]) : "";
+  const lastLabel = keys.length > 1 ? formatDayLabel(keys[keys.length - 1]) : "";
+  const single = points.length < 2;
+  const day = points[points.length - 1];
+  const barMax = Math.max(day?.always ?? 0, day?.mayfly ?? 0) || 1;
+  const barW = 56;
+  const barGap = 28;
+  const barLeft = padL + innerW / 2 - barW - barGap / 2;
 
   return (
     <figure className="cost-line-chart" aria-label="Estimated cumulative spend this month">
+      {single ? (
+        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-hidden="true">
+          <line className="cost-line-axis" x1={padL} y1={padT + innerH} x2={padL + innerW} y2={padT + innerH} />
+          {day ? (
+            <>
+              <rect
+                className="cost-bar-always"
+                x={barLeft}
+                y={padT + innerH - (day.always / barMax) * innerH}
+                width={barW}
+                height={Math.max(1, (day.always / barMax) * innerH)}
+                rx={4}
+              />
+              <rect
+                className="cost-bar-mayfly"
+                x={barLeft + barW + barGap}
+                y={padT + innerH - Math.max(1, (day.mayfly / barMax) * innerH)}
+                width={barW}
+                height={Math.max(1, (day.mayfly / barMax) * innerH)}
+                rx={4}
+              />
+              <text className="cost-bar-value" x={barLeft + barW / 2} y={Math.max(10, padT + innerH - (day.always / barMax) * innerH - 4)} textAnchor="middle">
+                {formatEstMoney(day.always, currency)}
+              </text>
+              <text className="cost-bar-value" x={barLeft + barW * 1.5 + barGap} y={padT + innerH - Math.max(1, (day.mayfly / barMax) * innerH) - 4} textAnchor="middle">
+                {formatEstMoney(day.mayfly, currency)}
+              </text>
+            </>
+          ) : null}
+          <text className="cost-line-edge" x={padL + innerW / 2} y={height - 2} textAnchor="middle">
+            {firstLabel}
+          </text>
+        </svg>
+      ) : (
       <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-hidden="true">
         <line
           className="cost-line-axis"
@@ -425,6 +475,8 @@ function CostUsageChart({
           {lastLabel}
         </text>
       </svg>
+      )}
+      {single ? <p className="cost-chart-note">The daily chart fills in as days pass.</p> : null}
       <dl className="cost-line-totals">
         <div>
           <dt>Estimated if always awake</dt>
@@ -486,25 +538,41 @@ function matchesBoardSearch(env: Environment, query: string) {
 
 type BoardActivity = {
   at: string;
-  repository: string;
-  prNumber: number;
+  /** "PR #12", "Demo", or "6 previews" for a grouped burst. */
+  subject: string;
+  /** Repository to show, only when the board has more than one repository. */
+  repository: string | null;
   type: string;
   label: string;
   icon: "moon" | "sun" | "clock" | "alert" | "check" | "trash";
 };
 
-function activityLabel(type: string) {
+function activityLabel(type: string, count = 1) {
   switch (type) {
+    case "opened":
+      return "opened";
     case "build_started":
       return "build started";
+    case "built":
+      return "built";
+    case "ready":
+      return "ready";
+    case "updated":
+      return "updated";
     case "keep_awake":
-      return "keep awake";
+      return "kept awake";
     case "keep_awake_off":
       return "keep awake off";
     case "slept":
       return "slept";
     case "woke":
-      return "woke";
+      return count > 1 ? "woke" : "woken by a visit";
+    case "extended":
+      return "extended";
+    case "failed":
+      return "failed";
+    case "destroyed":
+      return "removed";
     default:
       return type.replace(/_/g, " ");
   }
@@ -533,22 +601,136 @@ function activityIcon(type: string): BoardActivity["icon"] {
   }
 }
 
-/** Newest timeline events across all previews (real env.events only). */
-function boardRecentActivity(environments: Environment[]): BoardActivity[] {
-  const events: BoardActivity[] = [];
+const BURST_MS = 2 * 60 * 1000;
+const BURST_TYPES = new Set(["slept", "woke"]);
+
+/** Newest timeline events across all previews (real env.events only); sleep/wake bursts grouped. */
+function boardRecentActivity(environments: Environment[], demoKey: string | null): BoardActivity[] {
+  const repos = new Set(
+    environments.filter((env) => `${env.repository}#${env.prNumber}` !== demoKey).map((env) => env.repository),
+  );
+  const showRepo = repos.size > 1;
+  const raw: { at: string; env: Environment; type: string; demo: boolean }[] = [];
   for (const env of environments) {
-    for (const event of env.events ?? []) {
-      events.push({
-        at: event.at,
-        repository: env.repository,
-        prNumber: env.prNumber,
-        type: event.type,
-        label: activityLabel(event.type),
-        icon: activityIcon(event.type),
+    const demo = `${env.repository}#${env.prNumber}` === demoKey;
+    for (const event of env.events ?? []) raw.push({ at: event.at, env, type: event.type, demo });
+  }
+  raw.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+
+  const items: BoardActivity[] = [];
+  for (let i = 0; i < raw.length && items.length < 8; ) {
+    const first = raw[i];
+    let j = i + 1;
+    if (BURST_TYPES.has(first.type)) {
+      while (
+        j < raw.length &&
+        raw[j].type === first.type &&
+        Date.parse(first.at) - Date.parse(raw[j].at) <= BURST_MS
+      ) {
+        j += 1;
+      }
+    }
+    const count = j - i;
+    if (count > 1) {
+      items.push({
+        at: first.at,
+        subject: `${count} previews`,
+        repository: null,
+        type: first.type,
+        label: activityLabel(first.type, count),
+        icon: activityIcon(first.type),
+      });
+    } else {
+      items.push({
+        at: first.at,
+        subject: first.demo ? "Demo" : `PR #${first.env.prNumber}`,
+        repository: showRepo && !first.demo ? first.env.repository : null,
+        type: first.type,
+        label: activityLabel(first.type),
+        icon: activityIcon(first.type),
       });
     }
+    i = j;
   }
-  return events.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 8);
+  return items;
+}
+
+function LifecycleDrawer({
+  env,
+  demo,
+  onClose,
+}: {
+  env: Environment | null;
+  demo: boolean;
+  onClose: () => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (env && !dialog.open) dialog.showModal();
+    if (!env && dialog.open) dialog.close();
+  }, [env]);
+
+  const events = env ? timelineOldestFirst(env.events) : [];
+  const state = env ? cardState(env) : "running";
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="lifecycle-drawer"
+      aria-labelledby="lifecycle-title"
+      onClose={onClose}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+      onClick={(event) => {
+        if (event.target === dialogRef.current) onClose();
+      }}
+    >
+      {env ? (
+        <div className="lifecycle-inner">
+          <header className="lifecycle-head">
+            <div>
+              <h2 id="lifecycle-title">
+                {demo ? "Demo" : `PR #${env.prNumber}`} — Lifecycle
+              </h2>
+              <p className="lifecycle-sub">
+                <span className="mono">{demo ? "demo" : env.branch}</span> · {env.repository}
+              </p>
+            </div>
+            <button type="button" className="secondary lifecycle-close" onClick={onClose}>
+              Close
+            </button>
+          </header>
+          <p className="lifecycle-state">
+            <span className="state-pill" data-state={state}>
+              {statePillLabel(state)}
+            </span>
+            <span className="mono">{env.sha.slice(0, 8)}</span>
+          </p>
+          {events.length === 0 ? (
+            <p className="empty">No history yet — events are recorded from now on.</p>
+          ) : (
+            <ol className="lifecycle-list">
+              {events.map((event, index) => (
+                <li key={`${event.at}-${event.type}-${index}`} data-tone={timelineTone(event.type)}>
+                  <span className="lifecycle-dot" aria-hidden="true" />
+                  <div>
+                    <strong>{timelineLabel(event)}</strong>
+                    <time dateTime={event.at}>{formatEventTime(event.at)}</time>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+          <p className="lifecycle-foot">Mayfly keeps the last 50 events for each preview.</p>
+        </div>
+      ) : null}
+    </dialog>
+  );
 }
 
 const VIEW_STORAGE_KEY = "mayfly-board-view";
@@ -585,6 +767,7 @@ export function Dashboard() {
   const [navOpen, setNavOpen] = useState(false);
   const [cardView, setCardView] = useState<"grid" | "list">("grid");
   const [busy, setBusy] = useState(false);
+  const [lifecycleId, setLifecycleId] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const reload = useCallback(async () => {
@@ -722,7 +905,8 @@ export function Dashboard() {
   const buildingCount = current.filter(
     (env) => env.status === "provisioning" || env.status === "updating",
   ).length;
-  const activity = overview ? boardRecentActivity(overview.environments) : [];
+  const activity = overview ? boardRecentActivity(overview.environments, demoKey) : [];
+  const lifecycleEnv = lifecycleId ? (overview?.environments.find((env) => env.id === lifecycleId) ?? null) : null;
   const costPerHour = overview?.costPerHour ?? 0.05;
   const alwaysAwakeEstimate = overview
     ? estimatedCost((overview.usage?.awakeSeconds ?? 0) + (overview.usage?.asleepSeconds ?? 0), costPerHour)
@@ -865,7 +1049,7 @@ export function Dashboard() {
               <div className="ledger-head">
                 <div>
                   <h2>Active environments</h2>
-                  <p className="help">Previews that are still running.</p>
+                  <p className="help">Live previews, running or asleep.</p>
                 </div>
                 <div className="board-view-toggle" role="group" aria-label="Card layout">
                   <button type="button" aria-pressed={cardView === "grid"} onClick={() => chooseCardView("grid")}>
@@ -919,6 +1103,7 @@ export function Dashboard() {
                     signedIn={signedIn}
                     busy={busy}
                     onAdminAction={(item, action) => void adminAction(item, action)}
+                    onShowLifecycle={(item) => setLifecycleId(item.id)}
                   />
                 ))}
               </div>
@@ -1020,17 +1205,15 @@ export function Dashboard() {
                 ) : (
                   <ol className="board-activity-list">
                     {activity.map((item, index) => (
-                      <li key={`${item.at}-${item.repository}-${item.prNumber}-${item.type}-${index}`} data-tone={item.icon}>
+                      <li key={`${item.at}-${item.subject}-${item.type}-${index}`} data-tone={item.icon}>
                         <span className="board-activity-icon" aria-hidden="true">
                           <StateIcon name={item.icon} />
                         </span>
-                        <div>
-                          <strong>
-                            PR #{item.prNumber} {item.label}
-                          </strong>
-                          <span className="board-activity-repo">{item.repository}</span>
-                          <time dateTime={item.at}>{formatAgo(item.at, now)}</time>
-                        </div>
+                        <span className="board-activity-text">
+                          <strong>{item.subject}</strong> {item.label}
+                          {item.repository ? <span className="board-activity-repo"> · {item.repository}</span> : null}
+                        </span>
+                        <time dateTime={item.at}>{formatAgo(item.at, now)}</time>
                       </li>
                     ))}
                   </ol>
@@ -1046,6 +1229,11 @@ export function Dashboard() {
           ) : null}
         </main>
       </div>
+      <LifecycleDrawer
+        env={lifecycleEnv}
+        demo={lifecycleEnv ? demoKey === `${lifecycleEnv.repository}#${lifecycleEnv.prNumber}` : false}
+        onClose={() => setLifecycleId(null)}
+      />
     </div>
   );
 }

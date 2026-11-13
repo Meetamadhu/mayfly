@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AdminHeader } from "@/components/admin-header";
-import type { Environment, EnvironmentEvent, EnvironmentStatus, Overview } from "@/lib/types";
+import type { Environment, EnvironmentStatus, Overview } from "@/lib/types";
+import { timelineLabel, timelineNewestFirst } from "@/lib/timeline";
 
 const TRANSITIONAL = new Set<EnvironmentStatus>(["provisioning", "updating", "destroying"]);
 const LIVE = new Set<EnvironmentStatus>(["provisioning", "ready", "updating", "destroying"]);
@@ -117,52 +118,10 @@ function formatLocalTime(iso: string) {
   });
 }
 
-function formatExtendDay(iso: string) {
-  const ms = Date.parse(iso);
-  if (Number.isNaN(ms)) return iso;
-  return new Date(ms).toLocaleDateString(undefined, { day: "numeric", month: "short" });
-}
-
-function timelineLabel(event: EnvironmentEvent): string {
-  switch (event.type) {
-    case "opened":
-      return "Opened";
-    case "build_started":
-      return "Build started";
-    case "built":
-      return event.detail ? `Built in ${event.detail} s` : "Built";
-    case "ready":
-      return "Ready";
-    case "updated":
-      return event.detail ? `Updated to ${event.detail}` : "Updated";
-    case "slept":
-      return "Slept after no visits";
-    case "woke":
-      return event.detail ? `Woken by a visit (${event.detail} s)` : "Woken by a visit";
-    case "extended":
-      return event.detail ? `Extended to ${formatExtendDay(event.detail)}` : "Extended";
-    case "keep_awake":
-      return event.detail ? `Keep awake until ${formatAwakeUntil(event.detail)}` : "Keep awake";
-    case "keep_awake_off":
-      return "Stopped keeping awake";
-    case "failed":
-      return event.detail || "Failed";
-    case "destroyed":
-      return event.detail ? `Destroyed (${event.detail})` : "Destroyed";
-    default:
-      return event.detail ? `${event.type}: ${event.detail}` : event.type;
-  }
-}
-
 function formatAwakeUntil(iso: string) {
   const ms = Date.parse(iso);
   if (Number.isNaN(ms)) return iso;
   return new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-}
-
-function timelineNewestFirst(events: EnvironmentEvent[] | undefined) {
-  if (!events?.length) return [];
-  return [...events].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
 }
 
 function webhookMode(mode: Overview["config"]["webhookVerification"]) {
