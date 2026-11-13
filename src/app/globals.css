@@ -3336,3 +3336,21 @@ html:not([data-theme="dark"]) .board-mark {
     margin-top: -100px;
   }
 }
+
+/* Board panels: "Active environments" sits in a bordered panel like the reference mockup;
+   the right-hand cards share the same green-tinted border. */
+.board-app .live-column {
+  padding: 1.15rem 1.15rem 1.25rem;
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--mint) 30%, var(--line));
+  border-radius: var(--radius-lg);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--mint) 6%, transparent), 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+
+.board-app .board-rail-card {
+  border-color: color-mix(in srgb, var(--mint) 30%, var(--line));
+}
+
+@media (max-width: 700px) {
+  .board-app .live-column { padding: 0.85rem; }
+}
