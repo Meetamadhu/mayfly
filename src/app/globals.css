@@ -230,32 +230,7 @@ h1 {
   background: var(--success-bg);
   border: 1px solid color-mix(in srgb, var(--success) 28%, var(--line));
   border-radius: var(--radius-lg);
-}
-
-html[data-theme="dark"] .savings-hero {
-  background: #fff;
-  border-color: color-mix(in srgb, #1c1915 12%, #fff);
-  color: #1c1915;
-}
-
-html[data-theme="dark"] .savings-hero .savings-figure {
-  color: #1d6b45;
-}
-
-html[data-theme="dark"] .savings-hero .savings-figure span,
-html[data-theme="dark"] .savings-hero .savings-sub,
-html[data-theme="dark"] .savings-hero .cost-chart-max,
-html[data-theme="dark"] .savings-hero .cost-day-label,
-html[data-theme="dark"] .savings-hero .cost-chart-legend {
-  color: #5f594f;
-}
-
-html[data-theme="dark"] .savings-hero .cost-chart-axis-line {
-  border-top-color: color-mix(in srgb, #1c1915 18%, #fff);
-}
-
-html[data-theme="dark"] .savings-hero .cost-chart-max {
-  background: color-mix(in srgb, #fff 88%, transparent);
+  color: var(--ink);
 }
 
 .savings-figure {
@@ -365,8 +340,14 @@ html[data-theme="dark"] .savings-hero .cost-chart-max {
 }
 
 .cost-bar-actual {
-  background: #fff;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 22%, transparent);
+  /* Light fill that stays visible on --success-bg in both themes */
+  background: color-mix(in srgb, var(--paper) 72%, #fff);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 28%, transparent);
+}
+
+html[data-theme="dark"] .cost-bar-actual {
+  background: color-mix(in srgb, var(--ink) 88%, var(--paper));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 35%, transparent);
 }
 
 .cost-day-label {
@@ -459,8 +440,13 @@ html[data-theme="dark"] .savings-hero .cost-chart-max {
 }
 
 .cost-swatch-actual {
-  background: #fff;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 22%, transparent);
+  background: color-mix(in srgb, var(--paper) 72%, #fff);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 28%, transparent);
+}
+
+html[data-theme="dark"] .cost-swatch-actual {
+  background: color-mix(in srgb, var(--ink) 88%, var(--paper));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 35%, transparent);
 }
 
 .card-usage {
