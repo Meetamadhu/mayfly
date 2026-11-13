@@ -342,15 +342,22 @@ function formatContainerHours(seconds: number) {
   return hours.toFixed(2);
 }
 
-function formatUsageHours(seconds: number) {
+/** Card durations: "< 1 min", "4 min", or "1.2 h". */
+function formatUsageDuration(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds < 60) return "< 1 min";
+  if (seconds < 3600) return `${Math.max(1, Math.round(seconds / 60))} min`;
   const hours = seconds / 3600;
-  if (hours < 0.05) return hours.toFixed(2);
-  if (hours < 10) return hours.toFixed(1);
-  return hours.toFixed(0);
+  if (hours < 10) return `${hours.toFixed(1)} h`;
+  return `${Math.round(hours)} h`;
 }
 
 function estimatedCost(seconds: number, costPerHour: number) {
   return (seconds / 3600) * costPerHour;
+}
+
+function formatEstMoney(amount: number) {
+  if (!Number.isFinite(amount) || amount < 0.01) return "< $0.01";
+  return `$${amount.toFixed(2)}`;
 }
 
 function formatPreviewUsage(env: Environment, costPerHour: number, demo: boolean) {
@@ -359,7 +366,7 @@ function formatPreviewUsage(env: Environment, costPerHour: number, demo: boolean
   const awake = env.usage.awakeSeconds ?? 0;
   const asleep = env.usage.asleepSeconds ?? 0;
   const saved = estimatedCost(asleep, costPerHour);
-  return `Awake ${formatUsageHours(awake)} h · Asleep ${formatUsageHours(asleep)} h · Est. saved $${formatMoney(saved)}`;
+  return `Awake ${formatUsageDuration(awake)} · Asleep ${formatUsageDuration(asleep)} · Est. saved ${formatEstMoney(saved)}`;
 }
 
 function last14DayKeys(now = Date.now()) {
@@ -378,6 +385,16 @@ function dayTotals(days: Record<string, UsageDay> | undefined, key: string): Usa
   };
 }
 
+function formatDayParts(isoDay: string) {
+  const ms = Date.parse(`${isoDay}T00:00:00.000Z`);
+  if (Number.isNaN(ms)) return { day: isoDay, month: "" };
+  const date = new Date(ms);
+  return {
+    day: date.toLocaleDateString("en-GB", { day: "numeric", timeZone: "UTC" }),
+    month: date.toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" }),
+  };
+}
+
 function CostDayChart({
   usage,
   costPerHour,
@@ -390,50 +407,45 @@ function CostDayChart({
     const day = dayTotals(usage?.days, key);
     const always = estimatedCost(day.awakeSeconds + day.asleepSeconds, costPerHour);
     const actual = estimatedCost(day.awakeSeconds, costPerHour);
-    return { key, always, actual, label: key.slice(5) };
+    return { key, always, actual, ...formatDayParts(key) };
   });
-  const max = Math.max(0.01, ...points.map((p) => p.always));
-  const width = 280;
-  const height = 88;
-  const pad = 4;
-  const gap = 3;
-  const barSlot = (width - pad * 2) / points.length;
-  const barWidth = Math.max(3, (barSlot - gap) / 2);
+  const maxValue = Math.max(0, ...points.map((p) => p.always));
+  const scaleMax = maxValue > 0 ? maxValue : 0.01;
+  const maxLabel = maxValue <= 0 ? "$0.00" : formatEstMoney(maxValue);
 
   return (
     <figure className="cost-chart" aria-label="Estimated daily cost, last 14 days">
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-hidden="true">
-        {points.map((point, index) => {
-          const x = pad + index * barSlot;
-          const alwaysH = Math.max(point.always > 0 ? 2 : 0, (point.always / max) * (height - 18));
-          const actualH = Math.max(point.actual > 0 ? 2 : 0, (point.actual / max) * (height - 18));
-          return (
-            <g key={point.key}>
-              <rect
-                className="cost-bar cost-bar-always"
-                x={x}
-                y={height - 14 - alwaysH}
-                width={barWidth}
-                height={alwaysH}
-                rx="1.5"
-              />
-              <rect
-                className="cost-bar cost-bar-actual"
-                x={x + barWidth + 1}
-                y={height - 14 - actualH}
-                width={barWidth}
-                height={actualH}
-                rx="1.5"
-              />
-              {index % 2 === 0 || index === points.length - 1 ? (
-                <text className="cost-chart-label" x={x + barSlot / 2 - 1} y={height - 2} textAnchor="middle">
-                  {point.label}
-                </text>
-              ) : null}
-            </g>
-          );
-        })}
-      </svg>
+      <div className="cost-chart-plot">
+        <div className="cost-chart-axis" aria-hidden="true">
+          <span className="cost-chart-max">{maxLabel}</span>
+          <span className="cost-chart-axis-line" />
+        </div>
+        <div className="cost-chart-bars" role="img" aria-hidden="true">
+          {points.map((point, index) => {
+            const alwaysPct = Math.min(100, (point.always / scaleMax) * 100);
+            const actualPct = Math.min(100, (point.actual / scaleMax) * 100);
+            const showLabel = index % 2 === 0 || index === points.length - 1;
+            return (
+              <div key={point.key} className="cost-day" data-label={showLabel ? "show" : "hide"}>
+                <div className="cost-day-bars">
+                  <span
+                    className="cost-bar cost-bar-always"
+                    style={{ height: point.always > 0 ? `${Math.max(alwaysPct, 3)}%` : "0%" }}
+                  />
+                  <span
+                    className="cost-bar cost-bar-actual"
+                    style={{ height: point.actual > 0 ? `${Math.max(actualPct, 3)}%` : "0%" }}
+                  />
+                </div>
+                <span className="cost-day-label">
+                  <span className="cost-day-dom">{point.day}</span>
+                  <span className="cost-day-mon">{point.month}</span>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
       <figcaption className="cost-chart-legend">
         <span>
           <i className="cost-swatch cost-swatch-always" aria-hidden="true" /> If always awake
