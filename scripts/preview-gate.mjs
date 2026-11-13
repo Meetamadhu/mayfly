@@ -43,9 +43,31 @@ let sleptAt = null;
 let wokeAt = null;
 /** Last successful wake duration in milliseconds (null until the first wake). */
 let lastWakeMs = null;
+/** Epoch ms until which idle sleep is suppressed (0 = normal idle). */
+let keepAwakeUntilMs = 0;
 
 function alive() {
   return Boolean(child && child.exitCode === null && child.signalCode === null);
+}
+
+function keepAwakeActive() {
+  return keepAwakeUntilMs > Date.now();
+}
+
+function readJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on("data", (chunk) => chunks.push(chunk));
+    req.on("end", () => {
+      try {
+        if (!chunks.length) return resolve({});
+        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+      } catch (error) {
+        reject(error);
+      }
+    });
+    req.on("error", reject);
+  });
 }
 
 /**
@@ -250,6 +272,7 @@ function boot() {
 }
 
 setInterval(() => {
+  if (keepAwakeActive()) return;
   if (alive() && !booting && lastActive > 0 && Date.now() - lastActive >= idleMs) stopApp();
 }, 500).unref();
 
@@ -496,6 +519,37 @@ const server = createServer((req, res) => {
     stopApp();
     res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
     res.end(JSON.stringify({ state: "asleep" }));
+    return;
+  }
+  if (req.method === "POST" && pathOnly === "/__preview_keepawake") {
+    readJsonBody(req)
+      .then((body) => {
+        const raw = body && typeof body.until === "string" ? body.until.trim() : "";
+        if (!raw) {
+          keepAwakeUntilMs = 0;
+        } else {
+          const parsed = Date.parse(raw);
+          keepAwakeUntilMs = Number.isFinite(parsed) && parsed > Date.now() ? parsed : 0;
+        }
+        if (keepAwakeActive()) {
+          // Stay running for the keep-awake window; start if currently asleep.
+          boot().catch(() => {});
+          lastActive = Date.now();
+        }
+        res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+        res.end(
+          JSON.stringify({
+            keepAwakeUntil: keepAwakeActive() ? new Date(keepAwakeUntilMs).toISOString() : null,
+            state: gateState(),
+          }),
+        );
+      })
+      .catch(() => {
+        if (!res.headersSent) {
+          res.writeHead(400, { "content-type": "application/json", "cache-control": "no-store" });
+          res.end(JSON.stringify({ error: "Invalid JSON body." }));
+        }
+      });
     return;
   }
   // Probes report state only: they never boot and never count as activity.

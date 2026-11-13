@@ -1,7 +1,14 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { imageTag, isBuilding } from "./builder";
-import { buildsPullRequests, getConfig, previewCostPerHour, previewRepos, previewRuntime } from "./config";
+import {
+  buildsPullRequests,
+  getConfig,
+  previewCostPerHour,
+  previewRepos,
+  previewRuntime,
+  sleepSecondsForRepo,
+} from "./config";
 import { getDeployer, previewUrl, publicPreviewUrl, type Deployment } from "./deployer";
 import { publishCommitStatus, publishPullRequestComment } from "./http";
 import { exclusive, loadState, saveState } from "./store";
@@ -330,7 +337,15 @@ export async function getOverview(): Promise<Overview> {
   const environments: Environment[] = await Promise.all(
     sorted.map(async (env) => {
       const gate = await readGate(env, deployments);
-      return { ...env, sleep: gate.sleep, lastWakeMs: gate.lastWakeMs };
+      const keepAwakeUntil =
+        env.keepAwakeUntil && Date.parse(env.keepAwakeUntil) > Date.now() ? env.keepAwakeUntil : null;
+      return {
+        ...env,
+        sleep: gate.sleep,
+        lastWakeMs: gate.lastWakeMs,
+        sleepSeconds: sleepSecondsForRepo(env.repository),
+        keepAwakeUntil,
+      };
     }),
   );
 
@@ -822,6 +837,98 @@ export async function extendEnvironment(id: string, hours: number): Promise<Life
   });
 }
 
+async function gatePortFor(env: Environment): Promise<number | null> {
+  if (!env.deploymentId) return null;
+  const deployments = await getDeployer().list();
+  const port = deployments.find((item) => item.deploymentId === env.deploymentId)?.port;
+  return port && Number.isInteger(port) ? port : null;
+}
+
+/** Tell the gate on this machine to suppress idle sleep until `until` (ISO), or clear with null. */
+async function tellGateKeepAwake(env: Environment, until: string | null): Promise<boolean> {
+  const port = await gatePortFor(env);
+  if (!port) return false;
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/__preview_keepawake`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ until }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(3000),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+const KEEP_AWAKE_HOURS = new Set([1, 4, 8]);
+
+/** Hold a live preview awake for 1, 4, or 8 hours (no idle sleep). */
+export async function keepAwakeEnvironment(id: string, hours: number): Promise<LifecycleResult> {
+  if (!KEEP_AWAKE_HOURS.has(hours)) {
+    return { ok: false, code: "invalid", error: "hours must be 1, 4, or 8." };
+  }
+
+  const reserved = await exclusive(async () => {
+    const state = await loadState();
+    const env = state.environments.find((item) => item.id === id);
+    if (!env) return { ok: false as const, code: "not_found" as const, error: "No environment with that id." };
+    if (env.status !== "ready" && env.status !== "updating") {
+      return {
+        ok: false as const,
+        code: "conflict" as const,
+        error: "Only a live preview can be kept awake.",
+        environment: clone(env),
+      };
+    }
+    const until = iso(Date.now() + hours * 60 * 60 * 1000);
+    env.keepAwakeUntil = until;
+    env.updatedAt = iso();
+    pushEnvironmentEvent(env, { at: env.updatedAt, type: "keep_awake", detail: until });
+    await saveState(state);
+    return { ok: true as const, environment: clone(env) };
+  });
+  if (!reserved.ok) return reserved;
+
+  const told = await tellGateKeepAwake(reserved.environment, reserved.environment.keepAwakeUntil ?? null);
+  if (!told) {
+    return {
+      ok: false,
+      code: "deploy_failed",
+      error: "The preview gate did not accept keep-awake.",
+      environment: reserved.environment,
+    };
+  }
+  return { ok: true, action: "keep_awake", environment: reserved.environment };
+}
+
+/** Clear keep-awake so normal idle sleep resumes. */
+export async function keepAwakeOffEnvironment(id: string): Promise<LifecycleResult> {
+  const reserved = await exclusive(async () => {
+    const state = await loadState();
+    const env = state.environments.find((item) => item.id === id);
+    if (!env) return { ok: false as const, code: "not_found" as const, error: "No environment with that id." };
+    if (env.status !== "ready" && env.status !== "updating" && env.status !== "failed") {
+      return {
+        ok: false as const,
+        code: "conflict" as const,
+        error: "Only a live preview can clear keep-awake.",
+        environment: clone(env),
+      };
+    }
+    env.keepAwakeUntil = null;
+    env.updatedAt = iso();
+    pushEnvironmentEvent(env, { at: env.updatedAt, type: "keep_awake_off" });
+    await saveState(state);
+    return { ok: true as const, environment: clone(env) };
+  });
+  if (!reserved.ok) return reserved;
+
+  await tellGateKeepAwake(reserved.environment, null);
+  return { ok: true, action: "keep_awake_off", environment: reserved.environment };
+}
+
 /** Ask the gate on this machine to stop the app. The public /p/ proxy is not used. */
 export async function sleepEnvironment(id: string): Promise<LifecycleResult> {
   const located = await exclusive(async () => {
@@ -840,8 +947,7 @@ export async function sleepEnvironment(id: string): Promise<LifecycleResult> {
   });
   if (!located.ok) return located;
 
-  const deployments = await getDeployer().list();
-  const port = deployments.find((item) => item.deploymentId === located.environment.deploymentId)?.port;
+  const port = await gatePortFor(located.environment);
   if (!port) {
     return {
       ok: false,
@@ -965,6 +1071,11 @@ export async function restorePreviews() {
         branch: env.branch,
         deploymentId: env.deploymentId,
       });
+      const until = env.keepAwakeUntil;
+      if (until && Date.parse(until) > Date.now()) {
+        const told = await tellGateKeepAwake(env, until);
+        if (!told) console.error(`Keep-awake was not restored for ${env.repository}#${env.prNumber}`);
+      }
     } catch (error) {
       console.error(`Preview ${env.repository}#${env.prNumber} was not restored`, error);
     }

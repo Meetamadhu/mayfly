@@ -57,6 +57,8 @@ async function startBackgroundWork() {
   if (marker.__mayflyBooted) return;
   marker.__mayflyBooted = true;
 
+  const { getConfig } = await import("@/lib/config");
+  getConfig(); // Warns once about invalid PREVIEW_SLEEP_RULES entries.
   const { removeOrphanPreviewContainers, restorePreviews } = await import("@/lib/lifecycle");
   const { startReaperLoop } = await import("@/lib/reaper-loop");
   await removeOrphanPreviewContainers();

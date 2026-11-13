@@ -118,12 +118,51 @@ export function previewCostPerHour() {
   return positiveNumber("PREVIEW_COST_PER_HOUR", 0.05) || 0.05;
 }
 
+let sleepRulesCacheKey: string | null = null;
+let sleepRulesCache = new Map<string, number>();
+
+/**
+ * Parse PREVIEW_SLEEP_RULES="owner/name=60,other/repo=300". Invalid entries are skipped with a warning.
+ * Repos not listed use PREVIEW_SLEEP_SECONDS.
+ */
+export function parseSleepRules(raw = process.env.PREVIEW_SLEEP_RULES ?? ""): Map<string, number> {
+  if (raw === sleepRulesCacheKey) return sleepRulesCache;
+  const next = new Map<string, number>();
+  for (const part of raw.split(",")) {
+    const entry = part.trim();
+    if (!entry) continue;
+    const match = /^([\w.-]+\/[\w.-]+)=(\d+)$/.exec(entry);
+    if (!match) {
+      console.warn(`Ignoring invalid PREVIEW_SLEEP_RULES entry: ${entry}`);
+      continue;
+    }
+    const seconds = Number(match[2]);
+    if (!Number.isFinite(seconds) || seconds < 0) {
+      console.warn(`Ignoring invalid PREVIEW_SLEEP_RULES entry: ${entry}`);
+      continue;
+    }
+    next.set(match[1].toLowerCase(), seconds);
+  }
+  sleepRulesCacheKey = raw;
+  sleepRulesCache = next;
+  return next;
+}
+
+/** Idle seconds for this repository: per-repo rule, else PREVIEW_SLEEP_SECONDS. */
+export function sleepSecondsForRepo(repository: string): number {
+  const rules = parseSleepRules();
+  const key = repository.trim().toLowerCase();
+  return rules.get(key) ?? getConfig().sleepSeconds;
+}
+
 export function getConfig(): OrchestratorConfig {
   const ttlHours = positiveNumber("PREVIEW_TTL_HOURS", 8) || 8;
   const idleHours = positiveNumber("PREVIEW_IDLE_HOURS", 4) || 4;
   const maxLifetimeHours = positiveNumber("PREVIEW_MAX_LIFETIME_HOURS", 168) || 168;
   const maxConcurrent = positiveNumber("MAX_CONCURRENT_ENVIRONMENTS", 10) || 10;
   const sleepSeconds = positiveNumber("PREVIEW_SLEEP_SECONDS", 20) || 20;
+  // Warn about bad rules once at config load / first use.
+  parseSleepRules();
 
   return {
     maxConcurrent,

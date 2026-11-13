@@ -15,7 +15,9 @@ export type LifecycleAction =
   | "unchanged"
   | "idle-marked"
   | "activity"
-  | "slept";
+  | "slept"
+  | "keep_awake"
+  | "keep_awake_off";
 
 export interface PreviewComment {
   at: string;
@@ -61,6 +63,10 @@ export interface Environment {
   events?: EnvironmentEvent[];
   /** Estimated awake/asleep time for this preview (demo excluded). Absent on older previews. */
   usage?: PreviewUsage;
+  /** When set and in the future, the gate will not idle-sleep this preview. */
+  keepAwakeUntil?: string | null;
+  /** Effective idle seconds for this repo (overview-only; from PREVIEW_SLEEP_RULES / default). */
+  sleepSeconds?: number;
 }
 
 /** Per-preview estimated awake/asleep accumulators. */

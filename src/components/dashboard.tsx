@@ -47,16 +47,21 @@ function EnvironmentCard({
 
   const view = cardView(env);
   const path = env.url ? previewPath(env.url) : null;
-  const remain = secondsUntilSleep(env, sleepSeconds, now);
+  const idleSeconds = typeof env.sleepSeconds === "number" ? env.sleepSeconds : sleepSeconds;
+  const remain = secondsUntilSleep(env, idleSeconds, now);
+  const awakeUntil =
+    env.keepAwakeUntil && Date.parse(env.keepAwakeUntil) > now ? env.keepAwakeUntil : null;
   // A real pull request on a Docker Mayfly runs its own code; the demo and placeholder previews do not.
   const fromCode = buildsCode && !demo;
   const building = env.status === "provisioning" || env.status === "updating";
   const note =
-    view.tone === "awake"
-      ? `Sleeps in ${remain} s if nobody visits.`
-      : fromCode && building
-        ? "Building from the PR's Dockerfile…"
-        : view.note;
+    view.tone === "awake" && awakeUntil
+      ? `Kept awake until ${formatAwakeUntil(awakeUntil)}.`
+      : view.tone === "awake"
+        ? `Sleeps in ${remain} s if nobody visits.`
+        : fromCode && building
+          ? "Building from the PR's Dockerfile…"
+          : view.note;
   const showOpen = env.status !== "failed" && env.status !== "destroying";
   const openDisabled = env.status === "provisioning" || !env.url;
   const expiresValue = demo ? "Always on" : formatExpiresValue(env.expiresAt, now);
@@ -70,13 +75,14 @@ function EnvironmentCard({
             {view.word}
           </p>
           <p className="explainer">{note}</p>
-          {env.status === "ready" && env.sleep === "awake" ? (
+          {env.status === "ready" && env.sleep === "awake" && !awakeUntil ? (
             <div className="sleep-meter" aria-hidden="true">
-              <span style={{ width: `${sleepSeconds > 0 ? (remain / sleepSeconds) * 100 : 0}%` }} />
+              <span style={{ width: `${idleSeconds > 0 ? (remain / idleSeconds) * 100 : 0}%` }} />
             </div>
           ) : null}
         </div>
         {demo ? <span className="chip demo-chip">Demo</span> : null}
+        {awakeUntil ? <span className="chip">Awake until {formatAwakeUntil(awakeUntil)}</span> : null}
       </header>
       <div className="card-body">
         <p className="card-repo">{env.repository}</p>
@@ -99,6 +105,7 @@ function EnvironmentCard({
         </p>
         <p className="meta">
           {demo ? null : <span className="chip mono">{env.sha.slice(0, 8)}</span>}
+          <span className="chip">Sleeps after {idleSeconds} s</span>
           {fromCode ? <span className="chip code-chip">Built from PR code</span> : null}
           {typeof env.buildMs === "number" && env.buildMs >= 0 ? (
             <span className="chip timing-chip">Built in {formatDurationMs(env.buildMs)}</span>
@@ -182,6 +189,12 @@ function secondsUntilSleep(env: Environment, sleepSeconds: number, now: number) 
   const elapsed = Math.floor((now - Date.parse(env.lastActiveAt)) / 1000);
   if (!Number.isFinite(elapsed)) return sleepSeconds;
   return Math.max(0, sleepSeconds - elapsed);
+}
+
+function formatAwakeUntil(iso: string) {
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return iso;
+  return new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
 function StateIcon({ name }: { name: "moon" | "sun" | "clock" | "alert" }) {

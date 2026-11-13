@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { buildImage, imageExists, imageTag, removeImage } from "./builder";
-import { buildsPullRequests, getConfig, previewRuntime, repositoryAllowed } from "./config";
+import { buildsPullRequests, getConfig, previewRuntime, repositoryAllowed, sleepSecondsForRepo } from "./config";
 import { createExclusive, dataDir, readJson, writeJson } from "./store";
 import type { DeploymentRecord } from "./types";
 
@@ -338,7 +338,7 @@ function startPreview(port: number, input: DeployRequest, image: string) {
       ...previewBaseEnv(),
       PORT: String(port),
       APP_PORT: String(appPort),
-      PREVIEW_SLEEP_MS: String(getConfig().sleepMs),
+      PREVIEW_SLEEP_MS: String(sleepSecondsForRepo(input.repository) * 1000),
       PREVIEW_APP_SCRIPT: path.join(process.cwd(), "scripts", "preview-server.mjs"),
       PREVIEW_REPOSITORY: input.repository,
       PREVIEW_PR: String(input.prNumber),

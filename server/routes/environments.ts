@@ -5,6 +5,8 @@ import {
   extendEnvironment,
   getEnvironment,
   getOverview,
+  keepAwakeEnvironment,
+  keepAwakeOffEnvironment,
   reap,
   recordActivity,
   sleepEnvironment,
@@ -66,7 +68,14 @@ environmentsRouter.post(
     const action = typeof req.query.action === "string" ? req.query.action : null;
     const wait = req.query.wait === "1";
 
-    if (action === "destroy" || action === "sleep" || action === "activity" || action === "extend") {
+    if (
+      action === "destroy" ||
+      action === "sleep" ||
+      action === "activity" ||
+      action === "extend" ||
+      action === "keep_awake" ||
+      action === "keep_awake_off"
+    ) {
       const denied = checkAdmin({ method: req.method, header: headerOf(req) });
       if (denied) {
         sendJson(res, denied.body, denied.status);
@@ -94,6 +103,20 @@ environmentsRouter.post(
       }
       const hours = Number(hoursRaw);
       sendLifecycle(res, await extendEnvironment(id, hours));
+      return;
+    }
+    if (action === "keep_awake") {
+      const hoursRaw = typeof req.query.hours === "string" ? req.query.hours : "";
+      if (!/^\d+$/.test(hoursRaw)) {
+        sendJson(res, { ok: false, code: "invalid", error: "hours must be 1, 4, or 8." }, 400);
+        return;
+      }
+      const hours = Number(hoursRaw);
+      sendLifecycle(res, await keepAwakeEnvironment(id, hours));
+      return;
+    }
+    if (action === "keep_awake_off") {
+      sendLifecycle(res, await keepAwakeOffEnvironment(id));
       return;
     }
 

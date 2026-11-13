@@ -141,6 +141,10 @@ function timelineLabel(event: EnvironmentEvent): string {
       return event.detail ? `Woken by a visit (${event.detail} s)` : "Woken by a visit";
     case "extended":
       return event.detail ? `Extended to ${formatExtendDay(event.detail)}` : "Extended";
+    case "keep_awake":
+      return event.detail ? `Keep awake until ${formatAwakeUntil(event.detail)}` : "Keep awake";
+    case "keep_awake_off":
+      return "Stopped keeping awake";
     case "failed":
       return event.detail || "Failed";
     case "destroyed":
@@ -148,6 +152,12 @@ function timelineLabel(event: EnvironmentEvent): string {
     default:
       return event.detail ? `${event.type}: ${event.detail}` : event.type;
   }
+}
+
+function formatAwakeUntil(iso: string) {
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return iso;
+  return new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
 function timelineNewestFirst(events: EnvironmentEvent[] | undefined) {
@@ -344,6 +354,45 @@ export function AdminPanel() {
     }
   }
 
+  async function keepAwake(env: Environment, hours: 1 | 4 | 8) {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await fetch(
+        `/api/environments/${env.id}?action=keep_awake&hours=${hours}`,
+        { method: "POST", credentials: "include" },
+      );
+      const body = (await readBody(response)) as { environment: Environment };
+      const until = body.environment.keepAwakeUntil;
+      setNotice(until ? `Kept awake until ${formatAwakeUntil(until)}.` : "Kept awake.");
+      await reload();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Request failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function keepAwakeOff(env: Environment) {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await fetch(`/api/environments/${env.id}?action=keep_awake_off`, {
+        method: "POST",
+        credentials: "include",
+      });
+      await readBody(response);
+      setNotice("Stopped keeping awake.");
+      await reload();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Request failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function destroy(env: Environment) {
     if (!window.confirm(`Destroy ${env.repository} #${env.prNumber}?`)) return;
     setBusy(true);
@@ -418,9 +467,14 @@ export function AdminPanel() {
             {rows.map((env) => {
               const demo = demoKey === `${env.repository}#${env.prNumber}`;
               const canSleep = env.status === "ready" && env.sleep === "awake";
+              const canKeepAwake = env.status === "ready" || env.status === "updating";
+              const awakeUntil =
+                env.keepAwakeUntil && Date.parse(env.keepAwakeUntil) > now ? env.keepAwakeUntil : null;
               const tone = stateTone(env);
               const expiresValue = demo ? "Always on" : formatExpiresValue(env.expiresAt, now);
               const timeline = timelineNewestFirst(env.events);
+              const sleepLabel =
+                typeof env.sleepSeconds === "number" ? `Sleeps after ${env.sleepSeconds} s` : null;
               return (
                 <li key={env.id} className={env.status === "ready" ? "env featured" : "env"}>
                   <header className="state-band" data-state={tone}>
@@ -429,6 +483,9 @@ export function AdminPanel() {
                       <p className="explainer">{stateNote(env)}</p>
                     </div>
                     {demo ? <span className="chip demo-chip">Demo</span> : null}
+                    {awakeUntil ? (
+                      <span className="chip">Awake until {formatAwakeUntil(awakeUntil)}</span>
+                    ) : null}
                   </header>
                   <div className="card-body">
                     <p className="card-repo">{env.repository}</p>
@@ -452,8 +509,14 @@ export function AdminPanel() {
                     {demo ? null : (
                       <p className="meta">
                         <span className="chip mono">{env.sha.slice(0, 8)}</span>
+                        {sleepLabel ? <span className="chip">{sleepLabel}</span> : null}
                       </p>
                     )}
+                    {demo && sleepLabel ? (
+                      <p className="meta">
+                        <span className="chip">{sleepLabel}</span>
+                      </p>
+                    ) : null}
                     <details className="env-timeline">
                       <summary>Timeline</summary>
                       {timeline.length === 0 ? (
@@ -483,6 +546,38 @@ export function AdminPanel() {
                     <div className="admin-actions">
                       <button type="button" className="secondary" disabled={busy || !canSleep} onClick={() => void sleepNow(env.id)}>
                         Sleep now
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary"
+                        disabled={busy || !canKeepAwake}
+                        onClick={() => void keepAwake(env, 1)}
+                      >
+                        Keep awake 1 h
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary"
+                        disabled={busy || !canKeepAwake}
+                        onClick={() => void keepAwake(env, 4)}
+                      >
+                        Keep awake 4 h
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary"
+                        disabled={busy || !canKeepAwake}
+                        onClick={() => void keepAwake(env, 8)}
+                      >
+                        Keep awake 8 h
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary"
+                        disabled={busy || !awakeUntil}
+                        onClick={() => void keepAwakeOff(env)}
+                      >
+                        Stop keeping awake
                       </button>
                       <select
                         aria-label="Extend by"
