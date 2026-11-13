@@ -728,16 +728,46 @@ function monthKey(ms: number) {
   return new Date(ms).toISOString().slice(0, 7);
 }
 
-function emptyUsage(ms: number): UsageMonth {
-  return { month: monthKey(ms), asleepSeconds: 0, awakeSeconds: 0, lastSampleAt: iso(ms) };
+function dayKey(ms: number) {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+const USAGE_DAY_RETENTION = 31;
+
+function pruneUsageDays(
+  days: Record<string, { awakeSeconds: number; asleepSeconds: number }> | undefined,
+  nowMs: number,
+): Record<string, { awakeSeconds: number; asleepSeconds: number }> {
+  const kept: Record<string, { awakeSeconds: number; asleepSeconds: number }> = {};
+  const cutoff = dayKey(nowMs - (USAGE_DAY_RETENTION - 1) * 24 * 60 * 60 * 1000);
+  for (const [key, value] of Object.entries(days ?? {})) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(key) || key < cutoff) continue;
+    if (!value || typeof value !== "object") continue;
+    const awake = value.awakeSeconds;
+    const asleep = value.asleepSeconds;
+    if (typeof awake !== "number" || !Number.isFinite(awake) || awake < 0) continue;
+    if (typeof asleep !== "number" || !Number.isFinite(asleep) || asleep < 0) continue;
+    kept[key] = { awakeSeconds: awake, asleepSeconds: asleep };
+  }
+  return kept;
+}
+
+function emptyUsage(ms: number, days?: UsageMonth["days"]): UsageMonth {
+  return {
+    month: monthKey(ms),
+    asleepSeconds: 0,
+    awakeSeconds: 0,
+    lastSampleAt: iso(ms),
+    days: pruneUsageDays(days, ms),
+  };
 }
 
 function usageForMonth(usage: UsageMonth | undefined, ms: number): UsageMonth {
-  if (!usage || usage.month !== monthKey(ms)) return emptyUsage(ms);
-  return usage;
+  if (!usage || usage.month !== monthKey(ms)) return emptyUsage(ms, usage?.days);
+  return { ...usage, days: pruneUsageDays(usage.days, ms) };
 }
 
-/** First reaper tick after process start only reseeds lastSampleAt — downtime is not billed. */
+/** First reaper tick after process start only reseeds lastSampleAt — downtime is not estimated. */
 let usageSampleReady = false;
 
 const EXTEND_HOURS = new Set([2, 4, 12, 24]);
@@ -960,22 +990,44 @@ export async function reap(): Promise<ReapResult> {
   const due = await exclusive(async () => {
     const state = await loadState();
     const month = monthKey(now);
-    let usage = state.usage && state.usage.month === month ? { ...state.usage } : emptyUsage(now);
+    let usage: UsageMonth;
+    if (state.usage && state.usage.month === month) {
+      usage = { ...state.usage, days: { ...(state.usage.days ?? {}) } };
+    } else {
+      usage = emptyUsage(now, state.usage?.days);
+      // Keep the previous sample clock so a month boundary does not drop the open interval.
+      if (state.usage?.lastSampleAt) usage.lastSampleAt = state.usage.lastSampleAt;
+    }
+    usage.days = pruneUsageDays(usage.days, now);
     if (!usageSampleReady) {
       usage.lastSampleAt = iso(now);
       usageSampleReady = true;
-    } else if (state.usage && state.usage.month === month) {
+    } else if (state.usage) {
+      // Same month or a rollover: sample from the previous lastSampleAt so a month boundary does not drop time.
       const elapsed = Math.min(
         300,
         Math.max(0, Math.floor((now - Date.parse(usage.lastSampleAt)) / 1000)),
       );
       if (elapsed > 0) {
+        const today = dayKey(now);
+        const day = usage.days?.[today] ?? { awakeSeconds: 0, asleepSeconds: 0 };
         for (const env of state.environments) {
           if (!isLiveStatus(env.status) || isDemo(env)) continue;
           const sleep = gateById.get(env.id)?.sleep;
-          if (sleep === "asleep") usage.asleepSeconds += elapsed;
-          else if (sleep === "awake") usage.awakeSeconds += elapsed;
+          if (sleep !== "asleep" && sleep !== "awake") continue;
+          const preview = env.usage ?? { awakeSeconds: 0, asleepSeconds: 0 };
+          if (sleep === "asleep") {
+            preview.asleepSeconds += elapsed;
+            usage.asleepSeconds += elapsed;
+            day.asleepSeconds += elapsed;
+          } else {
+            preview.awakeSeconds += elapsed;
+            usage.awakeSeconds += elapsed;
+            day.awakeSeconds += elapsed;
+          }
+          env.usage = preview;
         }
+        usage.days = { ...usage.days, [today]: day };
       }
       usage.lastSampleAt = iso(now);
     }

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AdminHeader } from "@/components/admin-header";
-import type { Environment, EnvironmentStatus, Overview } from "@/lib/types";
+import type { Environment, EnvironmentStatus, Overview, UsageDay, UsageMonth } from "@/lib/types";
 
 const TRANSITIONAL = new Set<EnvironmentStatus>(["provisioning", "updating", "destroying"]);
 const LIVE = new Set<EnvironmentStatus>(["provisioning", "ready", "updating", "destroying"]);
@@ -16,6 +16,7 @@ function EnvironmentCard({
   now,
   demo,
   buildsCode,
+  costPerHour,
   onCopy,
 }: {
   env: Environment;
@@ -25,6 +26,7 @@ function EnvironmentCard({
   demo: boolean;
   /** True when this Mayfly builds each pull request's own Dockerfile (Docker runtime), not the placeholder app. */
   buildsCode: boolean;
+  costPerHour: number;
   onCopy: () => void;
 }) {
   if (env.status === "destroyed") {
@@ -116,6 +118,7 @@ function EnvironmentCard({
           <p className="url url-empty" aria-hidden="true" />
         )}
         {env.status === "failed" && env.error ? <pre className="fail-box">{env.error}</pre> : null}
+        <p className="card-usage">{formatPreviewUsage(env, costPerHour, demo)}</p>
       </div>
       <footer className="card-foot">
         {showOpen ? (
@@ -339,6 +342,110 @@ function formatContainerHours(seconds: number) {
   return hours.toFixed(2);
 }
 
+function formatUsageHours(seconds: number) {
+  const hours = seconds / 3600;
+  if (hours < 0.05) return hours.toFixed(2);
+  if (hours < 10) return hours.toFixed(1);
+  return hours.toFixed(0);
+}
+
+function estimatedCost(seconds: number, costPerHour: number) {
+  return (seconds / 3600) * costPerHour;
+}
+
+function formatPreviewUsage(env: Environment, costPerHour: number, demo: boolean) {
+  if (demo) return "—";
+  if (!env.usage) return "—";
+  const awake = env.usage.awakeSeconds ?? 0;
+  const asleep = env.usage.asleepSeconds ?? 0;
+  const saved = estimatedCost(asleep, costPerHour);
+  return `Awake ${formatUsageHours(awake)} h · Asleep ${formatUsageHours(asleep)} h · Est. saved $${formatMoney(saved)}`;
+}
+
+function last14DayKeys(now = Date.now()) {
+  const keys: string[] = [];
+  for (let i = 13; i >= 0; i -= 1) {
+    keys.push(new Date(now - i * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+  }
+  return keys;
+}
+
+function dayTotals(days: Record<string, UsageDay> | undefined, key: string): UsageDay {
+  const day = days?.[key];
+  return {
+    awakeSeconds: day?.awakeSeconds ?? 0,
+    asleepSeconds: day?.asleepSeconds ?? 0,
+  };
+}
+
+function CostDayChart({
+  usage,
+  costPerHour,
+}: {
+  usage: UsageMonth | undefined;
+  costPerHour: number;
+}) {
+  const keys = last14DayKeys();
+  const points = keys.map((key) => {
+    const day = dayTotals(usage?.days, key);
+    const always = estimatedCost(day.awakeSeconds + day.asleepSeconds, costPerHour);
+    const actual = estimatedCost(day.awakeSeconds, costPerHour);
+    return { key, always, actual, label: key.slice(5) };
+  });
+  const max = Math.max(0.01, ...points.map((p) => p.always));
+  const width = 280;
+  const height = 88;
+  const pad = 4;
+  const gap = 3;
+  const barSlot = (width - pad * 2) / points.length;
+  const barWidth = Math.max(3, (barSlot - gap) / 2);
+
+  return (
+    <figure className="cost-chart" aria-label="Estimated daily cost, last 14 days">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-hidden="true">
+        {points.map((point, index) => {
+          const x = pad + index * barSlot;
+          const alwaysH = Math.max(point.always > 0 ? 2 : 0, (point.always / max) * (height - 18));
+          const actualH = Math.max(point.actual > 0 ? 2 : 0, (point.actual / max) * (height - 18));
+          return (
+            <g key={point.key}>
+              <rect
+                className="cost-bar cost-bar-always"
+                x={x}
+                y={height - 14 - alwaysH}
+                width={barWidth}
+                height={alwaysH}
+                rx="1.5"
+              />
+              <rect
+                className="cost-bar cost-bar-actual"
+                x={x + barWidth + 1}
+                y={height - 14 - actualH}
+                width={barWidth}
+                height={actualH}
+                rx="1.5"
+              />
+              {index % 2 === 0 || index === points.length - 1 ? (
+                <text className="cost-chart-label" x={x + barSlot / 2 - 1} y={height - 2} textAnchor="middle">
+                  {point.label}
+                </text>
+              ) : null}
+            </g>
+          );
+        })}
+      </svg>
+      <figcaption className="cost-chart-legend">
+        <span>
+          <i className="cost-swatch cost-swatch-always" aria-hidden="true" /> If always awake
+        </span>
+        <span>
+          <i className="cost-swatch cost-swatch-actual" aria-hidden="true" /> Estimated actual
+        </span>
+      </figcaption>
+    </figure>
+  );
+}
+
 function formatDurationMs(ms: number) {
   if (!Number.isFinite(ms) || ms < 0) return "–";
   if (ms < 1000) return `${(ms / 1000).toFixed(1)} s`;
@@ -471,12 +578,12 @@ export function Dashboard() {
       ) : null}
       <AdminHeader />
 
-      <section className="savings-hero" aria-label="Savings this month">
+      <section className="savings-hero" aria-label="Estimated savings this month">
         <p className="savings-figure">
           {overview ? (
             <>
               {formatSaved(overview.savedEstimate)}
-              <span> saved this month</span>
+              <span> estimated saved this month</span>
             </>
           ) : (
             "–"
@@ -484,9 +591,12 @@ export function Dashboard() {
         </p>
         <p className="savings-sub">
           {overview
-            ? `${formatContainerHours(overview.usage?.asleepSeconds ?? 0)} container-hours asleep · estimate at $${formatMoney(overview.costPerHour ?? 0.05)} per container-hour`
+            ? `Awake ${formatContainerHours(overview.usage?.awakeSeconds ?? 0)} h · Asleep ${formatContainerHours(overview.usage?.asleepSeconds ?? 0)} h · at $${formatMoney(overview.costPerHour ?? 0.05)}/h estimated`
             : "Waiting for the first reaper sample…"}
         </p>
+        {overview ? (
+          <CostDayChart usage={overview.usage} costPerHour={overview.costPerHour ?? 0.05} />
+        ) : null}
       </section>
 
       <p className="board-settings">
@@ -580,6 +690,7 @@ export function Dashboard() {
                 now={now}
                 demo={demoKey === `${env.repository}#${env.prNumber}`}
                 buildsCode={dockerRuntime}
+                costPerHour={overview?.costPerHour ?? 0.05}
                 onCopy={() => void copyUrl(env.id, env.url ?? previewPath(""))}
               />
             ))}
@@ -655,6 +766,7 @@ export function Dashboard() {
                   now={now}
                   demo={config?.demo === `${env.repository}#${env.prNumber}`}
                   buildsCode={dockerRuntime}
+                  costPerHour={overview?.costPerHour ?? 0.05}
                   onCopy={() => void copyUrl(env.id, env.url ?? previewPath(""))}
                 />
               ))}
