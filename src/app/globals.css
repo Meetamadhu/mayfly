@@ -3354,3 +3354,15 @@ html:not([data-theme="dark"]) .board-mark {
 @media (max-width: 700px) {
   .board-app .live-column { padding: 0.85rem; }
 }
+
+/* Desktop: the sidebar fills the screen height and stays put while the board scrolls,
+   so the cube card sits at the bottom of the visible window, not the bottom of the page. */
+@media (min-width: 901px) {
+  .board-sidebar {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100vh;
+    overflow-y: auto;
+  }
+}
