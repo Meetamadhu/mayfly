@@ -124,8 +124,13 @@ function formatAwakeUntil(iso: string) {
   return new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
-function webhookMode(mode: Overview["config"]["webhookVerification"]) {
-  return mode === "signed" ? "Signed" : "Open in development";
+function isLocalPreviewBase(url: string) {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return host === "localhost" || host === "127.0.0.1" || host === "::1" || host.endsWith(".localhost");
+  } catch {
+    return /localhost|127\.0\.0\.1/i.test(url);
+  }
 }
 
 type Activity = { at: string; repository: string; prNumber: number; text: string };
@@ -701,32 +706,55 @@ export function AdminPanel() {
           </article>
         </details>
 
-        <section className="panel" aria-label="Settings">
-          <h2>Settings</h2>
-          <dl className="settings">
+        <section className="panel config-check" aria-label="Configuration check">
+          <h2>Configuration check</h2>
+          <p className="help">
+            Only the knobs that are not already on the dashboard — webhook security and the URL used for
+            preview links.
+          </p>
+          <dl className="settings config-check-list">
             <div>
-              <dt>Sleep seconds</dt>
-              <dd>{config ? config.sleepSeconds : "–"}</dd>
-            </div>
-            <div>
-              <dt>Lifetime</dt>
-              <dd>{config ? formatLifetime(config.ttlHours) : "–"}</dd>
-            </div>
-            <div>
-              <dt>Max previews</dt>
-              <dd>{config ? config.maxConcurrent : "–"}</dd>
+              <dt>Webhook mode</dt>
+              <dd>
+                {config ? (
+                  config.webhookVerification === "signed" ? (
+                    <span className="config-status" data-tone="ok">
+                      Signed
+                    </span>
+                  ) : (
+                    <span className="config-status" data-tone="bad">
+                      Unsigned — anyone can send PR events
+                    </span>
+                  )
+                ) : (
+                  "–"
+                )}
+              </dd>
             </div>
             <div>
               <dt>Base URL</dt>
-              <dd className="mono">{config?.previewBaseUrl ?? "–"}</dd>
-            </div>
-            <div>
-              <dt>Webhook mode</dt>
-              <dd>{config ? webhookMode(config.webhookVerification) : "–"}</dd>
+              <dd>
+                {config ? (
+                  <>
+                    <span className="mono config-base-url">{config.previewBaseUrl}</span>
+                    {isLocalPreviewBase(config.previewBaseUrl) ? (
+                      <span className="config-status" data-tone="warn">
+                        Still localhost — preview links and PR comments will point here, not a public URL
+                      </span>
+                    ) : null}
+                  </>
+                ) : (
+                  "–"
+                )}
+              </dd>
             </div>
           </dl>
           {config ? (
-            <p className="help">{config.onRender ? "Change these in Render → Environment" : "Change these in .env.local"}</p>
+            <p className="help">
+              {config.onRender
+                ? "Change GITHUB_WEBHOOK_SECRET and PREVIEW_BASE_URL in Render → Environment."
+                : "Change GITHUB_WEBHOOK_SECRET and PREVIEW_BASE_URL in .env.local."}
+            </p>
           ) : null}
         </section>
       </div>
