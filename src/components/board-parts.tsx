@@ -18,6 +18,7 @@ export const FAST_POLL_MS = 500;
 export const LIVE_POLL_MS = 5000;
 
 export type CardState = "running" | "sleeping" | "building" | "failed" | "destroying";
+export type StatIconName = "live" | "running" | "sleeping" | "building" | "savings";
 
 export function cardState(env: Environment): CardState {
   if (env.status === "failed") return "failed";
@@ -40,6 +41,13 @@ export function statePillLabel(state: CardState) {
     case "destroying":
       return "Destroying";
   }
+}
+
+function statePillIcon(state: CardState): StatIconName | null {
+  if (state === "running") return "running";
+  if (state === "sleeping") return "sleeping";
+  if (state === "building") return "building";
+  return null;
 }
 
 export function EnvironmentCard({
@@ -79,6 +87,7 @@ export function EnvironmentCard({
   }
 
   const state = cardState(env);
+  const pillIcon = statePillIcon(state);
   const href = previewHref(env.url);
   const canOpen = Boolean(href) && state !== "building" && state !== "destroying";
 
@@ -93,6 +102,7 @@ export function EnvironmentCard({
           <p className="card-repo">{env.repository}</p>
         </div>
         <span className="state-pill" data-state={state}>
+          {pillIcon ? <StatIcon name={pillIcon} /> : null}
           {statePillLabel(state)}
         </span>
       </header>
@@ -203,6 +213,62 @@ export function EnvironmentCard({
         ) : null}
       </footer>
     </article>
+  );
+}
+
+/** Icons for the dashboard metric tiles (Live / Running / Sleeping / Building). */
+export function StatIcon({ name }: { name: StatIconName }) {
+  const props = {
+    width: 18,
+    height: 18,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.9,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true as const,
+  };
+  if (name === "live") {
+    return (
+      <svg {...props}>
+        <path d="M12 3 4 7.5v9L12 21l8-4.5v-9L12 3z" />
+        <path d="M12 12 4 7.5M12 12l8-4.5M12 12v9" />
+      </svg>
+    );
+  }
+  if (name === "running") {
+    return (
+      <svg {...props}>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M10 8.5v7l6-3.5-6-3.5z" fill="currentColor" stroke="none" />
+      </svg>
+    );
+  }
+  if (name === "sleeping") {
+    return (
+      <svg {...props}>
+        <path d="M21 14.5A8.5 8.5 0 1 1 9.5 3a7 7 0 0 0 11.5 11.5z" />
+        <path d="M16.2 5.2h2.2l-2.2 2.4h2.4M18.6 2.6h1.5l-1.5 1.6h1.6" />
+      </svg>
+    );
+  }
+  if (name === "building") {
+    return (
+      <svg {...props}>
+        <path d="m15 5 4 4-9.5 9.5H5.5v-4L15 5z" />
+        <path d="m13.5 6.5 4 4" />
+        <path d="M5 19.5h5" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...props}>
+      <ellipse cx="12" cy="7" rx="6" ry="2.4" />
+      <path d="M6 7v3c0 1.3 2.7 2.4 6 2.4s6-1.1 6-2.4V7" />
+      <path d="M6 10v3c0 1.3 2.7 2.4 6 2.4s6-1.1 6-2.4v-3" />
+      <path d="M6 13v3c0 1.3 2.7 2.4 6 2.4s6-1.1 6-2.4v-3" />
+    </svg>
   );
 }
 
@@ -777,6 +843,7 @@ export function LifecycleDrawer({
           </header>
           <p className="lifecycle-state">
             <span className="state-pill" data-state={state}>
+              {statePillIcon(state) ? <StatIcon name={statePillIcon(state)!} /> : null}
               {statePillLabel(state)}
             </span>
             <span className="mono">{env.sha.slice(0, 8)}</span>

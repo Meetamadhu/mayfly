@@ -532,6 +532,50 @@ html[data-theme="dark"] .cost-swatch-actual {
   border-color: color-mix(in srgb, var(--mint) 28%, var(--line));
 }
 
+.stats .stat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.stats .stat-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  flex: none;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--mint) 16%, transparent);
+  color: var(--mint);
+}
+
+.stats > div[data-stat="live"] .stat-icon {
+  background: color-mix(in srgb, #8b7cf6 18%, transparent);
+  color: #7c6cf0;
+}
+
+.stats > div[data-stat="awake"] .stat-icon {
+  background: var(--awake-bg);
+  color: var(--awake);
+}
+
+.stats > div[data-stat="asleep"] .stat-icon {
+  background: var(--asleep-bg);
+  color: var(--asleep);
+}
+
+.stats > div[data-stat="building"] .stat-icon {
+  background: var(--building-bg);
+  color: var(--building);
+}
+
+.stats > div[data-stat="savings"] .stat-icon {
+  background: var(--mint-bg);
+  color: var(--mint);
+}
+
 .stats dt {
   color: var(--muted);
   font-size: 0.72rem;
@@ -2896,6 +2940,9 @@ html:not([data-theme="dark"]) .board-mark {
 }
 
 .state-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
   flex: none;
   padding: 0.25rem 0.55rem;
   border-radius: 999px;
@@ -2903,6 +2950,12 @@ html:not([data-theme="dark"]) .board-mark {
   font-weight: 650;
   letter-spacing: 0.02em;
   text-transform: uppercase;
+}
+
+.state-pill svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  flex: none;
 }
 
 .state-pill[data-state="running"] { background: var(--awake-bg); color: var(--awake); }
