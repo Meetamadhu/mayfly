@@ -7,6 +7,7 @@ import {
   EnvironmentCard,
   LifecycleDrawer,
   StateIcon,
+  StatIcon,
   boardRecentActivity,
   estimatedCost,
   formatAgo,
@@ -141,7 +142,12 @@ export function Dashboard() {
 
       <dl className="stats board-stats">
         <div data-stat="live">
-          <dt>Live</dt>
+          <div className="stat-head">
+            <dt>Live</dt>
+            <span className="stat-icon" aria-hidden="true">
+              <StatIcon name="live" />
+            </span>
+          </div>
           <dd>
             {overview ? liveCount : "–"}
             <span>/{capacity || "–"}</span>
@@ -151,19 +157,39 @@ export function Dashboard() {
           </div>
         </div>
         <div data-stat="awake">
-          <dt>Running</dt>
+          <div className="stat-head">
+            <dt>Running</dt>
+            <span className="stat-icon" aria-hidden="true">
+              <StatIcon name="running" />
+            </span>
+          </div>
           <dd>{overview?.summary.awake ?? "–"}</dd>
         </div>
         <div data-stat="asleep">
-          <dt>Sleeping</dt>
+          <div className="stat-head">
+            <dt>Sleeping</dt>
+            <span className="stat-icon" aria-hidden="true">
+              <StatIcon name="sleeping" />
+            </span>
+          </div>
           <dd>{overview?.summary.asleep ?? "–"}</dd>
         </div>
         <div data-stat="building">
-          <dt>Building</dt>
+          <div className="stat-head">
+            <dt>Building</dt>
+            <span className="stat-icon" aria-hidden="true">
+              <StatIcon name="building" />
+            </span>
+          </div>
           <dd>{overview ? buildingCount : "–"}</dd>
         </div>
         <div data-stat="savings">
-          <dt>Estimated</dt>
+          <div className="stat-head">
+            <dt>Estimated</dt>
+            <span className="stat-icon" aria-hidden="true">
+              <StatIcon name="savings" />
+            </span>
+          </div>
           <dd>{overview ? formatSaved(overview.savedEstimate, currency) : "–"}</dd>
         </div>
       </dl>
