@@ -3366,3 +3366,124 @@ html:not([data-theme="dark"]) .board-mark {
     overflow-y: auto;
   }
 }
+
+/* ---- Separate pages (Dashboard, Activity, Cost & savings, Admin) in one shell ---- */
+
+.board-side-nav a {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
+.board-side-nav a svg { flex-shrink: 0; opacity: 0.85; }
+.board-side-nav a[aria-current="page"] {
+  font-weight: 650;
+  box-shadow: inset 3px 0 0 var(--mint);
+}
+.board-side-nav a[aria-current="page"] svg { opacity: 1; color: var(--mint); }
+
+.board-rail-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.board-rail-head .board-rail-title { margin: 0; }
+
+.board-rail-link {
+  color: var(--mint);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.board-rail-link:hover { text-decoration: underline; }
+
+.board-rail-note {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.page-stats { grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); }
+
+.board-content .page-panel { margin-bottom: 1rem; }
+
+.cost-chart-panel .cost-line-chart { max-width: 520px; }
+
+.activity-day + .activity-day { margin-top: 1.1rem; }
+
+.activity-day-title {
+  margin: 0.9rem 0 0.5rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.activity-log li { padding: 0.55rem 0.7rem; }
+.activity-log .board-activity-text { white-space: normal; }
+
+.activity-subject {
+  padding: 0;
+  min-height: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 650;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--mint) 60%, transparent);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.activity-subject:hover { color: var(--mint); }
+
+.activity-note { margin: 1rem 0 0; }
+
+.cost-table-wrap { overflow-x: auto; }
+
+.cost-table {
+  width: 100%;
+  min-width: 540px;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.cost-table th,
+.cost-table td {
+  padding: 0.7rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.cost-table thead th {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.cost-table tbody th { font-weight: 600; }
+.cost-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.cost-table-sub {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 400;
+}
+
+.cost-table-removed { color: var(--muted); font-size: 0.82rem; }
+
+.admin-in-shell { min-width: 0; }
+.admin-in-shell .login-card { max-width: 32rem; }

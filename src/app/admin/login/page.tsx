@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { AdminHeader } from "@/components/admin-header";
+import { AppShell } from "@/components/app-shell";
 
 export default function AdminLoginPage() {
   const [token, setToken] = useState("");
@@ -33,8 +33,8 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <main className="shell admin-panel">
-      <AdminHeader />
+    <AppShell active="admin">
+      <div className="admin-panel admin-in-shell">
       <section className="panel login-card" aria-label="Admin sign in">
         <h1>Admin sign-in</h1>
         <p className="help login-lede">Admins only. Ask the project owner for the token.</p>
@@ -67,8 +67,9 @@ export default function AdminLoginPage() {
         {wrong ? <p className="error" role="alert">Wrong token</p> : null}
       </section>
       <p className="login-back">
-        <a href="/board">Back to board</a>
+        <a href="/board">Back to dashboard</a>
       </p>
-    </main>
+      </div>
+    </AppShell>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AdminHeader } from "@/components/admin-header";
+import { AppShell } from "@/components/app-shell";
 import type { Environment, EnvironmentStatus, Overview } from "@/lib/types";
 import { timelineLabel, timelineNewestFirst } from "@/lib/timeline";
 
@@ -408,8 +408,14 @@ export function AdminPanel() {
   const activity = overview ? recentActivity(overview.environments) : [];
 
   return (
-    <main className="shell admin-panel">
-      <AdminHeader onSignOut={() => void signOut()} />
+    <AppShell active="admin" githubConnected={Boolean(config?.githubConnected)} onSignOut={signOut}>
+      <div className="admin-panel admin-in-shell">
+      <section className="board-welcome">
+        <div>
+          <h1>Admin</h1>
+          <p className="lede">Open, update, sleep and remove previews, and try pull request events with the simulator.</p>
+        </div>
+      </section>
 
       <section className="panel" aria-label="Previews">
         <div className="ledger-head">
@@ -750,6 +756,7 @@ export function AdminPanel() {
           })}
         </ol>
       </section>
-    </main>
+      </div>
+    </AppShell>
   );
 }
