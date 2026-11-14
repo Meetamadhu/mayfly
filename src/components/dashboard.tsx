@@ -142,12 +142,12 @@ export function Dashboard() {
 
       <dl className="stats board-stats">
         <div data-stat="live">
-          <div className="stat-head">
-            <dt>Live</dt>
+          <dt className="stat-head">
+            <span>Live</span>
             <span className="stat-icon" aria-hidden="true">
               <StatIcon name="live" />
             </span>
-          </div>
+          </dt>
           <dd>
             {overview ? liveCount : "–"}
             <span>/{capacity || "–"}</span>
@@ -157,39 +157,39 @@ export function Dashboard() {
           </div>
         </div>
         <div data-stat="awake">
-          <div className="stat-head">
-            <dt>Running</dt>
+          <dt className="stat-head">
+            <span>Running</span>
             <span className="stat-icon" aria-hidden="true">
               <StatIcon name="running" />
             </span>
-          </div>
+          </dt>
           <dd>{overview?.summary.awake ?? "–"}</dd>
         </div>
         <div data-stat="asleep">
-          <div className="stat-head">
-            <dt>Sleeping</dt>
+          <dt className="stat-head">
+            <span>Sleeping</span>
             <span className="stat-icon" aria-hidden="true">
               <StatIcon name="sleeping" />
             </span>
-          </div>
+          </dt>
           <dd>{overview?.summary.asleep ?? "–"}</dd>
         </div>
         <div data-stat="building">
-          <div className="stat-head">
-            <dt>Building</dt>
+          <dt className="stat-head">
+            <span>Building</span>
             <span className="stat-icon" aria-hidden="true">
               <StatIcon name="building" />
             </span>
-          </div>
+          </dt>
           <dd>{overview ? buildingCount : "–"}</dd>
         </div>
         <div data-stat="savings">
-          <div className="stat-head">
-            <dt>Estimated</dt>
+          <dt className="stat-head">
+            <span>Estimated</span>
             <span className="stat-icon" aria-hidden="true">
               <StatIcon name="savings" />
             </span>
-          </div>
+          </dt>
           <dd>{overview ? formatSaved(overview.savedEstimate, currency) : "–"}</dd>
         </div>
       </dl>
