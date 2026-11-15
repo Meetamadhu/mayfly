@@ -50,7 +50,10 @@
   --btn-pad-x: 0.85rem;
 }
 
-html[data-theme="dark"] {
+/* Dark theme. The sidebar and top bar always use these colours, in light mode too. */
+html[data-theme="dark"],
+html:not([data-theme="dark"]) .board-sidebar,
+html:not([data-theme="dark"]) .board-topbar {
   color-scheme: dark;
   /* Deep green ground / panels, mint accent */
   --bg: #0a1412;
@@ -2598,10 +2601,6 @@ html[data-theme="dark"] .activity li[data-tone="failed"] { border-left-color: #f
   color: var(--mint);
 }
 
-html:not([data-theme="dark"]) .board-mark {
-  color: #ffffff;
-}
-
 .board-wordmark {
   display: block;
   font-size: 1.25rem;
@@ -3567,3 +3566,9 @@ html:not([data-theme="dark"]) .board-mark {
 
 .board-env-head h2 { margin: 0; white-space: nowrap; }
 .board-env-head .board-view-toggle { margin-left: auto; }
+
+/* Light mode: the top bar is see-through, so the light page made it paler than in dark mode.
+   Give it the same solid shade it shows over the dark page. */
+html:not([data-theme="dark"]) .board-topbar {
+  background: color-mix(in srgb, var(--surface) 88%, #0a1412);
+}
