@@ -3553,3 +3553,17 @@ html:not([data-theme="dark"]) .board-mark {
 
 /* Dashboard "Show all": previews take the full width while the side cards are hidden. */
 .board-workspace[data-expanded="true"] { grid-template-columns: minmax(0, 1fr); }
+
+/* Active environments: heading, filters and Grid/List on one line (wraps on narrow screens). */
+.board-env-head {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 0.5rem 0.75rem;
+}
+
+.board-env-head .board-filter-pills { gap: 0.3rem; }
+.board-env-head .board-filter-pill { padding-inline: 0.7rem; }
+.board-env-head .board-view-toggle button { min-height: 34px; padding: 0 0.6rem; }
+
+.board-env-head h2 { margin: 0; white-space: nowrap; }
+.board-env-head .board-view-toggle { margin-left: auto; }
