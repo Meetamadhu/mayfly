@@ -3550,3 +3550,6 @@ html:not([data-theme="dark"]) .board-mark {
   margin-top: 0.85rem;
   min-height: 44px;
 }
+
+/* Dashboard "Show all": previews take the full width while the side cards are hidden. */
+.board-workspace[data-expanded="true"] { grid-template-columns: minmax(0, 1fr); }
