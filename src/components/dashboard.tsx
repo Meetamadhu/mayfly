@@ -100,6 +100,8 @@ export function Dashboard() {
   const narrowing = boardFilter !== "all" || boardQuery.trim() !== "";
   const shown = showAllCards || narrowing ? visible : visible.slice(0, DASHBOARD_PREVIEW_LIMIT);
   const hiddenCount = visible.length - shown.length;
+  // "Show all" gives the previews the whole width: the Cost & Usage and Recent activity cards step aside.
+  const expanded = showAllCards && !narrowing && visible.length > DASHBOARD_PREVIEW_LIMIT;
   const removed = overview?.environments.filter((env) => env.status === "destroyed") ?? [];
   const dockerRuntime = config?.allowedRepositories != null;
   const liveCount = overview?.summary.live ?? 0;
@@ -206,7 +208,7 @@ export function Dashboard() {
           : "Sleeps after – · Max lifetime –"}
       </p>
 
-      <div className="board-workspace">
+      <div className="board-workspace" data-expanded={expanded ? "true" : "false"}>
         <section className="live-column">
           <div className="ledger-head">
             <div>
@@ -358,6 +360,7 @@ export function Dashboard() {
           {error ? <p className="error" role="alert">{error}</p> : null}
         </section>
 
+        {expanded ? null : (
         <aside className="board-rail">
           <section className="board-rail-card" aria-label="Estimated cost and usage">
             <div className="board-rail-head">
@@ -400,6 +403,7 @@ export function Dashboard() {
             )}
           </section>
         </aside>
+        )}
       </div>
 
       {config?.deployer === "fake" ? (
