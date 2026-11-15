@@ -210,22 +210,8 @@ export function Dashboard() {
 
       <div className="board-workspace" data-expanded={expanded ? "true" : "false"}>
         <section className="live-column">
-          <div className="ledger-head">
-            <div>
-              <h2>Active environments</h2>
-              <p className="help">Live previews, running or asleep.</p>
-            </div>
-            <div className="board-view-toggle" role="group" aria-label="Card layout">
-              <button type="button" aria-pressed={cardView === "grid"} onClick={() => chooseCardView("grid")}>
-                Grid
-              </button>
-              <button type="button" aria-pressed={cardView === "list"} onClick={() => chooseCardView("list")}>
-                List
-              </button>
-            </div>
-          </div>
-
-          <div className="board-filters">
+          <div className="ledger-head board-env-head">
+            <h2>Active environments</h2>
             <div className="board-filter-pills" role="group" aria-label="Filter previews">
               {(
                 [
@@ -245,6 +231,14 @@ export function Dashboard() {
                   {label}
                 </button>
               ))}
+            </div>
+            <div className="board-view-toggle" role="group" aria-label="Card layout">
+              <button type="button" aria-pressed={cardView === "grid"} onClick={() => chooseCardView("grid")}>
+                Grid
+              </button>
+              <button type="button" aria-pressed={cardView === "list"} onClick={() => chooseCardView("list")}>
+                List
+              </button>
             </div>
           </div>
 
