@@ -3540,3 +3540,13 @@ html:not([data-theme="dark"]) .board-mark {
 
 .admin-in-shell { min-width: 0; }
 .admin-in-shell .login-card { max-width: 32rem; }
+
+/* Dashboard: "Show all N previews" under the first two cards. */
+.board-show-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  align-self: flex-start;
+  margin-top: 0.85rem;
+  min-height: 44px;
+}
