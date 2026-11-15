@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import {
-  CostUsageChart,
   EnvironmentCard,
   LifecycleDrawer,
   StateIcon,
@@ -25,6 +24,8 @@ import {
 import type { Environment } from "@/lib/types";
 import { useOverview } from "@/lib/use-overview";
 
+const DASHBOARD_PREVIEW_LIMIT = 2;
+
 export function Dashboard() {
   const { overview, loadError, polledAt, now, reload } = useOverview();
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +36,7 @@ export function Dashboard() {
   const [cardView, setCardView] = useState<"grid" | "list">("grid");
   const [busy, setBusy] = useState(false);
   const [lifecycleId, setLifecycleId] = useState<string | null>(null);
+  const [showAllCards, setShowAllCards] = useState(false);
 
   useEffect(() => {
     setCardView(readStoredView());
@@ -94,6 +96,10 @@ export function Dashboard() {
   const visible = current.filter(
     (env) => matchesBoardFilter(env, boardFilter, now, demoKey) && matchesBoardSearch(env, boardQuery),
   );
+  // The Dashboard shows two previews; the rest sit behind "Show all". Searching or filtering shows every match.
+  const narrowing = boardFilter !== "all" || boardQuery.trim() !== "";
+  const shown = showAllCards || narrowing ? visible : visible.slice(0, DASHBOARD_PREVIEW_LIMIT);
+  const hiddenCount = visible.length - shown.length;
   const removed = overview?.environments.filter((env) => env.status === "destroyed") ?? [];
   const dockerRuntime = config?.allowedRepositories != null;
   const liveCount = overview?.summary.live ?? 0;
@@ -250,7 +256,7 @@ export function Dashboard() {
             {overview && current.length > 0 && visible.length === 0 ? (
               <p className="empty">No previews match this filter.</p>
             ) : null}
-            {visible.map((env) => (
+            {shown.map((env) => (
               <EnvironmentCard
                 key={env.id}
                 env={env}
@@ -263,6 +269,18 @@ export function Dashboard() {
               />
             ))}
           </div>
+
+          {hiddenCount > 0 || (showAllCards && !narrowing && visible.length > DASHBOARD_PREVIEW_LIMIT) ? (
+            <button
+              type="button"
+              className="secondary board-show-all"
+              aria-expanded={showAllCards}
+              onClick={() => setShowAllCards((open) => !open)}
+            >
+              {showAllCards ? "Show fewer" : `Show all ${visible.length} previews`}
+              <span aria-hidden="true">{showAllCards ? "↑" : "↓"}</span>
+            </button>
+          ) : null}
 
           <div className="board-toolbar">
             <div className="board-toolbar-main">
@@ -353,9 +371,6 @@ export function Dashboard() {
                 ? `Estimated always awake ${formatEstMoney(alwaysAwakeEstimate, currency)} · Estimated with Mayfly ${formatEstMoney(withMayflyEstimate, currency)}`
                 : "Waiting for the first reaper sample…"}
             </p>
-            {overview ? (
-              <CostUsageChart usage={overview.usage} costPerHour={costPerHour} currency={currency} />
-            ) : null}
           </section>
 
           <section className="board-rail-card board-activity" aria-label="Recent activity">
