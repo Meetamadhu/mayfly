@@ -193,6 +193,7 @@ export function AdminPanel() {
   const repositoryEdited = useRef(false);
   const [ttlMinutes, setTtlMinutes] = useState("");
   const [extendHours, setExtendHours] = useState("4");
+  const [keepAwakeHours, setKeepAwakeHours] = useState<1 | 4 | 8>(1);
   const [now, setNow] = useState(() => Date.now());
   const defaultTtlLabel = overview ? formatLifetime(overview.config.ttlHours) : "server default";
 
@@ -512,38 +513,29 @@ export function AdminPanel() {
                       <button type="button" className="secondary" disabled={busy || !canSleep} onClick={() => void sleepNow(env.id)}>
                         Sleep now
                       </button>
+                      <select
+                        aria-label="Keep awake for"
+                        value={keepAwakeHours}
+                        disabled={busy || !canKeepAwake}
+                        onChange={(event) => setKeepAwakeHours(Number(event.target.value) as 1 | 4 | 8)}
+                      >
+                        <option value={1}>1h</option>
+                        <option value={4}>4h</option>
+                        <option value={8}>8h</option>
+                      </select>
                       <button
                         type="button"
                         className="secondary"
                         disabled={busy || !canKeepAwake}
-                        onClick={() => void keepAwake(env, 1)}
+                        onClick={() => void keepAwake(env, keepAwakeHours)}
                       >
-                        Keep awake 1 h
+                        Keep awake
                       </button>
-                      <button
-                        type="button"
-                        className="secondary"
-                        disabled={busy || !canKeepAwake}
-                        onClick={() => void keepAwake(env, 4)}
-                      >
-                        Keep awake 4 h
-                      </button>
-                      <button
-                        type="button"
-                        className="secondary"
-                        disabled={busy || !canKeepAwake}
-                        onClick={() => void keepAwake(env, 8)}
-                      >
-                        Keep awake 8 h
-                      </button>
-                      <button
-                        type="button"
-                        className="secondary"
-                        disabled={busy || !awakeUntil}
-                        onClick={() => void keepAwakeOff(env)}
-                      >
-                        Stop keeping awake
-                      </button>
+                      {awakeUntil ? (
+                        <button type="button" className="secondary" disabled={busy} onClick={() => void keepAwakeOff(env)}>
+                          Stop keeping awake
+                        </button>
+                      ) : null}
                       <select
                         aria-label="Extend by"
                         value={extendHours}
