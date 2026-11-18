@@ -5,13 +5,14 @@ import { MayflyMark } from "@/components/admin-header";
 import { PromoArt } from "@/components/board-parts";
 import { ThemeToggle } from "@/components/theme-toggle";
 
-export type AppPage = "dashboard" | "activity" | "cost" | "policies" | "admin";
+export type AppPage = "dashboard" | "activity" | "cost" | "policies" | "comments" | "admin";
 
 const NAV: { id: AppPage; href: string; label: string }[] = [
   { id: "dashboard", href: "/board", label: "Dashboard" },
   { id: "activity", href: "/activity", label: "Activity" },
   { id: "cost", href: "/cost", label: "Cost & savings" },
   { id: "policies", href: "/policies", label: "TTL policies" },
+  { id: "comments", href: "/pr-comments", label: "PR comments" },
   { id: "admin", href: "/admin", label: "Admin" },
 ];
 
@@ -58,6 +59,13 @@ function NavIcon({ page }: { page: AppPage }) {
           <path d="M7.5 3v3.5c0 2 4.5 3.5 4.5 5.5s-4.5 3.5-4.5 5.5V21M16.5 3v3.5c0 2-4.5 3.5-4.5 5.5s4.5 3.5 4.5 5.5V21" />
         </svg>
       );
+    case "comments":
+      return (
+        <svg {...common}>
+          <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 4v-4h0A1.5 1.5 0 0 1 4 14.5z" />
+          <path d="M8 9h8M8 12h5" />
+        </svg>
+      );
     case "admin":
       return (
         <svg {...common}>
@@ -69,7 +77,7 @@ function NavIcon({ page }: { page: AppPage }) {
 }
 
 /**
- * The one sidebar + top bar every Mayfly screen shares (Dashboard, Activity, Cost & savings, TTL policies, Admin).
+ * The one sidebar + top bar every Mayfly screen shares (Dashboard, Activity, Cost & savings, TTL policies, PR comments, Admin).
  *
  * `search`: pages that can filter pass a controlled search; elsewhere the box searches the Dashboard
  * (submitting goes to /board?q=…).

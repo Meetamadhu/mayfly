@@ -23,7 +23,7 @@ export default function AdminLoginPage() {
       if (response.ok) {
         // Only known pages, so the link can't send someone elsewhere after signing in.
         const next = new URLSearchParams(window.location.search).get("next");
-        window.location.assign(next === "/policies" ? "/policies" : "/admin");
+        window.location.assign(next === "/policies" || next === "/pr-comments" ? next : "/admin");
         return;
       }
       setWrong(true);
