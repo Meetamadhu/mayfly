@@ -11,6 +11,13 @@ import {
   formatSaved,
   statePillLabel,
 } from "@/components/board-parts";
+import {
+  FLEET_WINDOW_DAYS,
+  REMOVAL_LABELS,
+  REMOVAL_ORDER,
+  fleetStats,
+  formatLifespan,
+} from "@/lib/fleet";
 import type { Environment } from "@/lib/types";
 import { useOverview } from "@/lib/use-overview";
 
@@ -64,6 +71,15 @@ export function CostPage() {
       };
     })
     .sort((a, b) => b.saved - a.saved);
+  const fleet = overview
+    ? fleetStats(overview.environments, { now: Date.now(), costPerHour, isDemo })
+    : null;
+  const removalRows = fleet
+    ? REMOVAL_ORDER.filter((reason) => (fleet.reasons[reason] ?? 0) > 0).map((reason) => ({
+        reason,
+        count: fleet.reasons[reason] ?? 0,
+      }))
+    : [];
   const lifecycleEnv = lifecycleId ? (overview?.environments.find((env) => env.id === lifecycleId) ?? null) : null;
 
   return (
@@ -115,6 +131,83 @@ export function CostPage() {
           <span className="board-rail-note">Estimated · always awake vs with Mayfly</span>
         </div>
         {overview ? <CostUsageChart usage={overview.usage} costPerHour={costPerHour} currency={currency} /> : null}
+      </section>
+
+      <section className="board-rail-card page-panel fleet-panel" aria-labelledby="fleet-title">
+        <div className="board-rail-head">
+          <h2 className="board-rail-title" id="fleet-title">
+            Fleet
+          </h2>
+          <span className="board-rail-note">Last {FLEET_WINDOW_DAYS} days · from Mayfly&apos;s own records (demo not counted)</span>
+        </div>
+        {fleet ? (
+          <>
+            <dl className="fleet-grid">
+              <div>
+                <dt>Cost per hour right now</dt>
+                <dd>
+                  {formatEstMoney(fleet.burnPerHour, currency)}
+                  <span className="fleet-unit">/h est.</span>
+                </dd>
+                <p className="fleet-sub">
+                  {fleet.awakeNow} awake · {fleet.asleepNow} asleep (asleep costs nothing)
+                </p>
+              </div>
+              <div>
+                <dt>Average lifespan</dt>
+                <dd>{fleet.averageLifespanMs === null ? "–" : formatLifespan(fleet.averageLifespanMs)}</dd>
+                <p className="fleet-sub">
+                  {fleet.lifespanCount === 0
+                    ? "No working preview was removed yet."
+                    : `Median ${formatLifespan(fleet.medianLifespanMs ?? 0)} · ${fleet.lifespanCount} removed preview${fleet.lifespanCount === 1 ? "" : "s"}, failed builds left out`}
+                </p>
+              </div>
+              <div>
+                <dt>Previews opened</dt>
+                <dd>{fleet.created}</dd>
+                <p className="fleet-sub">
+                  {fleet.peak > 0 && fleet.peakAt
+                    ? `Most at once: ${fleet.peak}, on ${new Date(fleet.peakAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`
+                    : "None running in this period."}
+                </p>
+              </div>
+              <div>
+                <dt>Removed automatically</dt>
+                <dd>{fleet.automaticShare === null ? "–" : `${Math.round(fleet.automaticShare * 100)}%`}</dd>
+                <p className="fleet-sub">
+                  {fleet.removed === 0
+                    ? "Nothing removed in this period."
+                    : `${fleet.removed - (fleet.reasons.manual ?? 0)} of ${fleet.removed} removals needed no one`}
+                </p>
+              </div>
+            </dl>
+            {removalRows.length > 0 ? (
+              <div className="fleet-reasons">
+                <p className="fleet-reasons-title">Why previews were removed</p>
+                <div className="fleet-bar" aria-hidden="true">
+                  {removalRows.map((row) => (
+                    <span
+                      key={row.reason}
+                      data-reason={row.reason}
+                      style={{ flexGrow: row.count }}
+                      title={`${REMOVAL_LABELS[row.reason]}: ${row.count}`}
+                    />
+                  ))}
+                </div>
+                <ul className="fleet-legend">
+                  {removalRows.map((row) => (
+                    <li key={row.reason}>
+                      <span className="fleet-swatch" data-reason={row.reason} aria-hidden="true" />
+                      {REMOVAL_LABELS[row.reason]} <strong>{row.count}</strong>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <p className="help">Loading…</p>
+        )}
       </section>
 
       <section className="live-column page-panel" aria-label="Savings per preview">
