@@ -17,34 +17,56 @@ function formatClock(iso: string) {
 const REMOVAL_REASONS: Record<string, string> = {
   closed: "PR closed",
   merged: "PR merged",
-  expired: "lifetime ended",
+  expired: "time ran out",
   manual: "removed by an admin",
-  stuck: "stuck",
-  failed: "failed",
+  idle: "not used",
+  stuck: "build got stuck",
+  failed: "build failed",
 };
+
+const REMOVED_BECAUSE: Record<string, string> = {
+  merged: "the pull request was merged",
+  closed: "the pull request was closed",
+  expired: "its time ran out",
+  manual: "an admin removed it",
+  idle: "nobody was using it",
+  failed: "its build failed",
+  stuck: "its build got stuck",
+};
+
+/** "the pull request was merged", for sentences like "This preview was removed because …". */
+export function removedBecause(reason: string) {
+  return REMOVED_BECAUSE[reason] ?? reason;
+}
+
+/** "Removed (PR merged)", "Removed (time ran out)", or plain "Removed". */
+export function removedLabel(reason: string | null | undefined) {
+  const words = reason ? (REMOVAL_REASONS[reason] ?? reason) : "";
+  return words ? `Removed (${words})` : "Removed";
+}
 
 export function timelineLabel(event: EnvironmentEvent): string {
   switch (event.type) {
     case "opened":
       return "Pull request opened";
     case "build_started":
-      return "Build started";
+      return "Started building";
     case "built":
-      return event.detail ? `Built in ${event.detail} s` : "Built";
+      return event.detail ? `Finished building in ${event.detail} s` : "Finished building";
     case "ready":
-      return "Preview ready";
+      return "Ready to view";
     case "updated":
-      return event.detail ? `Updated to ${event.detail}` : "Updated";
+      return event.detail ? `New commit ${event.detail}` : "New commit";
     case "slept":
-      return "Slept after no visits";
+      return "Fell asleep (no visitors)";
     case "woke":
-      return event.detail ? `Woken by a visit (${event.detail} s)` : "Woken by a visit";
+      return event.detail ? `Woke up for a visitor (took ${event.detail} s)` : "Woke up for a visitor";
     case "extended":
       return event.detail ? `Extended to ${formatDay(event.detail)}` : "Extended";
     case "keep_awake":
       return event.detail ? `Kept awake until ${formatClock(event.detail)}` : "Kept awake";
     case "keep_awake_off":
-      return "Stopped keeping awake";
+      return "Allowed to sleep again";
     case "kept":
       return event.detail ? `Kept open by the “${event.detail}” label` : "Kept open by a label";
     case "unkept":
@@ -53,11 +75,10 @@ export function timelineLabel(event: EnvironmentEvent): string {
       return "Expiry warning posted on the PR";
     case "failed": {
       const first = event.detail?.split("\n")[0]?.trim();
-      return first ? `Failed: ${first}` : "Failed";
+      return first ? `Couldn’t build: ${first}` : "Couldn’t build";
     }
     case "destroyed": {
-      const reason = event.detail ? (REMOVAL_REASONS[event.detail] ?? event.detail) : "";
-      return reason ? `Removed (${reason})` : "Removed";
+      return removedLabel(event.detail);
     }
     default:
       return event.detail ? `${event.type.replace(/_/g, " ")}: ${event.detail}` : event.type.replace(/_/g, " ");

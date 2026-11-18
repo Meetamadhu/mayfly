@@ -260,7 +260,7 @@ export function PoliciesPage() {
           ? { value: ruleTtl, from: "Repository rule" }
           : baseTtl !== null
             ? { value: baseTtl, from: "Default above" }
-            : { value: defaults.ttlHours, from: "Server default" };
+            : { value: defaults.ttlHours, from: "Standard setting" };
       const sleep =
         ruleSleep !== null
           ? { value: ruleSleep, from: "Repository rule" }
@@ -268,7 +268,7 @@ export function PoliciesPage() {
             ? { value: envSleep, from: "PREVIEW_SLEEP_RULES" }
             : baseSleep !== null
               ? { value: baseSleep, from: "Default above" }
-              : { value: defaults.sleepSeconds, from: "Server default" };
+              : { value: defaults.sleepSeconds, from: "Standard setting" };
       return { repository, ttl, sleep };
     });
   }, [draft, view, defaults]);
@@ -280,22 +280,22 @@ export function PoliciesPage() {
       <form className="policies" onSubmit={(event) => void save(event)} noValidate>
         <section className="board-welcome policies-head">
           <div>
-            <h1>TTL policies</h1>
+            <h1>Lifetime rules</h1>
             <p className="lede">
-              How long previews live, when they sleep, and what keeps them around. Leave a field empty to use the
+              How long previews stay up, when they fall asleep, and how someone can keep one around for longer. Leave a box empty to keep the
               server&apos;s default.
             </p>
           </div>
           <div className="policies-save">
             <button type="submit" disabled={busy || !draft || !dirty}>
-              {busy ? "Saving…" : "Save policies"}
+              {busy ? "Saving…" : "Save changes"}
             </button>
             <span className="help" aria-live="polite">
               {dirty
                 ? "Unsaved changes"
                 : view?.policy.updatedAt
                   ? `Saved ${new Date(view.policy.updatedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}`
-                  : "Using server defaults"}
+                  : "Using the standard settings"}
             </span>
           </div>
         </section>
@@ -312,7 +312,7 @@ export function PoliciesPage() {
         ) : null}
 
         {!draft || !defaults ? (
-          !error ? <p className="help">Loading policies…</p> : null
+          !error ? <p className="help">Loading…</p> : null
         ) : (
           <>
             <div className="policies-grid">
@@ -326,7 +326,7 @@ export function PoliciesPage() {
                   id="policy-ttl"
                   inputMode="numeric"
                   value={draft.ttlHours}
-                  placeholder={`${defaults.ttlHours} (server default)`}
+                  placeholder={`${defaults.ttlHours} (standard)`}
                   onChange={(event) => update({ ttlHours: event.target.value })}
                   aria-describedby="policy-ttl-help"
                 />
@@ -335,7 +335,7 @@ export function PoliciesPage() {
                   running previews keep their current expiry.
                 </p>
 
-                <label htmlFor="policy-ext">Extensions per preview</label>
+                <label htmlFor="policy-ext">How many times a preview can be extended</label>
                 <select
                   id="policy-ext"
                   value={draft.maxExtensions}
@@ -383,7 +383,7 @@ export function PoliciesPage() {
                   id="policy-sleep-seconds"
                   inputMode="numeric"
                   value={draft.sleepSeconds}
-                  placeholder={`${defaults.sleepSeconds} (server default)`}
+                  placeholder={`${defaults.sleepSeconds} (standard)`}
                   onChange={(event) => update({ sleepSeconds: event.target.value })}
                   aria-describedby="policy-sleep-help"
                 />
@@ -396,7 +396,7 @@ export function PoliciesPage() {
               <section className="board-rail-card policy-card" aria-labelledby="policy-keep">
                 <h2 id="policy-keep" className="policy-title">
                   <PolicyIcon kind="tag" />
-                  Keep label
+                  Keep-alive label
                 </h2>
                 <label htmlFor="policy-label">Pull request label</label>
                 <input
@@ -416,7 +416,7 @@ export function PoliciesPage() {
               <section className="board-rail-card policy-card" aria-labelledby="policy-warn">
                 <h2 id="policy-warn" className="policy-title">
                   <PolicyIcon kind="bell" />
-                  Expiry warning
+                  Heads-up before it expires
                 </h2>
                 <label htmlFor="policy-warn-minutes">Comment on the pull request</label>
                 <select
@@ -436,7 +436,7 @@ export function PoliciesPage() {
                   time.
                 </p>
                 {!view?.githubConnected && draft.warnMinutes !== "0" ? (
-                  <p className="policy-flag">No GitHub token is set, so warnings can&apos;t be posted.</p>
+                  <p className="policy-flag">Mayfly isn&apos;t connected to GitHub yet (no token), so it can&apos;t post these.</p>
                 ) : null}
               </section>
             </div>
@@ -445,13 +445,13 @@ export function PoliciesPage() {
               <div className="policy-rules-head">
                 <h2 id="policy-rules" className="policy-title">
                   <PolicyIcon kind="repo" />
-                  Per-repository rules
+                  Different rules for some repositories
                 </h2>
                 <button type="button" className="secondary" onClick={addRule} disabled={draft.repoRules.length >= 50}>
                   Add rule
                 </button>
               </div>
-              <p className="help">A rule beats the defaults above for that repository. Leave a column empty to use the default.</p>
+              <p className="help">A rule here wins over the settings above, for that repository only. Leave a box empty to use the setting above.</p>
 
               {draft.repoRules.length === 0 ? (
                 <p className="empty policy-empty">No rules. Every repository uses the defaults.</p>
@@ -509,7 +509,7 @@ export function PoliciesPage() {
 
               {envRules.length > 0 ? (
                 <p className="help policy-env-rules">
-                  Also set on the server (PREVIEW_SLEEP_RULES):{" "}
+                  Already set on the server (PREVIEW_SLEEP_RULES):{" "}
                   {envRules.map(([repo, seconds], index) => (
                     <span key={repo}>
                       {index > 0 ? ", " : ""}

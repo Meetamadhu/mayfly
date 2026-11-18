@@ -11,9 +11,9 @@ type ActivityFilter = "all" | "builds" | "sleep" | "lifetime" | "removed";
 
 const FILTERS: { id: ActivityFilter; label: string; types: Set<string> | null }[] = [
   { id: "all", label: "All", types: null },
-  { id: "builds", label: "Builds & updates", types: new Set(["opened", "build_started", "built", "ready", "updated", "failed"]) },
+  { id: "builds", label: "Builds & new commits", types: new Set(["opened", "build_started", "built", "ready", "updated", "failed"]) },
   { id: "sleep", label: "Sleep & wake", types: new Set(["slept", "woke"]) },
-  { id: "lifetime", label: "Lifetime", types: new Set(["extended", "keep_awake", "keep_awake_off"]) },
+  { id: "lifetime", label: "Time extended", types: new Set(["extended", "keep_awake", "keep_awake_off"]) },
   { id: "removed", label: "Removed", types: new Set(["destroyed"]) },
 ];
 
@@ -123,21 +123,21 @@ export function ActivityPage() {
       <section className="board-welcome">
         <div>
           <h1>Activity</h1>
-          <p className="lede">Everything Mayfly did with your previews: builds, sleeps, wakes and removals.</p>
+          <p className="lede">Everything that happened to your previews: builds, naps, wake-ups and clean-ups.</p>
         </div>
       </section>
 
       <dl className="stats board-stats page-stats">
         <div data-stat="live">
-          <dt>Events today</dt>
+          <dt>Things that happened today</dt>
           <dd>{overview ? todayCount : "–"}</dd>
         </div>
         <div data-stat="building">
-          <dt>Builds</dt>
+          <dt>Builds today</dt>
           <dd>{overview ? builds : "–"}</dd>
         </div>
         <div data-stat="awake">
-          <dt>Wakes</dt>
+          <dt>Wake-ups today</dt>
           <dd>{overview ? wakes : "–"}</dd>
         </div>
       </dl>
@@ -202,8 +202,8 @@ export function ActivityPage() {
         ))}
 
         <p className="help activity-note">
-          Mayfly keeps the last 50 events for each preview, including removed ones. Select a PR to see its full
-          lifecycle.
+          Mayfly remembers the last 50 things that happened to each preview, even after it&apos;s removed. Click a pull
+          request to see its whole history.
         </p>
       </section>
 

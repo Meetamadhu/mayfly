@@ -209,7 +209,7 @@ export function Landing() {
           <MayflyMark className="landing-mark" />
           Mayfly
         </a>
-        <span>Ephemeral pull request previews</span>
+        <span>A live preview for every pull request</span>
         <a href="#faq">Questions</a>
       </footer>
     </main>

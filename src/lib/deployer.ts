@@ -231,7 +231,7 @@ async function claimPort(preferred?: number) {
   for (let port = FIRST_PORT; port < FIRST_PORT + PORT_SPAN; port += 1) {
     if (await pairFree(port)) return port;
   }
-  throw new Error("No free preview port.");
+  throw new Error("The server has no room for another preview right now. Close a pull request and try again.");
 }
 
 /**
@@ -298,7 +298,9 @@ async function prepareImage(input: DeployRequest): Promise<string> {
     await ensurePreviewImage();
     return PREVIEW_IMAGE;
   }
-  if (!repositoryAllowed(input.repository)) throw new Error("Repository not allowed");
+  if (!repositoryAllowed(input.repository)) {
+    throw new Error("This repository isn't on Mayfly's list of allowed repositories (PREVIEW_REPOS). Ask an admin to add it.");
+  }
   const tag = imageTag(input.repository, input.prNumber, input.sha);
   // The tag names the commit, so an image that already exists is this commit's code. Waking never rebuilds it.
   if (await imageExists(tag)) return tag;
