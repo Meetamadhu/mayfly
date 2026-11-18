@@ -70,6 +70,8 @@ export interface Environment {
   sleepSeconds?: number;
   /** Label names on the pull request, from the latest GitHub event that carried them. */
   labels?: string[];
+  /** GitHub login of whoever opened the pull request. Absent for simulator previews. */
+  author?: string;
   /** Overview-only: the pull request carries the keep label, so this preview does not expire while it is open. */
   keptByLabel?: boolean;
   /** How many times this preview has been extended. */
@@ -103,6 +105,8 @@ export interface PullRequestEvent {
   action: "opened" | "synchronize" | "closed" | "reopened" | "labeled" | "unlabeled";
   /** Label names on the pull request, when the event carried them. */
   labels?: string[];
+  /** GitHub login of the pull request's author, when the event carried it. */
+  author?: string;
   repository: string;
   prNumber: number;
   sha: string;
@@ -137,6 +141,7 @@ export interface OrchestratorConfigView {
     sleepSeconds: number;
     maxLifetimeHours: number;
     maxExtensions: number | null;
+    maxPerAuthor: number | null;
     keepLabel: string;
     warnMinutes: number;
   };
@@ -182,7 +187,7 @@ export type LifecycleResult =
   | { ok: true; action: LifecycleAction; environment: Environment }
   | {
       ok: false;
-      code: "cap" | "not_found" | "invalid" | "conflict" | "deploy_failed";
+      code: "cap" | "author_cap" | "not_found" | "invalid" | "conflict" | "deploy_failed";
       error: string;
       environment?: Environment;
     };
