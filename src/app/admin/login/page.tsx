@@ -39,7 +39,7 @@ export default function AdminLoginPage() {
       <div className="admin-panel admin-in-shell">
       <section className="panel login-card" aria-label="Admin sign in">
         <h1>Admin sign-in</h1>
-        <p className="help login-lede">Admins only. Ask the project owner for the token.</p>
+        <p className="help login-lede">This part is for the people who look after Mayfly. Ask the project owner for the admin token.</p>
         <form onSubmit={(event) => void onSubmit(event)}>
           <label htmlFor="admin-token">Admin token</label>
           <div className="token-field">
@@ -66,7 +66,7 @@ export default function AdminLoginPage() {
             {busy ? "Signing in…" : "Sign in"}
           </button>
         </form>
-        {wrong ? <p className="error" role="alert">Wrong token</p> : null}
+        {wrong ? <p className="error" role="alert">That token didn&apos;t work. Check it and try again.</p> : null}
       </section>
       <p className="login-back">
         <a href="/board">Back to dashboard</a>

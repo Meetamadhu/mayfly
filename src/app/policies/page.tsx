@@ -5,7 +5,7 @@ import { PoliciesPage } from "@/components/policies-page";
 import { ADMIN_COOKIE, sessionIsValid } from "@/lib/admin";
 
 export const metadata: Metadata = {
-  title: "TTL policies · Mayfly",
+  title: "Lifetime rules · Mayfly",
   description: "How long previews live, when they sleep, and what keeps them around.",
 };
 

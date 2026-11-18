@@ -11,7 +11,7 @@ const NAV: { id: AppPage; href: string; label: string }[] = [
   { id: "dashboard", href: "/board", label: "Dashboard" },
   { id: "activity", href: "/activity", label: "Activity" },
   { id: "cost", href: "/cost", label: "Cost & savings" },
-  { id: "policies", href: "/policies", label: "TTL policies" },
+  { id: "policies", href: "/policies", label: "Lifetime rules" },
   { id: "comments", href: "/pr-comments", label: "PR comments" },
   { id: "admin", href: "/admin", label: "Admin" },
 ];
@@ -77,7 +77,7 @@ function NavIcon({ page }: { page: AppPage }) {
 }
 
 /**
- * The one sidebar + top bar every Mayfly screen shares (Dashboard, Activity, Cost & savings, TTL policies, PR comments, Admin).
+ * The one sidebar + top bar every Mayfly screen shares (Dashboard, Activity, Cost & savings, Lifetime rules, PR comments, Admin).
  *
  * `search`: pages that can filter pass a controlled search; elsewhere the box searches the Dashboard
  * (submitting goes to /board?q=…).
@@ -157,7 +157,7 @@ export function AppShell({
             <MayflyMark className="board-mark" />
             <span>
               <span className="board-wordmark">Mayfly</span>
-              <span className="board-tagline">Ephemeral Environments</span>
+              <span className="board-tagline">Previews for every pull request</span>
             </span>
           </a>
           <button
@@ -180,7 +180,7 @@ export function AppShell({
         </nav>
         <div className="board-promo">
           <PromoArt />
-          <p>Spin up PR previews on demand. Sleep when idle. Save on cloud costs.</p>
+          <p>A live preview for every pull request. Asleep when nobody&apos;s looking, gone when the work is merged.</p>
         </div>
       </aside>
 

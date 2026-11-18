@@ -13,6 +13,7 @@ import {
   sleepSecondsForRepo,
   ttlHoursForRepo,
 } from "./config";
+import { removedBecause } from "./timeline";
 import { getDeployer, previewUrl, publicPreviewUrl, type Deployment } from "./deployer";
 import { postPullRequestNote, publishCommitStatus, publishPullRequestComment } from "./http";
 import {
@@ -170,20 +171,20 @@ async function refreshReadyComment(id: string) {
 
 function failedComment(env: Environment, message: string) {
   return [
-    "**Mayfly preview failed**",
+    "**Mayfly couldn't build this preview**",
     "",
     message.slice(0, 500),
     "",
-    `Commit \`${env.sha.slice(0, 8)}\` on \`${env.branch}\`. Fix the build and push again, or destroy this preview from Admin.`,
+    `Commit \`${env.sha.slice(0, 8)}\` on \`${env.branch}\`. Fix the problem above and push again; Mayfly will try again on the new commit.`,
     "",
     lastUpdatedLine(),
   ].join("\n");
 }
 
 function destroyedComment(env: Environment) {
-  const reason = env.destroyReason ?? "removed";
+  const why = env.destroyReason ? ` because ${removedBecause(env.destroyReason)}` : "";
   return [
-    `**Mayfly preview removed** (${reason}). The deployment is gone.`,
+    `**Mayfly preview removed**${why}. Its link no longer works.`,
     "",
     lastUpdatedLine(),
   ].join("\n");
@@ -616,7 +617,7 @@ async function reserve(event: PullRequestEvent): Promise<LifecycleResult> {
         return {
           ok: false,
           code: "conflict",
-          error: "This preview is busy. Retry in a moment.",
+          error: "This preview is busy building. Try again in a moment.",
           environment: clone(existing),
         };
       }
@@ -656,7 +657,7 @@ async function reserve(event: PullRequestEvent): Promise<LifecycleResult> {
         return {
           ok: false,
           code: "author_cap",
-          error: `${normalized.author} already has ${mine.length} live preview${mine.length === 1 ? "" : "s"} (limit ${perAuthor}).`,
+          error: `${normalized.author} already has ${mine.length} preview${mine.length === 1 ? "" : "s"} running, the most allowed per person (${perAuthor}).`,
         };
       }
     }
@@ -667,7 +668,7 @@ async function reserve(event: PullRequestEvent): Promise<LifecycleResult> {
       return {
         ok: false,
         code: "cap",
-        error: `At the live limit of ${config.maxConcurrent}. Close a pull request or wait for the reaper.`,
+        error: `Mayfly is already running its maximum of ${config.maxConcurrent} previews. Close a pull request, or wait for an old preview to run out of time.`,
       };
     }
 
@@ -766,7 +767,7 @@ async function saveLabels(event: PullRequestEvent): Promise<LifecycleResult> {
     const state = await loadState();
     const env = findLive(state.environments, normalized.repository, normalized.prNumber);
     if (!env) {
-      return { ok: false, code: "not_found", error: `No live preview for ${normalized.repository}#${normalized.prNumber}.` };
+      return { ok: false, code: "not_found", error: `There's no running preview for ${normalized.repository} #${normalized.prNumber}.` };
     }
     const labels = eventLabels(normalized) ?? [];
     const wasKept = hasKeepLabel(env.labels);
@@ -791,7 +792,7 @@ export async function applyPullRequestEvent(
       return findLive(state.environments, normalized.repository, normalized.prNumber) ?? null;
     });
     if (!existing) {
-      return { ok: false, code: "not_found", error: `No live preview for ${normalized.repository}#${normalized.prNumber}.` };
+      return { ok: false, code: "not_found", error: `There's no running preview for ${normalized.repository} #${normalized.prNumber}.` };
     }
     return destroyEnvironment(existing.id, normalized.merged ? "merged" : "closed", options);
   }
@@ -802,7 +803,7 @@ export async function applyPullRequestEvent(
     event.headRepository !== undefined &&
     event.headRepository.trim().toLowerCase() !== event.repository.trim().toLowerCase()
   ) {
-    return { ok: false, code: "invalid", error: "Pull requests from forks are not built." };
+    return { ok: false, code: "invalid", error: "Pull requests from forks don't get previews, to keep the server safe." };
   }
 
   const reserved = await reserve(event);
@@ -883,7 +884,7 @@ export async function destroyEnvironment(
   const reserved = await exclusive(async () => {
     const state = await loadState();
     const env = state.environments.find((item) => item.id === id);
-    if (!env) return { ok: false as const, code: "not_found" as const, error: "No environment with that id." };
+    if (!env) return { ok: false as const, code: "not_found" as const, error: "That preview doesn't exist any more." };
     if (env.status === "destroyed") {
       return { ok: true as const, action: "unchanged" as const, environment: clone(env) };
     }
@@ -988,12 +989,12 @@ async function extendExpiry(id: string, hours: number): Promise<LifecycleResult>
   return exclusive(async () => {
     const state = await loadState();
     const env = state.environments.find((item) => item.id === id);
-    if (!env) return { ok: false, code: "not_found", error: "No environment with that id." };
+    if (!env) return { ok: false, code: "not_found", error: "That preview doesn't exist any more." };
     if (env.status === "destroying" || env.status === "destroyed" || !isLiveStatus(env.status)) {
       return {
         ok: false,
         code: "conflict",
-        error: "Only a live preview can be extended.",
+        error: "Only a running preview can be extended.",
         environment: clone(env),
       };
     }
@@ -1001,7 +1002,7 @@ async function extendExpiry(id: string, hours: number): Promise<LifecycleResult>
       return {
         ok: false,
         code: "invalid",
-        error: "The demo preview does not expire.",
+        error: "The demo preview never runs out, so there's nothing to extend.",
         environment: clone(env),
       };
     }
@@ -1015,7 +1016,7 @@ async function extendExpiry(id: string, hours: number): Promise<LifecycleResult>
         code: "invalid",
         error:
           limit === 0
-            ? "Extending is turned off in TTL policies."
+            ? "Extending previews is turned off in Lifetime rules."
             : `This preview has used all ${limit} extension${limit === 1 ? "" : "s"}.` +
               (label ? ` Add the “${label}” label to the pull request to keep it.` : ""),
         environment: clone(env),
@@ -1031,7 +1032,7 @@ async function extendExpiry(id: string, hours: number): Promise<LifecycleResult>
       return {
         ok: false,
         code: "invalid",
-        error: "Already at the maximum lifetime.",
+        error: "This preview is already at the longest it's allowed to run.",
         environment: clone(env),
       };
     }
@@ -1120,12 +1121,12 @@ export async function keepAwakeEnvironment(id: string, hours: number): Promise<L
   const reserved = await exclusive(async () => {
     const state = await loadState();
     const env = state.environments.find((item) => item.id === id);
-    if (!env) return { ok: false as const, code: "not_found" as const, error: "No environment with that id." };
+    if (!env) return { ok: false as const, code: "not_found" as const, error: "That preview doesn't exist any more." };
     if (env.status !== "ready" && env.status !== "updating") {
       return {
         ok: false as const,
         code: "conflict" as const,
-        error: "Only a live preview can be kept awake.",
+        error: "Only a running preview can be kept awake.",
         environment: clone(env),
       };
     }
@@ -1143,7 +1144,7 @@ export async function keepAwakeEnvironment(id: string, hours: number): Promise<L
     return {
       ok: false,
       code: "deploy_failed",
-      error: "The preview gate did not accept keep-awake.",
+      error: "The preview didn't answer. Try again in a moment.",
       environment: reserved.environment,
     };
   }
@@ -1155,12 +1156,12 @@ export async function keepAwakeOffEnvironment(id: string): Promise<LifecycleResu
   const reserved = await exclusive(async () => {
     const state = await loadState();
     const env = state.environments.find((item) => item.id === id);
-    if (!env) return { ok: false as const, code: "not_found" as const, error: "No environment with that id." };
+    if (!env) return { ok: false as const, code: "not_found" as const, error: "That preview doesn't exist any more." };
     if (env.status !== "ready" && env.status !== "updating" && env.status !== "failed") {
       return {
         ok: false as const,
         code: "conflict" as const,
-        error: "Only a live preview can clear keep-awake.",
+        error: "Only a running preview can be allowed to sleep again.",
         environment: clone(env),
       };
     }
@@ -1181,12 +1182,12 @@ export async function sleepEnvironment(id: string): Promise<LifecycleResult> {
   const located = await exclusive(async () => {
     const state = await loadState();
     const env = state.environments.find((item) => item.id === id);
-    if (!env) return { ok: false as const, code: "not_found" as const, error: "No environment with that id." };
+    if (!env) return { ok: false as const, code: "not_found" as const, error: "That preview doesn't exist any more." };
     if (env.status !== "ready" && env.status !== "updating") {
       return {
         ok: false as const,
         code: "conflict" as const,
-        error: "Only a live preview can be put to sleep.",
+        error: "Only a running preview can be put to sleep.",
         environment: clone(env),
       };
     }
@@ -1199,7 +1200,7 @@ export async function sleepEnvironment(id: string): Promise<LifecycleResult> {
     return {
       ok: false,
       code: "conflict",
-      error: "This preview has no process to sleep.",
+      error: "This preview isn't running, so there's nothing to put to sleep.",
       environment: located.environment,
     };
   }
@@ -1207,10 +1208,10 @@ export async function sleepEnvironment(id: string): Promise<LifecycleResult> {
   try {
     const response = await fetch(`http://127.0.0.1:${port}/__preview_sleep`, { method: "POST", cache: "no-store" });
     if (!response.ok) {
-      return { ok: false, code: "deploy_failed", error: "The preview did not sleep.", environment: located.environment };
+      return { ok: false, code: "deploy_failed", error: "The preview didn't answer. Try again in a moment.", environment: located.environment };
     }
   } catch {
-    return { ok: false, code: "deploy_failed", error: "The preview did not sleep.", environment: located.environment };
+    return { ok: false, code: "deploy_failed", error: "The preview didn't answer. Try again in a moment.", environment: located.environment };
   }
   return { ok: true, action: "slept", environment: located.environment };
 }
@@ -1243,7 +1244,7 @@ export async function recordActivity(id: string): Promise<LifecycleResult> {
   return exclusive(async () => {
     const state = await loadState();
     const env = state.environments.find((item) => item.id === id);
-    if (!env) return { ok: false, code: "not_found", error: "No environment with that id." };
+    if (!env) return { ok: false, code: "not_found", error: "That preview doesn't exist any more." };
     if (env.status !== "ready" && env.status !== "updating") {
       return {
         ok: false,
