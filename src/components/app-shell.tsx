@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { MayflyMark } from "@/components/admin-header";
-import { PromoArt } from "@/components/board-parts";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export type AppPage = "dashboard" | "activity" | "cost" | "policies" | "comments" | "admin";
@@ -178,10 +177,6 @@ export function AppShell({
             </a>
           ))}
         </nav>
-        <div className="board-promo">
-          <PromoArt />
-          <p>A live preview for every pull request. Asleep when nobody&apos;s looking, gone when the work is merged.</p>
-        </div>
       </aside>
 
       <div className="board-main">
