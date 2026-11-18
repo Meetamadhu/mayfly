@@ -1893,6 +1893,47 @@ html[data-theme="dark"] .admin-panel .simulator .actions {
 .settings dt { margin: 0; color: var(--muted); }
 .settings dd { margin: 0; overflow-wrap: anywhere; }
 
+.config-check .help {
+  margin: 0.35rem 0 0;
+}
+
+.config-check-list dd {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.config-base-url {
+  display: block;
+  font-size: 0.9rem;
+}
+
+.config-status {
+  display: inline-flex;
+  align-items: flex-start;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.28rem 0.55rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.config-status[data-tone="ok"] {
+  background: var(--ready-bg);
+  color: var(--ready);
+}
+
+.config-status[data-tone="bad"] {
+  background: var(--failed-bg);
+  color: var(--failed);
+}
+
+.config-status[data-tone="warn"] {
+  background: var(--asleep-bg);
+  color: var(--asleep);
+}
+
 .activity {
   list-style: none;
   margin: 0.85rem 0 0;
