@@ -110,27 +110,62 @@ function findLive(environments: Environment[], repository: string, prNumber: num
 }
 
 function lastUpdatedLine(at = iso()) {
-  return `Last updated ${at}`;
+  return `Last updated ${formatUtc(at)}.`;
+}
+
+function sleepWords(seconds: number) {
+  if (seconds >= 3600 && seconds % 3600 === 0) return `${seconds / 3600} h`;
+  if (seconds >= 60 && seconds % 60 === 0) return `${seconds / 60} min`;
+  return `${seconds} s`;
+}
+
+/** The lifetime line: a readable expiry, or why there is none. */
+function lifetimeLine(env: Environment) {
+  const label = currentPolicy().keepLabel;
+  if (isDemo(env)) return "This demo preview doesn't expire.";
+  if (hasKeepLabel(env.labels)) {
+    return `Kept open by the \`${label}\` label until the pull request is closed or merged.`;
+  }
+  const keep = label ? ` To keep it longer, add the \`${label}\` label.` : "";
+  return `Expires ${formatUtc(env.expiresAt)}.${keep}`;
 }
 
 function readyComment(env: Environment, refreshed: boolean) {
   const verb = refreshed ? "updated" : "ready";
   const build =
-    typeof env.buildMs === "number" && env.buildMs >= 0
-      ? `\nBuilt in ${formatDurationMs(env.buildMs)}.`
-      : "";
+    typeof env.buildMs === "number" && env.buildMs >= 0 ? ` Built in ${formatDurationMs(env.buildMs)}.` : "";
   const at = iso();
   return [
     `**Mayfly preview ${verb}**`,
     "",
     env.url ? `[Open preview](${env.url})` : "Preview URL is not available yet.",
     "",
-    `Commit \`${env.sha.slice(0, 8)}\` on \`${env.branch}\`. Expires ${env.expiresAt}.${build}`,
+    `Commit \`${env.sha.slice(0, 8)}\` on \`${env.branch}\`.${build}`,
     "",
-    "The preview sleeps when idle and wakes on the next visit. It is removed when the pull request closes or its lifetime ends.",
+    lifetimeLine(env),
+    "",
+    `Sleeps after ${sleepWords(sleepSecondsForRepo(env.repository))} without visits and wakes on the next one. Removed when the pull request is closed or merged.`,
     "",
     lastUpdatedLine(at),
   ].join("\n");
+}
+
+/**
+ * Rewrite the PR comment after something that changes its lifetime line (extend, keep label). Edits the
+ * existing comment in place, so nobody is notified. Call outside exclusive().
+ */
+async function refreshReadyComment(id: string) {
+  const env = await exclusive(async () => {
+    const state = await loadState();
+    const current = state.environments.find((item) => item.id === id);
+    if (!current || current.status !== "ready") return null;
+    const body = readyComment(current, false);
+    current.comments.push({ at: iso(), body });
+    await saveState(state);
+    return clone(current);
+  });
+  const body = env?.comments.at(-1)?.body;
+  if (env && body) await commentQuietly(env, body);
 }
 
 function failedComment(env: Environment, message: string) {
@@ -662,6 +697,12 @@ function startDeploy(environment: Environment, action: "created" | "updated"): P
 
 /** A label was added or removed on the pull request: no rebuild, only the keep label matters. */
 async function applyLabels(event: PullRequestEvent): Promise<LifecycleResult> {
+  const result = await saveLabels(event);
+  if (result.ok && result.action === "labels") await refreshReadyComment(result.environment.id);
+  return result;
+}
+
+async function saveLabels(event: PullRequestEvent): Promise<LifecycleResult> {
   const normalized = normalizeEvent(event);
   return exclusive(async () => {
     const state = await loadState();
@@ -873,6 +914,12 @@ const EXTEND_HOURS = new Set([2, 4, 12, 24]);
 
 /** Push expiresAt forward by a fixed number of hours, capped at createdAt + max lifetime. */
 export async function extendEnvironment(id: string, hours: number): Promise<LifecycleResult> {
+  const result = await extendExpiry(id, hours);
+  if (result.ok) await refreshReadyComment(id);
+  return result;
+}
+
+async function extendExpiry(id: string, hours: number): Promise<LifecycleResult> {
   if (!EXTEND_HOURS.has(hours)) {
     return { ok: false, code: "invalid", error: "hours must be 2, 4, 12, or 24." };
   }
