@@ -55,18 +55,18 @@ html[data-theme="dark"],
 html:not([data-theme="dark"]) .board-sidebar,
 html:not([data-theme="dark"]) .board-topbar {
   color-scheme: dark;
-  /* Deep green ground / panels, mint accent */
-  --bg: #0a1412;
-  --surface: #122421;
-  --paper: #152a26;
-  --ink: #e7f3ed;
+  /* Deep navy ground and slate panels, mint accent */
+  --bg: #020618;
+  --surface: #0b1324;
+  --paper: #0f172b;
+  --ink: #e8edf5;
   --text: var(--ink);
-  --muted: #9bb5ab;
-  --line: #243f39;
+  --muted: #94a3b8;
+  --line: #1d293d;
   --border: var(--line);
-  --soft: #1c3530;
-  --field: #1a322d;
-  --on-ink: #0a1412;
+  --soft: #1a2438;
+  --field: #131d33;
+  --on-ink: #020618;
   --glow: rgba(61, 214, 165, 0.06);
   --accent: #3dd6a5;
   --mint: #3dd6a5;
@@ -85,8 +85,8 @@ html:not([data-theme="dark"]) .board-topbar {
   --work-bg: var(--building-bg);
   --failed: var(--danger);
   --failed-bg: var(--danger-bg);
-  --dead: #b7c7c1;
-  --dead-bg: #1a322d;
+  --dead: #b4c0d0;
+  --dead-bg: #1d293d;
   --awake: #3dd6a5;
   --awake-bg: #14352c;
   --band-awake: #1a5c48;
@@ -95,9 +95,9 @@ html:not([data-theme="dark"]) .board-topbar {
   --band-asleep: #3a2c14;
   --band-work: #1d4f91;
   --band-failed: #9b1c1c;
-  --sidebar: #0d1c19;
-  --sidebar-ink: #e7f3ed;
-  --sidebar-muted: #8fafa3;
+  --sidebar: #060c1e;
+  --sidebar-ink: #e8edf5;
+  --sidebar-muted: #94a3b8;
 }
 
 * { box-sizing: border-box; }
@@ -3611,7 +3611,7 @@ html[data-theme="dark"] .activity li[data-tone="failed"] { border-left-color: #f
 /* Light mode: the top bar is see-through, so the light page made it paler than in dark mode.
    Give it the same solid shade it shows over the dark page. */
 html:not([data-theme="dark"]) .board-topbar {
-  background: color-mix(in srgb, var(--surface) 88%, #0a1412);
+  background: color-mix(in srgb, var(--surface) 88%, #020618);
 }
 
 /* TTL policies page */
