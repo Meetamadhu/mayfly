@@ -30,6 +30,7 @@ function check(cond, message, detail) {
 
 // ---- mock GitHub: records posted comments for any repository ----
 const posted = [];
+const patched = [];
 let nextId = 500;
 const mock = createServer((req, res) => {
   const chunks = [];
@@ -50,7 +51,10 @@ const mock = createServer((req, res) => {
       posted.push(row);
       return send(201, row);
     }
-    if (req.method === "PATCH") return send(200, {});
+    if (req.method === "PATCH") {
+      patched.push(String(JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}").body ?? ""));
+      return send(200, {});
+    }
     if (req.method === "POST" && url.pathname.includes("/statuses/")) return send(201, {});
     send(404, { message: `mock miss ${req.method} ${url.pathname}` });
   });
@@ -260,6 +264,18 @@ try {
   check((await gateSleep("acme/short", 1)) === 10, "repo rule sleep: acme/short sleeps after 10 s");
   check((await gateSleep("acme/web", 2)) === 30, "page default sleep: acme/web sleeps after 30 s");
   check((await gateSleep("acme/rules", 3)) === 60, "PREVIEW_SLEEP_RULES beats the page default");
+  const readyBody = await waitFor(
+    () => posted.find((c) => c.repo === "acme/web" && c.pr === 2 && c.body.includes("<!-- mayfly-preview -->"))?.body,
+    "ready comment on acme/web",
+  );
+  check(
+    /Expires \d{1,2} \w{3} \d{4}, \d{2}:\d{2} UTC\./.test(readyBody) &&
+      readyBody.includes("add the `keep-preview` label") &&
+      readyBody.includes("Sleeps after 30 s without visits") &&
+      !/\d{4}-\d{2}-\d{2}T/.test(readyBody),
+    "PR comment shows a readable expiry, the keep label and the sleep time",
+    readyBody,
+  );
 
   // --- sleep change reaches running previews ---
   const resave = await api("PUT", "/api/admin/policy", { ...policy, sleepSeconds: 45 });
@@ -281,6 +297,10 @@ try {
   // --- extension limit ---
   const ext1 = await api("POST", `/api/environments/${web.id}?action=extend&hours=2`);
   check(ext1.status === 200 && ext1.json.environment.extensions === 1, "first extend works", ext1.json);
+  const extendedDay = new Date(ext1.json.environment.expiresAt).toLocaleString("en-GB", {
+    day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC",
+  });
+  check(patched.some((b) => b.includes(`Expires ${extendedDay} UTC`)), "extending edits the PR comment's expiry", extendedDay);
   const ext2 = await api("POST", `/api/environments/${web.id}?action=extend&hours=2`);
   check(ext2.status === 400 && /used all 1 extension/.test(ext2.json.error), "second extend is refused", ext2.json);
 
@@ -288,6 +308,10 @@ try {
   const labeled = await webhook("labeled", "acme/short", 1, ["bug", "Keep-Preview"]);
   check(labeled.status === 200 && labeled.json.action === "labels", "label event is applied (any case)", labeled.json);
   check((await envFor("acme/short", 1)).keptByLabel === true, "overview shows kept by label");
+  check(
+    patched.some((b) => b.includes("Kept open by the `keep-preview` label")),
+    "adding the label edits the PR comment",
+  );
   await editEnv("acme/short", 1, (e) => {
     e.expiresAt = new Date(Date.now() - 60_000).toISOString();
   });
