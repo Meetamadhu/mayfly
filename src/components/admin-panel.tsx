@@ -390,7 +390,7 @@ export function AdminPanel() {
   return (
     <AppShell active="admin" githubConnected={Boolean(config?.githubConnected)} onSignOut={signOut}>
       <div className="admin-panel admin-in-shell">
-      <section className="board-welcome">
+      <section className="board-welcome page-head-inline">
         <div>
           <h1>Admin</h1>
           <p className="lede">Look after every preview by hand, and try out pull requests without going to GitHub.</p>
