@@ -6,7 +6,6 @@ import {
   EnvironmentCard,
   LifecycleDrawer,
   StateIcon,
-  StatIcon,
   boardRecentActivity,
   estimatedCost,
   formatAgo,
@@ -25,6 +24,35 @@ import type { Environment } from "@/lib/types";
 import { useOverview } from "@/lib/use-overview";
 
 const DASHBOARD_PREVIEW_LIMIT = 2;
+
+const NUMBER_WORDS = ["No", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve"];
+
+function countWord(n: number, capital = true) {
+  const word = NUMBER_WORDS[n] ?? String(n);
+  return capital ? word : word.toLowerCase();
+}
+
+/** The dashboard's headline: what is up right now, said the way a person would say it. */
+function boardHeadline(
+  counts: { live: number; awake: number; asleep: number; building: number; capacity: number } | null,
+) {
+  if (!counts) return "Checking on your previews…";
+  const { live, awake, asleep, building, capacity } = counts;
+  if (live === 0) return "No previews are up right now.";
+  const first = `${countWord(live)} preview${live === 1 ? " is" : "s are"} up${live >= capacity && capacity > 0 ? ", the most Mayfly allows" : ""}.`;
+  if (live > 1 && (awake === live || asleep === live || building === live)) {
+    const all = awake === live ? "awake" : asleep === live ? "asleep" : "building";
+    return `${first.slice(0, -1)}, ${live === 2 ? "both" : "all of them"} ${all}.`;
+  }
+  const parts = [
+    awake ? `${countWord(awake, false)} awake` : "",
+    asleep ? `${countWord(asleep, false)} asleep` : "",
+    building ? `${countWord(building, false)} building` : "",
+  ].filter(Boolean);
+  if (parts.length === 0) return first;
+  const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
+  return `${first} ${list.charAt(0).toUpperCase()}${list.slice(1)}.`;
+}
 
 export function Dashboard() {
   const { overview, loadError, polledAt, now, reload } = useOverview();
@@ -106,7 +134,6 @@ export function Dashboard() {
   const dockerRuntime = config?.allowedRepositories != null;
   const liveCount = overview?.summary.live ?? 0;
   const capacity = config?.maxConcurrent ?? 0;
-  const capacityRatio = capacity > 0 ? Math.min(1, liveCount / capacity) : 0;
   const buildingCount = current.filter((env) => env.status === "provisioning" || env.status === "updating").length;
   const activity = overview ? boardRecentActivity(overview.environments, demoKey).slice(0, 6) : [];
   const lifecycleEnv = lifecycleId ? (overview?.environments.find((env) => env.id === lifecycleId) ?? null) : null;
@@ -134,79 +161,22 @@ export function Dashboard() {
         </p>
       ) : null}
 
-      <section className="board-welcome">
-        <div>
-          <h1>Welcome to Mayfly</h1>
-          <p className="lede">
-            Every pull request gets its own live preview to click through. Previews sleep when nobody&apos;s looking and clean themselves up when the work is merged.
-          </p>
-        </div>
+      <section className="board-hero" aria-live="polite">
+        <h1 className="board-headline">{boardHeadline(overview ? { live: liveCount, awake: overview.summary.awake, asleep: overview.summary.asleep, building: buildingCount, capacity } : null)}</h1>
+        <p className="board-subline">
+          {overview && overview.savedEstimate >= 0.01
+            ? `Sleeping has saved about ${formatSaved(overview.savedEstimate, currency).replace("≈ ", "")} this month. `
+            : ""}
+          {config
+            ? `Previews fall asleep after ${formatSleep(config.sleepSeconds)} without visitors and last up to ${formatLifetime(config.ttlHours)}.`
+            : ""}
+        </p>
         {signedIn ? (
-          <a className="btn secondary" href="/admin#simulator">
+          <a className="btn secondary board-hero-action" href="/admin#simulator">
             Try a pull request
           </a>
         ) : null}
       </section>
-
-      <dl className="stats board-stats">
-        <div data-stat="live">
-          <dt className="stat-head">
-            <span>Live</span>
-            <span className="stat-icon" aria-hidden="true">
-              <StatIcon name="live" />
-            </span>
-          </dt>
-          <dd>
-            {overview ? liveCount : "–"}
-            <span>/{capacity || "–"}</span>
-          </dd>
-          <div className="meter" aria-hidden="true">
-            <span data-hot={capacityRatio >= 0.8 ? "true" : "false"} style={{ width: `${capacityRatio * 100}%` }} />
-          </div>
-        </div>
-        <div data-stat="awake">
-          <dt className="stat-head">
-            <span>Running</span>
-            <span className="stat-icon" aria-hidden="true">
-              <StatIcon name="running" />
-            </span>
-          </dt>
-          <dd>{overview?.summary.awake ?? "–"}</dd>
-        </div>
-        <div data-stat="asleep">
-          <dt className="stat-head">
-            <span>Sleeping</span>
-            <span className="stat-icon" aria-hidden="true">
-              <StatIcon name="sleeping" />
-            </span>
-          </dt>
-          <dd>{overview?.summary.asleep ?? "–"}</dd>
-        </div>
-        <div data-stat="building">
-          <dt className="stat-head">
-            <span>Building</span>
-            <span className="stat-icon" aria-hidden="true">
-              <StatIcon name="building" />
-            </span>
-          </dt>
-          <dd>{overview ? buildingCount : "–"}</dd>
-        </div>
-        <div data-stat="savings">
-          <dt className="stat-head">
-            <span>Saved this month</span>
-            <span className="stat-icon" aria-hidden="true">
-              <StatIcon name="savings" />
-            </span>
-          </dt>
-          <dd>{overview ? formatSaved(overview.savedEstimate, currency) : "–"}</dd>
-        </div>
-      </dl>
-
-      <p className="board-settings">
-        {config
-          ? `Previews fall asleep after ${formatSleep(config.sleepSeconds)} without visitors and last up to ${formatLifetime(config.ttlHours)}.`
-          : "\u00a0"}
-      </p>
 
       <div className="board-workspace" data-expanded={expanded ? "true" : "false"}>
         <section className="live-column">
@@ -360,13 +330,13 @@ export function Dashboard() {
             <div className="board-rail-head">
               <h2 className="board-rail-title">Cost this month</h2>
               <a className="board-rail-link" href="/cost">
-                Details <span aria-hidden="true">→</span>
+                Details
               </a>
             </div>
             <p className="savings-sub">
               {overview
-                ? alwaysAwakeEstimate < 0.005
-                  ? "Nothing spent yet this month."
+                ? alwaysAwakeEstimate < 0.01
+                  ? "Less than a cent so far this month."
                   : `About ${formatEstMoney(withMayflyEstimate, currency)} with Mayfly, instead of ${formatEstMoney(alwaysAwakeEstimate, currency)} if every preview stayed on.`
                 : "The first numbers appear about a minute after start-up."}
             </p>
@@ -376,7 +346,7 @@ export function Dashboard() {
             <div className="board-rail-head">
               <h2 className="board-rail-title">Recent activity</h2>
               <a className="board-rail-link" href="/activity">
-                View all <span aria-hidden="true">→</span>
+                View all
               </a>
             </div>
             {activity.length === 0 ? (
@@ -389,8 +359,9 @@ export function Dashboard() {
                       <StateIcon name={item.icon} />
                     </span>
                     <span className="board-activity-text">
-                      <strong>{item.subject}</strong> {item.label}
-                      {item.repository ? <span className="board-activity-repo"> · {item.repository}</span> : null}
+                      <strong>{item.subject}</strong>
+                      {item.repository ? <span className="board-activity-repo"> in {item.repository}</span> : null}{" "}
+                      {item.label}
                     </span>
                     <time dateTime={item.at}>{formatAgo(item.at, now)}</time>
                   </li>
