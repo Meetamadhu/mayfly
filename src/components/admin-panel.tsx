@@ -418,7 +418,7 @@ export function AdminPanel() {
               const pillState = cardState(env);
               const timeline = timelineNewestFirst(env.events);
               return (
-                <li key={env.id} className={env.status === "ready" ? "env featured" : "env"}>
+                <li key={env.id} className={env.status === "ready" ? "env featured" : "env"} data-state={pillState}>
                   <div className="card-body">
                     <header className="admin-card-head">
                       <h3>

@@ -4010,3 +4010,29 @@ body { background: var(--bg); }
 .sim-pr-band .sim-pr-title h3 { color: var(--ink); }
 .prc-picker { max-width: min(34rem, 100%); min-width: 0; }
 .prc-picker select { width: 100%; min-width: 0; }
+
+/* Light mode: the top of each preview card gets its own shade, so title and state read as a header. */
+html:not([data-theme="dark"]) {
+  --card-head: #e8edf4;
+}
+/* The header's colour says the preview's state: awake, asleep, building, failed. */
+html:not([data-theme="dark"]) [data-state="running"] { --card-head: #d3f2e4; }
+html:not([data-theme="dark"]) [data-state="sleeping"] { --card-head: #f8ebcc; }
+html:not([data-theme="dark"]) [data-state="building"] { --card-head: #dbe8fb; }
+html:not([data-theme="dark"]) [data-state="failed"] { --card-head: #fadede; }
+html:not([data-theme="dark"]) [data-state="destroying"] { --card-head: #e4e7ec; }
+html:not([data-theme="dark"]) .env-card-head {
+  background: var(--card-head);
+  border-bottom: 1px solid var(--line);
+  border-radius: 10px 10px 0 0;
+}
+html:not([data-theme="dark"]) .env-card-body { padding-top: 0.8rem; }
+html:not([data-theme="dark"]) .preview-list .env .card-body > .admin-card-head {
+  margin: -1rem -1.05rem 0.75rem;
+  padding: 0.85rem 1.05rem;
+  background: var(--card-head);
+  border-bottom: 1px solid var(--line);
+  border-radius: 10px 10px 0 0;
+}
+html:not([data-theme="dark"]) .env-card-head .state-pill,
+html:not([data-theme="dark"]) .admin-card-head .state-pill { background: var(--paper); }
