@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { AppShell } from "@/components/app-shell";
 import { cardState, previewHref, statePillLabel } from "@/components/board-parts";
-import { formatEventTime } from "@/lib/timeline";
+import { formatEventTime, removedLabel } from "@/lib/timeline";
 import { isLiveStatus, type Environment } from "@/lib/types";
 import { useOverview } from "@/lib/use-overview";
 
@@ -74,7 +74,7 @@ function CommentBody({ body }: { body: string }) {
 
 function checkState(env: Environment): { label: string; tone: "success" | "pending" | "failure" | "neutral" } {
   if (env.status === "ready") return { label: "Mayfly — Preview ready", tone: "success" };
-  if (env.status === "provisioning" || env.status === "updating") return { label: "Building preview…", tone: "pending" };
+  if (env.status === "provisioning" || env.status === "updating") return { label: "Mayfly — Building preview…", tone: "pending" };
   if (env.status === "failed") return { label: "Mayfly — Preview failed", tone: "failure" };
   return { label: "Preview removed", tone: "neutral" };
 }
@@ -154,14 +154,14 @@ export function PrCommentsPage() {
       ) : null}
       {!config?.githubConnected && overview ? (
         <p className="policy-flag prc-flag">
-          No GitHub token is set, so these comments are only kept here and not posted to GitHub.
+          Mayfly isn&apos;t connected to GitHub yet (no token), so these comments are only shown here, not on GitHub.
         </p>
       ) : null}
 
       {!overview ? (
         <p className="help">Loading…</p>
       ) : all.length === 0 ? (
-        <p className="empty">No pull request has a preview yet.</p>
+        <p className="empty">No pull request has a preview yet. Open one on GitHub and its comment will show up here.</p>
       ) : (
         <>
           <div className="prc-picker">
@@ -231,8 +231,8 @@ export function PrCommentsPage() {
                   ) : (
                     <p className="help prc-none">
                       {signedOutView
-                        ? "Sign in as admin to see comment text."
-                        : "Mayfly comments once the first build finishes."}
+                        ? "Sign in as an admin to read the comment."
+                        : "Mayfly comments once the first build finishes, usually within a minute."}
                     </p>
                   )}
                   {check ? (
@@ -255,7 +255,7 @@ export function PrCommentsPage() {
                             {statePillLabel(state)}
                           </span>
                         ) : (
-                          `Removed${env.destroyReason ? ` (${env.destroyReason})` : ""}`
+                          removedLabel(env.destroyReason)
                         )}
                       </dd>
                     </div>
@@ -288,7 +288,7 @@ export function PrCommentsPage() {
                       <dd>{state && typeof env.sleepSeconds === "number" ? `${env.sleepSeconds} s idle` : "–"}</dd>
                     </div>
                     <div>
-                      <dt>Comment edits</dt>
+                      <dt>Times updated</dt>
                       <dd>{env.comments.length}</dd>
                     </div>
                   </dl>

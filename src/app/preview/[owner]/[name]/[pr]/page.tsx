@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getPreview } from "@/lib/lifecycle";
+import { removedBecause } from "@/lib/timeline";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,8 +30,8 @@ export default async function PreviewPage({ params }: RouteContext) {
             <span className="chip mono">{deployment?.sha.slice(0, 12)}</span>
           </p>
           <p>
-            This preview is running. It stays up while the pull request is open and in use, then Mayfly
-            deletes it.
+            This preview is up. It stays while the pull request is open, falls asleep when nobody&apos;s looking, and
+            is cleaned up when the pull request is merged or closed.
           </p>
           {deployment?.url ? (
             <p>
@@ -41,11 +42,11 @@ export default async function PreviewPage({ params }: RouteContext) {
           ) : null}
         </>
       ) : environment ? (
-        <p>This preview was removed{environment.destroyReason ? ` (${environment.destroyReason})` : ""}.</p>
+        <p>This preview has been removed{environment.destroyReason ? ` because ${removedBecause(environment.destroyReason)}` : ""}.</p>
       ) : (
         <p>
-          No preview is deployed for this pull request. This site keeps the record. Open the preview on the
-          computer where Mayfly is running.
+          There&apos;s no preview for this pull request right now. One appears automatically when the pull request is
+          opened or gets a new commit.
         </p>
       )}
       <p>

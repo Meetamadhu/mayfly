@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import type { Environment, EnvironmentStatus, Overview } from "@/lib/types";
-import { timelineLabel, timelineNewestFirst } from "@/lib/timeline";
+import { removedLabel, timelineLabel, timelineNewestFirst } from "@/lib/timeline";
 
 const TRANSITIONAL = new Set<EnvironmentStatus>(["provisioning", "updating", "destroying"]);
 const LIVE = new Set<EnvironmentStatus>(["provisioning", "ready", "updating", "destroying"]);
@@ -70,13 +70,13 @@ function stateTone(env: Environment) {
 
 function stateNote(env: Environment) {
   if (env.status === "provisioning" || env.status === "updating") {
-    return "Setting up the preview for this commit.";
+    return "Building this commit. This usually takes under a minute.";
   }
   if (env.status === "destroying") return "Removing this preview.";
-  if (env.status === "failed") return "The preview did not start.";
-  if (env.sleep === "asleep") return "App stopped. Wakes on the next visit.";
+  if (env.status === "failed") return "This preview couldn't be built. Open History to see why.";
+  if (env.sleep === "asleep") return "Saving money while nobody's looking. Opening it wakes it up in a second or two.";
   if (env.sleep === "waking") return "Starting up…";
-  return "Ready for review.";
+  return "Ready to look at.";
 }
 
 function formatAgo(iso: string, now: number) {
@@ -170,7 +170,7 @@ function recentActivity(environments: Environment[]) {
       events.push({ at: env.updatedAt, repository: env.repository, prNumber: env.prNumber, text: "Updated" });
     }
     if (env.destroyedAt) {
-      const reason = env.destroyReason ? `Removed (${env.destroyReason})` : "Removed";
+      const reason = removedLabel(env.destroyReason);
       events.push({ at: env.destroyedAt, repository: env.repository, prNumber: env.prNumber, text: reason });
     }
     for (const comment of env.comments) {
@@ -243,9 +243,9 @@ export function AdminPanel() {
     const body = (await response.json()) as { error?: string };
     if (response.status === 401) {
       window.location.assign("/admin/login");
-      throw new Error("Sign in again.");
+      throw new Error("Your sign-in ran out. Please sign in again.");
     }
-    if (!response.ok) throw new Error(body.error || `Request failed (${response.status})`);
+    if (!response.ok) throw new Error(body.error || `Something went wrong (error ${response.status}). Please try again.`);
     return body;
   }
 
@@ -279,7 +279,7 @@ export function AdminPanel() {
       setNotice(action === "opened" ? "Preview opened." : null);
       await reload();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Request failed.");
+      setError(caught instanceof Error ? caught.message : "Something went wrong. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -294,7 +294,7 @@ export function AdminPanel() {
       await readBody(response);
       await reload();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Request failed.");
+      setError(caught instanceof Error ? caught.message : "Something went wrong. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -313,7 +313,7 @@ export function AdminPanel() {
       setNotice(`Extended. New expiry ${body.environment.expiresAt}.`);
       await reload();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Request failed.");
+      setError(caught instanceof Error ? caught.message : "Something went wrong. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -333,7 +333,7 @@ export function AdminPanel() {
       setNotice(until ? `Kept awake until ${formatAwakeUntil(until)}.` : "Kept awake.");
       await reload();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Request failed.");
+      setError(caught instanceof Error ? caught.message : "Something went wrong. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -352,14 +352,14 @@ export function AdminPanel() {
       setNotice("Stopped keeping awake.");
       await reload();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Request failed.");
+      setError(caught instanceof Error ? caught.message : "Something went wrong. Please try again.");
     } finally {
       setBusy(false);
     }
   }
 
   async function destroy(env: Environment) {
-    if (!window.confirm(`Destroy ${env.repository} #${env.prNumber}?`)) return;
+    if (!window.confirm(`Remove the preview for ${env.repository} #${env.prNumber}? Its link will stop working.`)) return;
     setBusy(true);
     setError(null);
     setNotice(null);
@@ -371,7 +371,7 @@ export function AdminPanel() {
       await readBody(response);
       await reload();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Request failed.");
+      setError(caught instanceof Error ? caught.message : "Something went wrong. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -385,11 +385,12 @@ export function AdminPanel() {
       const response = await fetch("/api/reaper", { method: "POST", credentials: "include" });
       const body = (await readBody(response)) as { destroyed: Environment[]; failed: { error: string }[] };
       if (body.failed.length > 0) setError(body.failed.map((item) => item.error).join(" "));
-      else if (body.destroyed.length > 0) setNotice(`Destroyed ${body.destroyed.length}.`);
-      else setNotice("Nothing was due.");
+      else if (body.destroyed.length > 0)
+        setNotice(`Cleaned up ${body.destroyed.length} preview${body.destroyed.length === 1 ? "" : "s"} whose time had run out.`);
+      else setNotice("Nothing needed cleaning up.");
       await reload();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Reaper failed.");
+      setError(caught instanceof Error ? caught.message : "Clean-up didn't finish. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -419,7 +420,7 @@ export function AdminPanel() {
       <section className="board-welcome">
         <div>
           <h1>Admin</h1>
-          <p className="lede">Open, update, sleep and remove previews, and try pull request events with the simulator.</p>
+          <p className="lede">Look after every preview by hand, and try out pull requests without going to GitHub.</p>
         </div>
       </section>
 
@@ -427,12 +428,12 @@ export function AdminPanel() {
         <div className="ledger-head">
           <div>
             <h2>Previews</h2>
-            <p className="help">Live and failed previews. Destroy asks before it removes one (including failed).</p>
+            <p className="help">Everything running now, plus any that failed to build. You&apos;ll always be asked before a preview is removed.</p>
           </div>
         </div>
         {loadError ? <p className="error" role="alert">{loadError}</p> : null}
-        {!overview && !loadError ? <p className="empty">Loading the ledger…</p> : null}
-        {overview && rows.length === 0 ? <p className="empty">No live previews.</p> : null}
+        {!overview && !loadError ? <p className="empty">Loading previews…</p> : null}
+        {overview && rows.length === 0 ? <p className="empty">Nothing is running right now.</p> : null}
         {rows.length > 0 ? (
           <ul className="preview-list">
             {rows.map((env) => {
@@ -489,9 +490,9 @@ export function AdminPanel() {
                       </p>
                     ) : null}
                     <details className="env-timeline">
-                      <summary>Timeline</summary>
+                      <summary>History</summary>
                       {timeline.length === 0 ? (
-                        <p className="env-timeline-empty">No history yet</p>
+                        <p className="env-timeline-empty">Nothing has happened yet</p>
                       ) : (
                         <ol className="env-timeline-list">
                           {timeline.map((event, index) => (
@@ -516,7 +517,7 @@ export function AdminPanel() {
                     )}
                     <div className="admin-actions">
                       <button type="button" className="secondary" disabled={busy || !canSleep} onClick={() => void sleepNow(env.id)}>
-                        Sleep now
+                        Put to sleep
                       </button>
                       <select
                         aria-label="Keep awake for"
@@ -556,7 +557,7 @@ export function AdminPanel() {
                         Extend
                       </button>
                       <button type="button" className="destroy" disabled={busy || env.status === "destroying"} onClick={() => void destroy(env)}>
-                        Destroy
+                        Remove
                       </button>
                     </div>
                   </footer>
@@ -571,9 +572,9 @@ export function AdminPanel() {
 
       <div className="workspace">
         <details id="simulator" className="panel simulator" open>
-          <summary>Simulate a pull request</summary>
+          <summary>Try a pull request</summary>
           <p className="help">
-            This talks to Mayfly directly. GitHub can send the same actions to <span className="mono">/api/webhooks/github</span>.
+            Pretend to be GitHub: open, update, close or merge a pull request and watch what Mayfly does. Real pull requests arrive at <span className="mono">/api/webhooks/github</span>.
           </p>
           <article className="sim-pr-card" aria-label="Pull request draft">
             <header className="sim-pr-band">
@@ -598,7 +599,7 @@ export function AdminPanel() {
                   <span className="fact-value mono">{sha.trim() ? sha.trim().slice(0, 8) : "latest"}</span>
                 </span>
                 <span className="fact-pill" data-fact="expires">
-                  <span className="fact-label">TTL</span>
+                  <span className="fact-label">Lifetime</span>
                   <span className="fact-value">
                     {ttlMinutes === "0" ? "expire now" : ttlMinutes.trim() ? `${ttlMinutes} m` : defaultTtlLabel}
                   </span>
@@ -662,7 +663,7 @@ export function AdminPanel() {
                   />
                 </label>
                 <label>
-                  TTL minutes
+                  Lifetime (minutes)
                   <input
                     value={ttlMinutes}
                     onChange={(event) => setTtlMinutes(event.target.value)}
@@ -672,25 +673,25 @@ export function AdminPanel() {
                     placeholder={`default: ${defaultTtlLabel}`}
                   />
                 </label>
-                <p className="help">Leave empty for PREVIEW_TTL_HOURS. Use 0 to expire as soon as the preview is ready, then run the reaper.</p>
+                <p className="help">Leave empty for the usual lifetime. Enter 0 to make it run out straight away, then press Clean up now to see it removed.</p>
                 <div className="actions">
-                  <button type="submit" disabled={busy}>Open PR</button>
+                  <button type="submit" disabled={busy}>Open the pull request</button>
                   <button
                     type="button"
                     className="secondary"
                     disabled={busy}
                     onClick={() => void send("synchronize", { sha: "" })}
                   >
-                    Push commit
+                    Push a new commit
                   </button>
                   <button type="button" className="secondary" disabled={busy} onClick={() => void send("closed")}>
-                    Close PR
+                    Close it
                   </button>
                   <button type="button" className="secondary" disabled={busy} onClick={() => void send("closed", { merged: true })}>
-                    Merge PR
+                    Merge it
                   </button>
                   <button type="button" className="secondary" disabled={busy} onClick={() => void runReaper()}>
-                    Run reaper
+                    Clean up now
                   </button>
                 </div>
               </form>
@@ -699,23 +700,23 @@ export function AdminPanel() {
         </details>
 
         <section className="panel config-check" aria-label="Configuration check">
-          <h2>Configuration check</h2>
+          <h2>Setup check</h2>
           <p className="help">
-            Only the knobs that are not already on the dashboard — webhook security and the URL used for
-            preview links.
+            Two settings worth checking: whether Mayfly can tell real GitHub messages from fake ones, and the address
+            people use to open previews.
           </p>
           <dl className="settings config-check-list">
             <div>
-              <dt>Webhook mode</dt>
+              <dt>Messages from GitHub</dt>
               <dd>
                 {config ? (
                   config.webhookVerification === "signed" ? (
                     <span className="config-status" data-tone="ok">
-                      Signed
+                      Verified
                     </span>
                   ) : (
                     <span className="config-status" data-tone="bad">
-                      Unsigned — anyone can send PR events
+                      Not verified — anyone could pretend to be GitHub
                     </span>
                   )
                 ) : (
@@ -724,14 +725,14 @@ export function AdminPanel() {
               </dd>
             </div>
             <div>
-              <dt>Base URL</dt>
+              <dt>Public address</dt>
               <dd>
                 {config ? (
                   <>
                     <span className="mono config-base-url">{config.previewBaseUrl}</span>
                     {isLocalPreviewBase(config.previewBaseUrl) ? (
                       <span className="config-status" data-tone="warn">
-                        Still localhost — preview links and PR comments will point here, not a public URL
+                        This is a local address, so links in PR comments won&apos;t work for anyone else
                       </span>
                     ) : null}
                   </>
@@ -744,8 +745,8 @@ export function AdminPanel() {
           {config ? (
             <p className="help">
               {config.onRender
-                ? "Change GITHUB_WEBHOOK_SECRET and PREVIEW_BASE_URL in Render → Environment."
-                : "Change GITHUB_WEBHOOK_SECRET and PREVIEW_BASE_URL in .env.local."}
+                ? "To change these, set GITHUB_WEBHOOK_SECRET and PREVIEW_BASE_URL in Render → Environment."
+                : "To change these, set GITHUB_WEBHOOK_SECRET and PREVIEW_BASE_URL in .env.local, then restart Mayfly."}
             </p>
           ) : null}
         </section>

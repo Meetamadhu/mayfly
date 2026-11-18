@@ -92,8 +92,8 @@ export function CostPage() {
         <div>
           <h1>Cost &amp; savings</h1>
           <p className="lede">
-            Estimated from how long previews were awake versus asleep, at {formatEstMoney(costPerHour, currency)} per
-            preview-hour. These are estimates, not a bill.
+            A preview that&apos;s awake is counted at {formatEstMoney(costPerHour, currency)} an hour; a sleeping one costs
+            nothing. These are estimates to compare with, not a bill.
           </p>
         </div>
       </section>
@@ -119,7 +119,7 @@ export function CostPage() {
 
       <p className="board-settings">
         {overview
-          ? `${monthLabel}: awake ${formatSpan(awake)}, asleep ${formatSpan(asleep)} across all previews (demo not counted).`
+          ? `In ${monthLabel}, previews were awake for ${formatSpan(awake)} and asleep for ${formatSpan(asleep)} in total (the demo isn’t counted).`
           : "Loading usage…"}
       </p>
 
@@ -136,9 +136,9 @@ export function CostPage() {
       <section className="board-rail-card page-panel fleet-panel" aria-labelledby="fleet-title">
         <div className="board-rail-head">
           <h2 className="board-rail-title" id="fleet-title">
-            Fleet
+            All previews
           </h2>
-          <span className="board-rail-note">Last {FLEET_WINDOW_DAYS} days · from Mayfly&apos;s own records (demo not counted)</span>
+          <span className="board-rail-note">Last {FLEET_WINDOW_DAYS} days · the demo isn&apos;t counted</span>
         </div>
         {fleet ? (
           <>
@@ -147,19 +147,19 @@ export function CostPage() {
                 <dt>Cost per hour right now</dt>
                 <dd>
                   {formatEstMoney(fleet.burnPerHour, currency)}
-                  <span className="fleet-unit">/h est.</span>
+                  <span className="fleet-unit">an hour (est.)</span>
                 </dd>
                 <p className="fleet-sub">
-                  {fleet.awakeNow} awake · {fleet.asleepNow} asleep (asleep costs nothing)
+                  {fleet.awakeNow} awake, {fleet.asleepNow} asleep. Sleeping previews cost nothing.
                 </p>
               </div>
               <div>
-                <dt>Average lifespan</dt>
+                <dt>How long previews last</dt>
                 <dd>{fleet.averageLifespanMs === null ? "–" : formatLifespan(fleet.averageLifespanMs)}</dd>
                 <p className="fleet-sub">
                   {fleet.lifespanCount === 0
-                    ? "No working preview was removed yet."
-                    : `Median ${formatLifespan(fleet.medianLifespanMs ?? 0)} · ${fleet.lifespanCount} removed preview${fleet.lifespanCount === 1 ? "" : "s"}, failed builds left out`}
+                    ? "No preview has been removed yet."
+                    : `On average. Half last under ${formatLifespan(fleet.medianLifespanMs ?? 0)}. Based on ${fleet.lifespanCount} removed preview${fleet.lifespanCount === 1 ? "" : "s"}.`}
                 </p>
               </div>
               <div>
@@ -167,17 +167,17 @@ export function CostPage() {
                 <dd>{fleet.created}</dd>
                 <p className="fleet-sub">
                   {fleet.peak > 0 && fleet.peakAt
-                    ? `Most at once: ${fleet.peak}, on ${new Date(fleet.peakAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`
-                    : "None running in this period."}
+                    ? `Busiest: ${fleet.peak} at once, on ${new Date(fleet.peakAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`
+                    : "None in the last 30 days."}
                 </p>
               </div>
               <div>
-                <dt>Removed automatically</dt>
+                <dt>Cleaned up on their own</dt>
                 <dd>{fleet.automaticShare === null ? "–" : `${Math.round(fleet.automaticShare * 100)}%`}</dd>
                 <p className="fleet-sub">
                   {fleet.removed === 0
-                    ? "Nothing removed in this period."
-                    : `${fleet.removed - (fleet.reasons.manual ?? 0)} of ${fleet.removed} removals needed no one`}
+                    ? "Nothing removed in the last 30 days."
+                    : `${fleet.removed - (fleet.reasons.manual ?? 0)} of ${fleet.removed} removed without anyone lifting a finger`}
                 </p>
               </div>
             </dl>
@@ -214,7 +214,7 @@ export function CostPage() {
         <div className="ledger-head">
           <div>
             <h2>Per preview</h2>
-            <p className="help">Time each preview spent awake and asleep, and what sleeping saved. Highest first.</p>
+            <p className="help">How long each preview was awake and asleep, and how much sleeping saved. Biggest savings first.</p>
           </div>
         </div>
         {overview && rows.length === 0 ? (
@@ -226,7 +226,7 @@ export function CostPage() {
               <thead>
                 <tr>
                   <th scope="col">Preview</th>
-                  <th scope="col">State</th>
+                  <th scope="col">Now</th>
                   <th scope="col" className="num">
                     Awake
                   </th>
@@ -234,7 +234,7 @@ export function CostPage() {
                     Asleep
                   </th>
                   <th scope="col" className="num">
-                    Est. saved
+                    Saved (est.)
                   </th>
                 </tr>
               </thead>
@@ -269,7 +269,7 @@ export function CostPage() {
           </div>
         ) : null}
         <p className="help activity-note">
-          “—” means the preview was removed before Mayfly started recording time per preview.
+          “—” means the preview was removed before Mayfly started keeping track of time.
         </p>
       </section>
 

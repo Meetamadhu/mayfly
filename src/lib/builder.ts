@@ -120,7 +120,7 @@ function git(args: string[], options: { cwd?: string; watch?: string; maxBytes: 
     child.on("close", (code) => {
       done();
       if (tooLarge) reject(new RepoTooLarge(`Repository is larger than ${Math.round(options.maxBytes / MB)} MB.`));
-      else if (timedOut) reject(new Error("git took longer than 2 minutes."));
+      else if (timedOut) reject(new Error("Downloading the code took longer than 2 minutes. Push again to retry."));
       else if (code !== 0) reject(new Error(err.trim().split(/\r?\n/).slice(-LOG_LINES).join("\n")));
       else resolve(out);
     });
@@ -139,7 +139,7 @@ async function checkout(repository: string, prNumber: number, sha: string, dir: 
   if (!head.startsWith(sha)) {
     // The pull request moved on, or the commit is reachable some other way. Only a full sha can be fetched by name.
     if (!/^[0-9a-f]{40}$/.test(sha)) {
-      throw new Error(`Pull request head is ${head.slice(0, 8)}, not ${sha.slice(0, 8)}.`);
+      throw new Error(`A newer commit (${head.slice(0, 8)}) was pushed while this one (${sha.slice(0, 8)}) was being built. Mayfly builds the newest one.`);
     }
     await git(["fetch", "--depth", "1", "origin", sha], { cwd: dir, ...guarded });
     head = (await git(["rev-parse", "FETCH_HEAD"], { cwd: dir, maxBytes })).trim();
@@ -274,15 +274,15 @@ export function buildImage(request: BuildRequest): Promise<string> {
       console.log(`Building ${tag} from ${request.repository}#${request.prNumber}`);
       await checkout(request.repository, request.prNumber, request.sha, source, maxBytes);
       if ((await directorySize(source)) > maxBytes) {
-        throw new Error(`Repository is larger than ${limits.maxRepoMb} MB.`);
+        throw new Error(`The repository is bigger than Mayfly's ${limits.maxRepoMb} MB limit.`);
       }
-      if (!(await hasDockerfile(source))) throw new Error("No Dockerfile at repo root");
+      if (!(await hasDockerfile(source))) throw new Error("There's no Dockerfile at the top of the repository, so Mayfly doesn't know how to build it. Add one and push again.");
       await dockerBuild(tag, request.envId, source);
 
       const size = Number((await run("docker", ["image", "inspect", "--format", "{{.Size}}", tag]).catch(() => "0")).trim());
       if (size > limits.maxImageMb * MB) {
         await removeImage(tag);
-        throw new Error(`Image is ${Math.round(size / MB)} MB. The limit is ${limits.maxImageMb} MB.`);
+        throw new Error(`The built app is ${Math.round(size / MB)} MB, more than Mayfly's ${limits.maxImageMb} MB limit. Try making the Docker image smaller.`);
       }
       console.log(`Built ${tag} in ${Math.round((Date.now() - started) / 1000)}s (${Math.round(size / MB)} MB)`);
       return tag;
