@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { PullRequestEvent } from "./types";
 
-const HANDLED_ACTIONS = new Set(["opened", "synchronize", "closed", "reopened"]);
+const HANDLED_ACTIONS = new Set(["opened", "synchronize", "closed", "reopened", "labeled", "unlabeled"]);
 
 /** HMAC over the exact request bytes (string or Buffer). GitHub signs the raw body, not a re-parsed JSON form. */
 export function verifyGithubSignature(
@@ -49,6 +49,7 @@ export function parseGithubWebhook(
     pull_request?: {
       number?: unknown;
       merged?: unknown;
+      labels?: unknown;
       head?: { sha?: unknown; ref?: unknown; repo?: { full_name?: unknown } | null };
     };
   };
@@ -66,6 +67,13 @@ export function parseGithubWebhook(
     return { ok: false, error: "Webhook payload is missing repository, pull request, sha, or branch." };
   }
 
+  const labels = Array.isArray(body.pull_request?.labels)
+    ? (body.pull_request.labels as unknown[])
+        .map((label) => (label && typeof label === "object" ? (label as { name?: unknown }).name : null))
+        .filter((name): name is string => typeof name === "string")
+        .slice(0, 100)
+    : undefined;
+
   return {
     ok: true,
     event: {
@@ -75,6 +83,7 @@ export function parseGithubWebhook(
       sha,
       branch,
       merged: body.pull_request?.merged === true,
+      labels,
       // GitHub sends no head repo when the fork was deleted. An empty value counts as a fork.
       headRepository:
         typeof body.pull_request?.head?.repo?.full_name === "string" ? body.pull_request.head.repo.full_name : "",

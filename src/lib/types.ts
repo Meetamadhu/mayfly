@@ -17,7 +17,8 @@ export type LifecycleAction =
   | "activity"
   | "slept"
   | "keep_awake"
-  | "keep_awake_off";
+  | "keep_awake_off"
+  | "labels";
 
 export interface PreviewComment {
   at: string;
@@ -65,8 +66,16 @@ export interface Environment {
   usage?: PreviewUsage;
   /** When set and in the future, the gate will not idle-sleep this preview. */
   keepAwakeUntil?: string | null;
-  /** Effective idle seconds for this repo (overview-only; from PREVIEW_SLEEP_RULES / default). */
+  /** Effective idle seconds for this repo (overview-only; from the TTL policies / env defaults). */
   sleepSeconds?: number;
+  /** Label names on the pull request, from the latest GitHub event that carried them. */
+  labels?: string[];
+  /** Overview-only: the pull request carries the keep label, so this preview does not expire while it is open. */
+  keptByLabel?: boolean;
+  /** How many times this preview has been extended. */
+  extensions?: number;
+  /** The expiry time an expiry warning was already posted for, so it is posted once per expiry. */
+  warnedFor?: string | null;
 }
 
 /** Per-preview estimated awake/asleep accumulators. */
@@ -91,7 +100,9 @@ export interface DeploymentRecord {
 }
 
 export interface PullRequestEvent {
-  action: "opened" | "synchronize" | "closed" | "reopened";
+  action: "opened" | "synchronize" | "closed" | "reopened" | "labeled" | "unlabeled";
+  /** Label names on the pull request, when the event carried them. */
+  labels?: string[];
   repository: string;
   prNumber: number;
   sha: string;
@@ -120,6 +131,15 @@ export interface OrchestratorConfigView {
   githubConnected: boolean;
   /** Currency symbol for estimated savings (from PREVIEW_CURRENCY). */
   currency: string;
+  /** The TTL policy in effect (page settings over env defaults). */
+  policy: {
+    ttlHours: number;
+    sleepSeconds: number;
+    maxLifetimeHours: number;
+    maxExtensions: number | null;
+    keepLabel: string;
+    warnMinutes: number;
+  };
 }
 
 /** One UTC day's estimated awake/asleep totals. */

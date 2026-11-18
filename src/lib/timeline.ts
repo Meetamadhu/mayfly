@@ -45,6 +45,12 @@ export function timelineLabel(event: EnvironmentEvent): string {
       return event.detail ? `Kept awake until ${formatClock(event.detail)}` : "Kept awake";
     case "keep_awake_off":
       return "Stopped keeping awake";
+    case "kept":
+      return event.detail ? `Kept open by the “${event.detail}” label` : "Kept open by a label";
+    case "unkept":
+      return "Keep label removed, lifetime restarted";
+    case "warned":
+      return "Expiry warning posted on the PR";
     case "failed": {
       const first = event.detail?.split("\n")[0]?.trim();
       return first ? `Failed: ${first}` : "Failed";

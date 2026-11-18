@@ -4,6 +4,7 @@ import express, { type NextFunction, type Request, type Response } from "express
 import { adminRouter } from "./routes/admin";
 import { environmentsRouter } from "./routes/environments";
 import { eventsRouter } from "./routes/events";
+import { policyRouter } from "./routes/policy";
 import { previewRouter } from "./routes/preview";
 import { webhooksRouter } from "./routes/webhooks";
 import { sendJson } from "./lib/respond";
@@ -59,8 +60,10 @@ async function startBackgroundWork() {
 
   const { getConfig } = await import("@/lib/config");
   getConfig(); // Warns once about invalid PREVIEW_SLEEP_RULES entries.
-  const { removeOrphanPreviewContainers, restorePreviews } = await import("@/lib/lifecycle");
+  const { loadPolicy, removeOrphanPreviewContainers, restorePreviews } = await import("@/lib/lifecycle");
   const { startReaperLoop } = await import("@/lib/reaper-loop");
+  // Restored previews start their gates with the saved sleep times, so load the policy first.
+  await loadPolicy();
   await removeOrphanPreviewContainers();
   await restorePreviews();
   startReaperLoop();
@@ -85,6 +88,7 @@ async function main() {
   server.use(environmentsRouter);
   server.use(webhooksRouter);
   server.use(eventsRouter);
+  server.use(policyRouter);
   server.use(previewRouter);
   server.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
     if (res.headersSent) {

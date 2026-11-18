@@ -182,6 +182,17 @@ export async function publishPullRequestComment(
   return postComment(repository, prNumber, marked, token);
 }
 
+/**
+ * Post a separate, unmarked comment (such as an expiry warning) so GitHub notifies the PR's participants.
+ * The single edit-in-place Mayfly comment is left alone. Returns false when no token is configured.
+ */
+export async function postPullRequestNote(repository: string, prNumber: number, body: string): Promise<boolean> {
+  const token = getConfig().githubToken;
+  if (!token) return false;
+  await postComment(repository, prNumber, body, token);
+  return true;
+}
+
 export type CommitStatusState = "error" | "failure" | "pending" | "success";
 
 /** Posts a commit status that shows on the pull request as a Mayfly check. Needs `repo:status` (or `repo`). */

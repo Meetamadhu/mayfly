@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import net from "node:net";
 import { MongoClient, type Collection, type Db, type Filter } from "mongodb";
 import type { State } from "./store";
+import { asStoredPolicy } from "./policy";
 
 // Far regions (e.g. Codespaces) often need >250 ms to the first address Node tries.
 net.setDefaultAutoSelectFamilyAttemptTimeout(2000);
@@ -93,7 +94,8 @@ function asState(value: unknown): State {
   const environments = (value as State).environments;
   if (!Array.isArray(environments)) return { environments: [] };
   const usage = asUsage((value as State).usage);
-  return usage ? { environments, usage } : { environments };
+  const policy = asStoredPolicy((value as State).policy);
+  return { environments, ...(usage ? { usage } : {}), ...(policy ? { policy } : {}) };
 }
 
 async function getClient(): Promise<MongoClient> {
