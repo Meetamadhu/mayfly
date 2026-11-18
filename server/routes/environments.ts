@@ -11,6 +11,7 @@ import {
   recordActivity,
   sleepEnvironment,
 } from "@/lib/lifecycle";
+import { publicEnvironment, publicOverview } from "@/lib/public-view";
 import { requireAdmin } from "../middleware/require-admin";
 import { asyncHandler, sendJson, sendLifecycle } from "../lib/respond";
 
@@ -32,10 +33,16 @@ function parseId(raw: string | string[] | undefined): string | null {
   return id;
 }
 
+/** Signed-in admins see everything; everyone else gets the trimmed public view. */
+function isAdmin(req: { method: string; headers: Record<string, string | string[] | undefined> }) {
+  return checkAdmin({ method: req.method, header: headerOf(req) }) === null;
+}
+
 environmentsRouter.get(
   "/api/environments",
-  asyncHandler(async (_req, res) => {
-    sendJson(res, await getOverview());
+  asyncHandler(async (req, res) => {
+    const overview = await getOverview();
+    sendJson(res, isAdmin(req) ? overview : publicOverview(overview));
   }),
 );
 
@@ -52,7 +59,7 @@ environmentsRouter.get(
       sendJson(res, { ok: false, code: "not_found", error: "No environment with that id." }, 404);
       return;
     }
-    sendJson(res, { ok: true, environment });
+    sendJson(res, { ok: true, environment: isAdmin(req) ? environment : publicEnvironment(environment) });
   }),
 );
 
