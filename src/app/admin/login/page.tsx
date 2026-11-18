@@ -21,7 +21,9 @@ export default function AdminLoginPage() {
         body: JSON.stringify({ token }),
       });
       if (response.ok) {
-        window.location.assign("/admin");
+        // Only known pages, so the link can't send someone elsewhere after signing in.
+        const next = new URLSearchParams(window.location.search).get("next");
+        window.location.assign(next === "/policies" ? "/policies" : "/admin");
         return;
       }
       setWrong(true);

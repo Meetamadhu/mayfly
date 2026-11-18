@@ -8,11 +8,20 @@ import {
   previewCostPerHour,
   previewCurrency,
   previewRepos,
+  parseSleepRules,
   previewRuntime,
   sleepSecondsForRepo,
+  ttlHoursForRepo,
 } from "./config";
 import { getDeployer, previewUrl, publicPreviewUrl, type Deployment } from "./deployer";
-import { publishCommitStatus, publishPullRequestComment } from "./http";
+import { postPullRequestNote, publishCommitStatus, publishPullRequestComment } from "./http";
+import {
+  currentPolicy,
+  hasKeepLabel,
+  parsePolicy,
+  setCurrentPolicy,
+  type PreviewPolicy,
+} from "./policy";
 import { exclusive, loadState, saveState } from "./store";
 import {
   isLiveStatus,
@@ -70,9 +79,28 @@ function lastEventAt(env: Environment, type: string): number {
 }
 
 function ttlMsFor(event: PullRequestEvent) {
-  const config = getConfig();
-  if (event.ttlMinutes === undefined) return config.ttlMs;
+  if (event.ttlMinutes === undefined) return ttlHoursForRepo(event.repository) * 60 * 60 * 1000;
   return event.ttlMinutes * 60 * 1000;
+}
+
+/** Labels from a GitHub event, trimmed and capped. Undefined when the event carried none (the simulator). */
+function eventLabels(event: PullRequestEvent): string[] | undefined {
+  if (!event.labels) return undefined;
+  return event.labels.map((name) => name.trim()).filter(Boolean).slice(0, 50);
+}
+
+/** Note on the timeline when the keep label is added or removed. */
+function noteKeepChange(env: Environment, wasKept: boolean, at: string) {
+  const kept = hasKeepLabel(env.labels);
+  if (kept === wasKept) return;
+  if (kept) {
+    pushEnvironmentEvent(env, { at, type: "kept", detail: currentPolicy().keepLabel });
+  } else {
+    // Without the label, the normal lifetime starts again from now so the preview is not removed at once.
+    env.expiresAt = iso(Math.max(Date.parse(env.expiresAt), Date.parse(at) + ttlHoursForRepo(env.repository) * 3_600_000));
+    env.warnedFor = null;
+    pushEnvironmentEvent(env, { at, type: "unkept" });
+  }
 }
 
 function findLive(environments: Environment[], repository: string, prNumber: number) {
@@ -247,9 +275,11 @@ type GateStatus = {
   lastWakeMs: number | null;
   sleptAt: string | null;
   wokeAt: string | null;
+  /** The idle time the gate is using now. */
+  sleepSeconds: number | null;
 };
 
-const UNKNOWN_GATE: GateStatus = { sleep: "unknown", lastWakeMs: null, sleptAt: null, wokeAt: null };
+const UNKNOWN_GATE: GateStatus = { sleep: "unknown", lastWakeMs: null, sleptAt: null, wokeAt: null, sleepSeconds: null };
 
 function asIsoTimestamp(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -278,6 +308,7 @@ async function readGate(env: Environment, deployments: DeploymentRecord[]): Prom
       lastWakeMs?: unknown;
       sleptAt?: unknown;
       wokeAt?: unknown;
+      sleepSeconds?: unknown;
     };
     const sleep: SleepState =
       body.state === "awake" || body.state === "waking" || body.state === "asleep" ? body.state : "unknown";
@@ -290,6 +321,10 @@ async function readGate(env: Environment, deployments: DeploymentRecord[]): Prom
       lastWakeMs,
       sleptAt: asIsoTimestamp(body.sleptAt),
       wokeAt: asIsoTimestamp(body.wokeAt),
+      sleepSeconds:
+        typeof body.sleepSeconds === "number" && Number.isFinite(body.sleepSeconds) && body.sleepSeconds > 0
+          ? body.sleepSeconds
+          : null,
     };
   } catch {
     return UNKNOWN_GATE;
@@ -331,6 +366,8 @@ export async function getOverview(): Promise<Overview> {
     getDeployer().list(),
   ]);
 
+  setCurrentPolicy(state.policy);
+  const policy = currentPolicy();
   const sorted = state.environments.map(refreshPreviewUrl).sort((a, b) => {
     const liveRank = Number(isLiveStatus(b.status)) - Number(isLiveStatus(a.status));
     if (liveRank !== 0) return liveRank;
@@ -347,6 +384,7 @@ export async function getOverview(): Promise<Overview> {
         lastWakeMs: gate.lastWakeMs,
         sleepSeconds: sleepSecondsForRepo(env.repository),
         keepAwakeUntil,
+        keptByLabel: isLiveStatus(env.status) && hasKeepLabel(env.labels),
       };
     }),
   );
@@ -361,9 +399,9 @@ export async function getOverview(): Promise<Overview> {
     }),
     config: {
       maxConcurrent: config.maxConcurrent,
-      ttlHours: config.ttlHours,
+      ttlHours: policy.ttlHours ?? config.ttlHours,
       idleHours: config.idleHours,
-      sleepSeconds: config.sleepSeconds,
+      sleepSeconds: policy.sleepSeconds ?? config.sleepSeconds,
       reaperIntervalMs: config.reaperIntervalMs,
       previewBaseUrl: config.previewBaseUrl,
       deployer: config.deployer,
@@ -373,6 +411,14 @@ export async function getOverview(): Promise<Overview> {
       onRender: Boolean(process.env.RENDER),
       githubConnected: githubConfigured(),
       currency,
+      policy: {
+        ttlHours: policy.ttlHours ?? config.ttlHours,
+        sleepSeconds: policy.sleepSeconds ?? config.sleepSeconds,
+        maxLifetimeHours: config.maxLifetimeHours,
+        maxExtensions: policy.maxExtensions,
+        keepLabel: policy.keepLabel,
+        warnMinutes: policy.warnMinutes,
+      },
     },
     summary: {
       live: environments.filter((env) => isLiveStatus(env.status)).length,
@@ -549,6 +595,12 @@ async function reserve(event: PullRequestEvent): Promise<LifecycleResult> {
       existing.error = null;
       existing.updateGeneration += 1;
       pushEnvironmentEvent(existing, { at: now, type: "updated", detail: normalized.sha.slice(0, 8) });
+      const labels = eventLabels(normalized);
+      if (labels) {
+        const wasKept = hasKeepLabel(existing.labels);
+        existing.labels = labels;
+        noteKeepChange(existing, wasKept, now);
+      }
       await saveState(state);
       return { ok: true, action: "updated", environment: clone(existing) };
     }
@@ -582,7 +634,12 @@ async function reserve(event: PullRequestEvent): Promise<LifecycleResult> {
       updateGeneration: 1,
       comments: [],
       events: [{ at: now, type: "opened" }],
+      labels: eventLabels(normalized) ?? [],
+      extensions: 0,
     };
+    if (hasKeepLabel(created.labels)) {
+      pushEnvironmentEvent(created, { at: now, type: "kept", detail: currentPolicy().keepLabel });
+    }
     state.environments.push(created);
     await saveState(state);
     return { ok: true, action: "created", environment: clone(created) };
@@ -603,10 +660,31 @@ function startDeploy(environment: Environment, action: "created" | "updated"): P
   return runDeploy(environment, work, action);
 }
 
+/** A label was added or removed on the pull request: no rebuild, only the keep label matters. */
+async function applyLabels(event: PullRequestEvent): Promise<LifecycleResult> {
+  const normalized = normalizeEvent(event);
+  return exclusive(async () => {
+    const state = await loadState();
+    const env = findLive(state.environments, normalized.repository, normalized.prNumber);
+    if (!env) {
+      return { ok: false, code: "not_found", error: `No live preview for ${normalized.repository}#${normalized.prNumber}.` };
+    }
+    const labels = eventLabels(normalized) ?? [];
+    const wasKept = hasKeepLabel(env.labels);
+    env.labels = labels;
+    noteKeepChange(env, wasKept, iso());
+    await saveState(state);
+    return { ok: true, action: wasKept === hasKeepLabel(labels) ? "unchanged" : "labels", environment: clone(env) };
+  });
+}
+
 export async function applyPullRequestEvent(
   event: PullRequestEvent,
   options?: { wait?: boolean },
 ): Promise<LifecycleResult> {
+  if (event.action === "labeled" || event.action === "unlabeled") {
+    return applyLabels(event);
+  }
   if (event.action === "closed") {
     const normalized = normalizeEvent(event);
     const existing = await exclusive(async () => {
@@ -820,6 +898,22 @@ export async function extendEnvironment(id: string, hours: number): Promise<Life
       };
     }
 
+    const limit = currentPolicy().maxExtensions;
+    const used = env.extensions ?? 0;
+    if (limit !== null && used >= limit) {
+      const label = currentPolicy().keepLabel;
+      return {
+        ok: false,
+        code: "invalid",
+        error:
+          limit === 0
+            ? "Extending is turned off in TTL policies."
+            : `This preview has used all ${limit} extension${limit === 1 ? "" : "s"}.` +
+              (label ? ` Add the “${label}” label to the pull request to keep it.` : ""),
+        environment: clone(env),
+      };
+    }
+
     const nowMs = Date.now();
     const currentExpires = Date.parse(env.expiresAt);
     const createdMs = Date.parse(env.createdAt);
@@ -837,6 +931,8 @@ export async function extendEnvironment(id: string, hours: number): Promise<Life
     const next = Math.min(base + hours * 60 * 60 * 1000, cap);
     env.expiresAt = iso(next);
     env.updatedAt = iso(nowMs);
+    env.extensions = used + 1;
+    env.warnedFor = null;
     pushEnvironmentEvent(env, { at: env.updatedAt, type: "extended", detail: env.expiresAt });
     await saveState(state);
     return { ok: true, action: "updated", environment: clone(env) };
@@ -866,6 +962,43 @@ async function tellGateKeepAwake(env: Environment, until: string | null): Promis
   } catch {
     return false;
   }
+}
+
+/** Tell a running gate to use a new idle time, so a policy change applies without a rebuild. */
+async function tellGateIdle(port: number, seconds: number): Promise<boolean> {
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/__preview_idle`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ seconds }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(3000),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Push each live preview's current idle time to its gate when the gate uses a different one. */
+async function syncGateIdle(
+  envs: Environment[],
+  deployments: DeploymentRecord[],
+  known?: Map<string, GateStatus>,
+): Promise<{ updated: number; failed: number }> {
+  let updated = 0;
+  let failed = 0;
+  for (const env of envs) {
+    if (env.status !== "ready" && env.status !== "updating") continue;
+    const port = deployments.find((item) => item.deploymentId === env.deploymentId)?.port;
+    if (!port || !Number.isInteger(port)) continue;
+    const want = sleepSecondsForRepo(env.repository);
+    const have = known?.get(env.id)?.sleepSeconds;
+    if (known && (have == null || have === want)) continue;
+    if (await tellGateIdle(port, want)) updated += 1;
+    else failed += 1;
+  }
+  return { updated, failed };
 }
 
 const KEEP_AWAKE_HOURS = new Set([1, 4, 8]);
@@ -1097,6 +1230,134 @@ function newestEvent(env: Environment): EnvironmentEvent | null {
   return newest;
 }
 
+function formatUtc(isoTime: string) {
+  return `${new Date(isoTime).toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "UTC",
+  })} UTC`;
+}
+
+function formatLeft(ms: number) {
+  const minutes = Math.max(1, Math.round(ms / 60_000));
+  if (minutes < 90) return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+  const hours = Math.round(minutes / 60);
+  return hours < 36 ? `${hours} hours` : `${Math.round(hours / 24)} days`;
+}
+
+/** Post a separate PR comment (so people are notified) before the preview's lifetime ends. */
+async function postExpiryWarning(env: Environment) {
+  const label = currentPolicy().keepLabel;
+  const ways = [
+    label ? `add the \`${label}\` label to this pull request` : null,
+    "push a new commit",
+    `extend it on [Mayfly Admin](${getConfig().previewBaseUrl}/admin)`,
+  ].filter(Boolean);
+  const body = [
+    `**Mayfly preview expires in about ${formatLeft(Date.parse(env.expiresAt) - Date.now())}**`,
+    "",
+    `This pull request's preview will be removed at ${formatUtc(env.expiresAt)}.`,
+    "",
+    `To keep it longer: ${ways.slice(0, -1).join(", ")}, or ${ways.at(-1)}.`,
+  ].join("\n");
+  let posted = false;
+  try {
+    posted = await postPullRequestNote(env.repository, env.prNumber, body);
+  } catch (error) {
+    console.error("Expiry warning was not posted", error);
+  }
+  if (!posted) return;
+  await exclusive(async () => {
+    const state = await loadState();
+    const current = state.environments.find((item) => item.id === env.id);
+    if (!current) return;
+    pushEnvironmentEvent(current, { at: iso(), type: "warned", detail: env.expiresAt });
+    await saveState(state);
+  });
+}
+
+/** Load the saved policy into memory. Called at startup before previews are restored. */
+export async function loadPolicy() {
+  const state = await exclusive(async () => loadState());
+  setCurrentPolicy(state.policy);
+}
+
+export interface PolicyView {
+  policy: PreviewPolicy;
+  /** What applies when a field is left empty: the environment variables. */
+  defaults: {
+    ttlHours: number;
+    sleepSeconds: number;
+    maxLifetimeHours: number;
+    sleepRules: Record<string, number>;
+  };
+  /** Repositories worth offering in the rule picker. */
+  repositories: string[];
+  githubConnected: boolean;
+}
+
+export async function getPolicyView(): Promise<PolicyView> {
+  const config = getConfig();
+  const state = await exclusive(async () => loadState());
+  setCurrentPolicy(state.policy);
+  const policy = currentPolicy();
+  const repositories = new Set<string>([
+    ...previewRepos(),
+    ...state.environments.filter((env) => isLiveStatus(env.status)).map((env) => env.repository),
+    ...policy.repoRules.map((rule) => rule.repository),
+  ]);
+  const demo = config.demo?.repository;
+  if (demo) repositories.delete(demo);
+  return {
+    policy,
+    defaults: {
+      ttlHours: config.ttlHours,
+      sleepSeconds: config.sleepSeconds,
+      maxLifetimeHours: config.maxLifetimeHours,
+      sleepRules: Object.fromEntries(parseSleepRules()),
+    },
+    repositories: [...repositories].sort(),
+    githubConnected: githubConfigured(),
+  };
+}
+
+export type PolicySaveResult =
+  | { ok: true; view: PolicyView; gates: { updated: number; failed: number } }
+  | { ok: false; error: string };
+
+/**
+ * Save the policy from the TTL policies page. New lifetimes apply when a preview opens or gets a new commit;
+ * sleep times apply to running previews right away.
+ */
+export async function savePolicy(input: unknown): Promise<PolicySaveResult> {
+  const parsed = parsePolicy(input, iso());
+  if (!parsed.ok) return parsed;
+
+  const live = await exclusive(async () => {
+    const state = await loadState();
+    const keptBefore = new Map(state.environments.map((env) => [env.id, hasKeepLabel(env.labels)]));
+    state.policy = parsed.policy;
+    setCurrentPolicy(parsed.policy);
+    // A renamed or removed keep label releases previews it was holding: give them a fresh lifetime.
+    const now = iso();
+    for (const env of state.environments) {
+      if (!isLiveStatus(env.status)) continue;
+      noteKeepChange(env, keptBefore.get(env.id) ?? false, now);
+    }
+    await saveState(state);
+    return state.environments.filter((env) => isLiveStatus(env.status)).map((env) => clone(env));
+  });
+
+  const deployments = await getDeployer().list();
+  const known = new Map<string, GateStatus>();
+  await Promise.all(live.map(async (env) => known.set(env.id, await readGate(env, deployments))));
+  const gates = await syncGateIdle(live, deployments, known);
+  return { ok: true, view: await getPolicyView(), gates };
+}
+
 export async function reap(): Promise<ReapResult> {
   const config = getConfig();
   const now = Date.now();
@@ -1113,8 +1374,10 @@ export async function reap(): Promise<ReapResult> {
     }),
   );
 
+  const warnings: Environment[] = [];
   const due = await exclusive(async () => {
     const state = await loadState();
+    setCurrentPolicy(state.policy);
     const month = monthKey(now);
     let usage: UsageMonth;
     if (state.usage && state.usage.month === month) {
@@ -1218,10 +1481,31 @@ export async function reap(): Promise<ReapResult> {
       // Idle previews are not destroyed here. The gate sleeps an unused app (the app process exits, the gate
       // stays up) and the next visit wakes it. Only the time limit ends a ready preview.
       if (isDemo(env)) continue;
-      if (now >= Date.parse(env.expiresAt)) targets.push({ id: env.id, reason: "expired" });
+      // The keep label holds a preview until its pull request closes.
+      if (hasKeepLabel(env.labels)) continue;
+      const expiresMs = Date.parse(env.expiresAt);
+      if (now >= expiresMs) {
+        targets.push({ id: env.id, reason: "expired" });
+        continue;
+      }
+      // Warn once per expiry time, and only when the preview lived longer than the warning window.
+      const warnMs = currentPolicy().warnMinutes * 60_000;
+      if (
+        warnMs > 0 &&
+        expiresMs - now <= warnMs &&
+        expiresMs - Date.parse(env.createdAt) > warnMs &&
+        env.warnedFor !== env.expiresAt
+      ) {
+        env.warnedFor = env.expiresAt;
+        warnings.push(clone(env));
+      }
     }
+    if (warnings.length > 0) await saveState(state);
     return targets;
   });
+
+  for (const env of warnings) await postExpiryWarning(env);
+  await syncGateIdle(sampled, deployments, gateById);
 
   const destroyed: Environment[] = [];
   const failed: { id: string; error: string }[] = [];

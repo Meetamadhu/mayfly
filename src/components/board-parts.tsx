@@ -653,7 +653,7 @@ export function matchesBoardFilter(env: Environment, filter: BoardFilter, now: n
   if (filter === "asleep") return env.sleep === "asleep";
   if (filter === "expiring") {
     if (demoKey && demoKey === `${env.repository}#${env.prNumber}`) return false;
-    if (!env.expiresAt) return false;
+    if (env.keptByLabel || !env.expiresAt) return false;
     const left = Date.parse(env.expiresAt) - now;
     return Number.isFinite(left) && left > 0 && left <= EXPIRING_SOON_MS;
   }
