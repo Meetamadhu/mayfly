@@ -3705,3 +3705,53 @@ html:not([data-theme="dark"]) .board-topbar {
   .policy-effect-table td { white-space: normal; }
   .policy-effect-table th, .policy-effect-table td { padding-left: 0.4rem; padding-right: 0.4rem; }
 }
+
+/* Cost page: fleet stats */
+.fleet-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0.35rem 0 0;
+}
+.fleet-grid > div {
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  min-width: 0;
+}
+.fleet-grid dt { color: var(--muted); font-size: 0.82rem; font-weight: 600; }
+.fleet-grid dd {
+  margin: 0.3rem 0 0;
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.fleet-unit { margin-left: 0.2rem; font-size: 0.8rem; font-weight: 600; color: var(--muted); letter-spacing: 0; }
+.fleet-sub { margin: 0.3rem 0 0; color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
+.fleet-reasons { margin-top: 1rem; }
+.fleet-reasons-title { margin: 0 0 0.45rem; font-size: 0.85rem; font-weight: 600; }
+.fleet-bar { display: flex; gap: 2px; height: 0.7rem; border-radius: 999px; overflow: hidden; }
+.fleet-bar span { flex-basis: 0; min-width: 4px; }
+.fleet-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  margin: 0.55rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.fleet-legend li { display: inline-flex; align-items: center; gap: 0.35rem; }
+.fleet-legend strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+.fleet-swatch { width: 0.65rem; height: 0.65rem; border-radius: 3px; }
+.fleet-panel [data-reason="merged"] { background: var(--accent); }
+.fleet-panel [data-reason="closed"] { background: var(--building); }
+.fleet-panel [data-reason="expired"] { background: var(--warn); }
+.fleet-panel [data-reason="manual"] { background: color-mix(in srgb, var(--muted) 70%, var(--line)); }
+.fleet-panel [data-reason="idle"] { background: color-mix(in srgb, var(--building) 50%, var(--line)); }
+.fleet-panel [data-reason="failed"], .fleet-panel [data-reason="stuck"] { background: var(--danger); }
+@media (max-width: 960px) { .fleet-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .fleet-grid { grid-template-columns: minmax(0, 1fr); } }
