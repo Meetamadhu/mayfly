@@ -1,3 +1,5 @@
+import { currentPolicy, repoRuleFor } from "./policy";
+
 export interface OrchestratorConfig {
   maxConcurrent: number;
   ttlMs: number;
@@ -160,11 +162,24 @@ export function parseSleepRules(raw = process.env.PREVIEW_SLEEP_RULES ?? ""): Ma
   return next;
 }
 
-/** Idle seconds for this repository: per-repo rule, else PREVIEW_SLEEP_SECONDS. */
+/**
+ * Idle seconds for this repository. The most specific setting wins, and the TTL policies page beats an
+ * environment variable at the same level: page repo rule, PREVIEW_SLEEP_RULES, page default,
+ * PREVIEW_SLEEP_SECONDS.
+ */
 export function sleepSecondsForRepo(repository: string): number {
-  const rules = parseSleepRules();
   const key = repository.trim().toLowerCase();
-  return rules.get(key) ?? getConfig().sleepSeconds;
+  return (
+    repoRuleFor(key)?.sleepSeconds ??
+    parseSleepRules().get(key) ??
+    currentPolicy().sleepSeconds ??
+    getConfig().sleepSeconds
+  );
+}
+
+/** Lifetime in hours for this repository: page repo rule, page default, then PREVIEW_TTL_HOURS. */
+export function ttlHoursForRepo(repository: string): number {
+  return repoRuleFor(repository)?.ttlHours ?? currentPolicy().ttlHours ?? getConfig().ttlHours;
 }
 
 export function getConfig(): OrchestratorConfig {

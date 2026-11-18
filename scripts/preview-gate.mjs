@@ -3,7 +3,8 @@ import { createServer, request as forward } from "node:http";
 
 const port = Number(process.env.PORT);
 const appPort = Number(process.env.APP_PORT);
-const idleMs = Number(process.env.PREVIEW_SLEEP_MS || 20_000);
+/** Idle time before the app sleeps. Mayfly can change it at runtime with POST /__preview_idle. */
+let idleMs = Number(process.env.PREVIEW_SLEEP_MS || 20_000);
 const script = process.env.PREVIEW_APP_SCRIPT;
 const useDocker = process.env.PREVIEW_RUNTIME === "docker";
 const containerName = process.env.PREVIEW_CONTAINER || `mayfly-app-${appPort}`;
@@ -519,6 +520,28 @@ const server = createServer((req, res) => {
     stopApp();
     res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
     res.end(JSON.stringify({ state: "asleep" }));
+    return;
+  }
+  // Private control (the public /p/ proxy blocks every /__preview_* path except GET status).
+  if (req.method === "POST" && pathOnly === "/__preview_idle") {
+    readJsonBody(req)
+      .then((body) => {
+        const seconds = body && typeof body.seconds === "number" ? body.seconds : NaN;
+        if (!Number.isInteger(seconds) || seconds < 1 || seconds > 86_400) {
+          res.writeHead(400, { "content-type": "application/json", "cache-control": "no-store" });
+          res.end(JSON.stringify({ error: "seconds must be a whole number from 1 to 86400." }));
+          return;
+        }
+        idleMs = seconds * 1000;
+        res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+        res.end(JSON.stringify({ sleepSeconds: seconds }));
+      })
+      .catch(() => {
+        if (!res.headersSent) {
+          res.writeHead(400, { "content-type": "application/json", "cache-control": "no-store" });
+          res.end(JSON.stringify({ error: "Invalid JSON body." }));
+        }
+      });
     return;
   }
   if (req.method === "POST" && pathOnly === "/__preview_keepawake") {
