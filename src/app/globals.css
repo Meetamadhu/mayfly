@@ -3849,3 +3849,164 @@ html:not([data-theme="dark"]) .board-topbar {
 .prc-history li { display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; color: var(--muted); }
 .prc-history-when { min-width: 9rem; font-variant-numeric: tabular-nums; }
 @media (max-width: 860px) { .prc-layout { grid-template-columns: minmax(0, 1fr); } }
+
+/* ------------------------------------------------------------------------------------------------
+   Less generic: plain ground, sentence-case labels, flat numbers, one memorable element (the lifespan line).
+   ------------------------------------------------------------------------------------------------ */
+body { background: var(--bg); }
+
+/* Labels read as words, not shouted tags. */
+.eyebrow, .stats dt, .fact-pill .fact-label, .status, .sleep, .state-word, .removed-pill, .sim-pr-open,
+.admin-panel .simulator label, .activity-kind, .landing-orbit-kicker, .landing-compare h3, .state-pill,
+.env-card-meta .fact-label, .cost-line-totals dt, .activity-day-title, .cost-table thead th, .prc-facts dt {
+  text-transform: none;
+  letter-spacing: normal;
+}
+.stats dt, .fact-pill .fact-label, .cost-line-totals dt, .activity-day-title, .cost-table thead th, .prc-facts dt {
+  font-size: 0.86rem;
+  font-weight: 500;
+}
+.state-pill { font-size: 0.8rem; font-weight: 600; }
+.state-pill svg { display: none; }
+
+/* Numbers in a row, separated by rules, instead of a strip of gradient tiles with icon badges. */
+.stats { gap: 0; }
+.stats > div {
+  padding: 0.15rem 1.1rem 0.2rem;
+  background: none;
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  box-shadow: none;
+}
+.stats > div:first-child { padding-left: 0; border-left: 0; }
+.stats .stat-icon, .stats .meter { display: none; }
+.stats dd { font-size: 1.7rem; font-weight: 600; letter-spacing: -0.02em; }
+@media (max-width: 720px) {
+  .stats > div:nth-child(odd) { padding-left: 0; border-left: 0; }
+}
+
+/* Cards: quieter. One radius for containers, no glow or lift. */
+.board-rail-card, .env-card, .panel, .page-panel, .prc-comment { border-radius: 10px; box-shadow: none; }
+
+/* Dashboard headline: the state of things, in a sentence. */
+.board-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.35rem 1.5rem;
+  align-items: end;
+  margin: 0.25rem 0 1.6rem;
+}
+.board-headline {
+  grid-column: 1;
+  max-width: 30ch;
+  margin: 0;
+  font-size: clamp(1.7rem, 3.4vw, 2.6rem);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+.board-subline { grid-column: 1; max-width: 62ch; margin: 0.35rem 0 0; color: var(--muted); font-size: 1rem; }
+.board-hero-action { grid-column: 2; grid-row: 1 / span 2; align-self: end; }
+@media (max-width: 720px) {
+  .board-hero { grid-template-columns: minmax(0, 1fr); }
+  .board-hero-action { grid-column: 1; grid-row: auto; justify-self: start; margin-top: 0.6rem; }
+}
+
+/* Preview card: title, branch, the lifespan line, one sentence of facts. */
+.env-card-titles h3 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.15rem 0.5rem; }
+.env-card-titles h3 .card-repo { margin: 0; font-size: 0.85rem; font-weight: 500; letter-spacing: normal; }
+.env-card-branch { margin: 0.2rem 0 0; color: var(--muted); font-size: 0.82rem; overflow-wrap: anywhere; }
+.env-card-facts { margin: 0.7rem 0 0; color: var(--muted); font-size: 0.86rem; line-height: 1.45; }
+.env-card-facts .mono { color: var(--ink); font-size: 0.82rem; }
+
+/* The lifespan line. */
+.lifespan { margin: 0.2rem 0 0; }
+.lifespan-track {
+  position: relative;
+  height: 0.6rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line) 55%, transparent);
+  overflow: hidden;
+}
+.lifespan-seg { position: absolute; top: 0; bottom: 0; min-width: 2px; }
+.lifespan-seg[data-life="awake"] { background: var(--accent); }
+.lifespan-seg[data-life="asleep"] { top: 35%; bottom: 35%; background: color-mix(in srgb, var(--muted) 70%, transparent); }
+.lifespan-seg[data-life="build"] {
+  background: repeating-linear-gradient(135deg, var(--building) 0 3px, transparent 3px 6px);
+}
+.lifespan-seg[data-life="unknown"] { top: 42%; bottom: 42%; background: var(--line); }
+.lifespan-left {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border: 1px dashed color-mix(in srgb, var(--muted) 60%, transparent);
+  border-left: 0;
+  border-radius: 0 999px 999px 0;
+}
+.lifespan[data-open-ended="true"] .lifespan-left {
+  border: 0;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--muted) 30%, transparent), transparent);
+}
+.lifespan-now { position: absolute; top: -2px; bottom: -2px; width: 2px; margin-left: -1px; background: var(--ink); }
+.lifespan-ends {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.lifespan-share { flex: 1; text-align: center; }
+@media (max-width: 420px) { .lifespan-share { display: none; } }
+
+/* Keep the bordered previews panel (as asked), without the glow. */
+.board-app .live-column { box-shadow: none; }
+
+/* Admin preview card: same anatomy as the dashboard card. */
+.admin-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.6rem; }
+.admin-card-head h3 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.15rem 0.5rem;
+  margin: 0;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+.admin-card-head h3 .card-repo { margin: 0; font-size: 0.85rem; font-weight: 500; letter-spacing: normal; }
+.admin-card-note { margin: 0.55rem 0 0.7rem; font-size: 0.9rem; line-height: 1.45; }
+.preview-list .env { border-color: var(--line); }
+
+/* Flat number rows everywhere (no tinted tiles), and figures without stretched punctuation. */
+.stats > div[data-stat] { background: none; }
+.stats dd, .fleet-grid dd, .cost-line-totals dd { font-variant-numeric: normal; }
+.fleet-grid, .cost-line-totals { gap: 0; }
+.fleet-grid > div, .cost-line-totals div {
+  padding: 0.1rem 1rem 0.2rem;
+  background: none;
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+}
+.fleet-grid > div:first-child, .cost-line-totals div:first-child { padding-left: 0; border-left: 0; }
+@media (max-width: 960px) {
+  .fleet-grid { row-gap: 0.9rem; }
+  .fleet-grid > div:nth-child(odd) { padding-left: 0; border-left: 0; }
+}
+@media (max-width: 480px) {
+  .fleet-grid > div { padding-left: 0; border-left: 0; }
+}
+
+/* The simulator's pull request: a plain panel, not a green gradient banner. */
+.sim-pr-band, html[data-theme="dark"] .sim-pr-band {
+  background: var(--surface);
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+}
+.sim-pr-band .sim-pr-open { background: var(--accent); color: var(--on-ink); }
+.sim-pr-band .sim-pr-repo { color: var(--muted); }
+.sim-pr-band .sim-pr-title h3 { color: var(--ink); }
+.prc-picker { max-width: min(34rem, 100%); min-width: 0; }
+.prc-picker select { width: 100%; min-width: 0; }

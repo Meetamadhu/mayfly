@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { Lifespan, cardState, statePillLabel } from "@/components/board-parts";
 import type { Environment, EnvironmentStatus, Overview } from "@/lib/types";
 import { removedLabel, timelineLabel, timelineNewestFirst } from "@/lib/timeline";
 
@@ -52,21 +53,7 @@ function formatLifetime(hours: number) {
   return `${hours} h`;
 }
 
-function stateWord(env: Environment) {
-  if (env.status === "provisioning") return "Provisioning";
-  if (env.status === "updating") return "Updating";
-  if (env.status === "destroying") return "Destroying";
-  if (env.status === "failed") return "Failed";
-  if (env.sleep === "asleep") return "Asleep";
-  if (env.sleep === "waking") return "Waking";
-  return "Awake";
-}
 
-function stateTone(env: Environment) {
-  if (env.status !== "ready") return env.status;
-  if (env.sleep === "asleep" || env.sleep === "waking") return env.sleep;
-  return "awake";
-}
 
 function stateNote(env: Environment) {
   if (env.status === "provisioning" || env.status === "updating") {
@@ -87,24 +74,10 @@ function formatAgo(iso: string, now: number) {
   const hours = Math.floor(Math.abs(delta) / 3600000);
   const rest = minutes % 60;
   if (hours >= 48) return `${Math.floor(hours / 24)} d ${hours % 24} h ago`;
-  if (hours > 0) return `${hours} h ${rest} m ago`;
-  return `${minutes} m ago`;
+  if (hours > 0) return rest ? `${hours} h ${rest} min ago` : `${hours} h ago`;
+  return `${minutes} min ago`;
 }
 
-function formatExpiresValue(iso: string, now: number) {
-  const delta = Date.parse(iso) - now;
-  if (Number.isNaN(delta)) return iso;
-  if (delta <= 0) return "Expired";
-  const totalMin = Math.floor(delta / 60000);
-  const hours = Math.floor(totalMin / 60);
-  const mins = totalMin % 60;
-  if (hours >= 48) {
-    const days = Math.floor(hours / 24);
-    return `in ${days} d ${hours % 24} h`;
-  }
-  if (hours > 0) return `in ${hours} h ${mins} m`;
-  return `in ${Math.max(1, mins)} m`;
-}
 
 function formatLocalTime(iso: string) {
   const ms = Date.parse(iso);
@@ -442,53 +415,37 @@ export function AdminPanel() {
               const canKeepAwake = env.status === "ready" || env.status === "updating";
               const awakeUntil =
                 env.keepAwakeUntil && Date.parse(env.keepAwakeUntil) > now ? env.keepAwakeUntil : null;
-              const tone = stateTone(env);
-              const expiresValue = demo ? "Always on" : env.keptByLabel ? "Kept by label" : formatExpiresValue(env.expiresAt, now);
+              const pillState = cardState(env);
               const timeline = timelineNewestFirst(env.events);
-              const sleepLabel =
-                typeof env.sleepSeconds === "number" ? `Sleeps after ${env.sleepSeconds} s` : null;
               return (
                 <li key={env.id} className={env.status === "ready" ? "env featured" : "env"}>
-                  <header className="state-band" data-state={tone}>
-                    <div>
-                      <p className="state-word">{stateWord(env)}</p>
-                      <p className="explainer">{stateNote(env)}</p>
-                    </div>
-                    {demo ? <span className="chip demo-chip">Demo</span> : null}
-                    {awakeUntil ? (
-                      <span className="chip">Awake until {formatAwakeUntil(awakeUntil)}</span>
-                    ) : null}
-                  </header>
                   <div className="card-body">
-                    <p className="card-repo">{env.repository}</p>
-                    <h3>{demo ? <>#{env.prNumber} · demo</> : <>#{env.prNumber}</>}</h3>
-                    <p className="meta meta-facts">
-                      {demo ? null : (
-                        <span className="fact-pill" data-fact="branch">
-                          <span className="fact-label">Branch</span>
-                          <span className="fact-value mono">{env.branch}</span>
-                        </span>
-                      )}
-                      <span className="fact-pill" data-fact="visit">
-                        <span className="fact-label">Last visit</span>
-                        <span className="fact-value">{formatAgo(env.lastActiveAt, now)}</span>
+                    <header className="admin-card-head">
+                      <h3>
+                        {demo ? "Demo preview" : `PR #${env.prNumber}`}
+                        <span className="card-repo">{env.repository}</span>
+                      </h3>
+                      <span className="state-pill" data-state={pillState}>
+                        {statePillLabel(pillState)}
                       </span>
-                      <span className="fact-pill" data-fact="expires">
-                        <span className="fact-label">Expires</span>
-                        <span className="fact-value">{expiresValue}</span>
-                      </span>
+                    </header>
+                    {demo ? null : <p className="env-card-branch mono">{env.branch}</p>}
+                    <p className="admin-card-note">
+                      {stateNote(env)}
+                      {awakeUntil ? ` Kept awake until ${formatAwakeUntil(awakeUntil)}.` : ""}
                     </p>
-                    {demo ? null : (
-                      <p className="meta">
-                        <span className="chip mono">{env.sha.slice(0, 8)}</span>
-                        {sleepLabel ? <span className="chip">{sleepLabel}</span> : null}
-                      </p>
-                    )}
-                    {demo && sleepLabel ? (
-                      <p className="meta">
-                        <span className="chip">{sleepLabel}</span>
-                      </p>
-                    ) : null}
+                    <Lifespan env={env} now={now} demo={demo} />
+                    <p className="env-card-facts">
+                      {demo ? null : (
+                        <>
+                          Commit <span className="mono">{env.sha.slice(0, 7)}</span>.{" "}
+                        </>
+                      )}
+                      Last visited {formatAgo(env.lastActiveAt, now)}.
+                      {typeof env.sleepSeconds === "number"
+                        ? ` Falls asleep after ${env.sleepSeconds} s without visitors.`
+                        : ""}
+                    </p>
                     <details className="env-timeline">
                       <summary>History</summary>
                       {timeline.length === 0 ? (
