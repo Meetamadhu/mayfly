@@ -13,6 +13,7 @@ export const LIMITS = {
   ttlHours: { min: 1, max: 720 },
   sleepSeconds: { min: 5, max: 86_400 },
   maxExtensions: { min: 0, max: 20 },
+  maxPerAuthor: { min: 1, max: 50 },
 } as const;
 
 export interface RepoPolicyRule {
@@ -31,6 +32,8 @@ export interface PreviewPolicy {
   sleepSeconds: number | null;
   /** How many times one preview may be extended. Null: no limit. */
   maxExtensions: number | null;
+  /** How many live previews one PR author may have at once. Null: no limit. */
+  maxPerAuthor: number | null;
   /** PR label that stops a preview expiring while the PR is open. Empty: off. */
   keepLabel: string;
   /** Post a warning on the PR this many minutes before a preview expires. 0: off. */
@@ -44,6 +47,7 @@ export function defaultPolicy(): PreviewPolicy {
     ttlHours: null,
     sleepSeconds: null,
     maxExtensions: null,
+    maxPerAuthor: null,
     keepLabel: DEFAULT_KEEP_LABEL,
     warnMinutes: 0,
     repoRules: [],
@@ -94,6 +98,10 @@ export function parsePolicy(input: unknown, updatedAt: string | null = null): Po
   if (maxExtensions === undefined) {
     return { ok: false, error: `Extension limit must be ${LIMITS.maxExtensions.min}–${LIMITS.maxExtensions.max}.` };
   }
+  const maxPerAuthor = wholeNumberIn(raw.maxPerAuthor, LIMITS.maxPerAuthor.min, LIMITS.maxPerAuthor.max);
+  if (maxPerAuthor === undefined) {
+    return { ok: false, error: `Previews per developer must be ${LIMITS.maxPerAuthor.min}–${LIMITS.maxPerAuthor.max}.` };
+  }
   const keepLabel = labelName(raw.keepLabel);
   if (keepLabel === undefined) return { ok: false, error: "Keep label must be up to 50 characters." };
   const warnRaw = raw.warnMinutes ?? 0;
@@ -138,7 +146,16 @@ export function parsePolicy(input: unknown, updatedAt: string | null = null): Po
 
   return {
     ok: true,
-    policy: { ttlHours, sleepSeconds, maxExtensions, keepLabel, warnMinutes: warnMinutes as number, repoRules, updatedAt },
+    policy: {
+      ttlHours,
+      sleepSeconds,
+      maxExtensions,
+      maxPerAuthor,
+      keepLabel,
+      warnMinutes: warnMinutes as number,
+      repoRules,
+      updatedAt,
+    },
   };
 }
 

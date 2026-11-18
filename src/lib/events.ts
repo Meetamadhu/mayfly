@@ -55,6 +55,8 @@ export function parseSimulatorEvent(
       merged: body.merged === true,
       ttlMinutes,
       headRepository: typeof body.headRepository === "string" ? body.headRepository.trim().toLowerCase() : undefined,
+      author:
+        typeof body.author === "string" && /^[A-Za-z0-9-]{1,39}$/.test(body.author.trim()) ? body.author.trim() : undefined,
     },
   };
 }
