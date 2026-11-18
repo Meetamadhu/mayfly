@@ -119,7 +119,7 @@ async function api(method, url, body, headers = admin) {
   return { status: res.status, json, text, headers: res.headers };
 }
 
-async function webhook(action, repo, pr, labels, sha) {
+async function webhook(action, repo, pr, labels, sha, author) {
   const payload = JSON.stringify({
     action,
     repository: { full_name: repo },
@@ -127,6 +127,7 @@ async function webhook(action, repo, pr, labels, sha) {
       number: pr,
       merged: false,
       labels: labels.map((name) => ({ name })),
+      ...(author ? { user: { login: author } } : {}),
       head: { sha: sha ?? "a".repeat(40), ref: `feature/${pr}`, repo: { full_name: repo } },
     },
   });
@@ -199,6 +200,7 @@ try {
     [{ ttlHours: 1.5 }, "lifetime 1.5"],
     [{ sleepSeconds: 4 }, "sleep 4 s"],
     [{ maxExtensions: 21 }, "21 extensions"],
+    [{ maxPerAuthor: 0 }, "0 previews per developer"],
     [{ warnMinutes: 7 }, "warning 7 min"],
     [{ keepLabel: "x".repeat(51) }, "51-char label"],
     [{ repoRules: [{ repository: "nope", ttlHours: 2 }] }, "rule without owner/name"],
@@ -356,6 +358,35 @@ try {
   check((await envFor("acme/web", 2)).events.some((e) => e.type === "warned"), "timeline records the warning");
   const shortWarned = posted.some((c) => c.repo === "acme/short" && /expires in about/.test(c.body));
   check(!shortWarned, "a kept preview gets no warning");
+
+  // --- previews per developer ---
+  await api("PUT", "/api/admin/policy", { ...policy, sleepSeconds: 45, maxPerAuthor: 1 });
+  const firstOwn = await webhook("opened", "acme/web", 20, [], "c".repeat(40), "dev-a");
+  check(firstOwn.status === 200, "a developer's first preview starts", firstOwn.json);
+  await waitFor(async () => (await envFor("acme/web", 20))?.status === "ready", "acme/web#20 ready");
+  check((await envFor("acme/web", 20)).author === "dev-a", "the preview records its author");
+  const secondOwn = await webhook("opened", "acme/web", 21, [], "d".repeat(40), "Dev-A");
+  check(
+    secondOwn.status === 409 && secondOwn.json.code === "author_cap" && !(await envFor("acme/web", 21)),
+    "over the limit (any letter case) no preview starts",
+    secondOwn.json,
+  );
+  const explained = await waitFor(
+    () => posted.find((c) => c.repo === "acme/web" && c.pr === 21 && /not started/.test(c.body))?.body,
+    "explanation comment on #21",
+  );
+  check(/#20 in this repository/.test(explained) && /\(1\)/.test(explained), "the PR comment says why and which PR", explained);
+  const otherDev = await webhook("opened", "acme/web", 22, [], "e".repeat(40), "dev-b");
+  check(otherDev.status === 200, "another developer is not affected", otherDev.json);
+  const noAuthor = await webhook("opened", "acme/web", 23, [], "f".repeat(40));
+  check(noAuthor.status === 200, "events without an author (simulator) are not limited", noAuthor.json);
+  await webhook("closed", "acme/web", 20, [], "c".repeat(40), "dev-a");
+  await waitFor(async () => !(await envFor("acme/web", 20)), "acme/web#20 closed");
+  const retry = await webhook("synchronize", "acme/web", 21, [], "d".repeat(40), "dev-a");
+  check(retry.status === 200 && retry.json.action === "created", "after closing one, a new push starts it", retry.json);
+  await waitFor(async () => (await envFor("acme/web", 21))?.status === "ready", "acme/web#21 ready");
+  for (const pr of [21, 22, 23]) await webhook("closed", "acme/web", pr, []);
+  await api("PUT", "/api/admin/policy", { ...policy, sleepSeconds: 45 });
 
   // --- renaming the label releases previews it held ---
   await api("PUT", "/api/admin/policy", { ...policy, sleepSeconds: 45, keepLabel: "pin" });
