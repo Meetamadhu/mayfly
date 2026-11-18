@@ -66,7 +66,7 @@ export function Dashboard() {
   }
 
   async function adminAction(env: Environment, action: "sleep" | "extend" | "destroy") {
-    if (action === "destroy" && !window.confirm(`Destroy ${env.repository} #${env.prNumber}?`)) return;
+    if (action === "destroy" && !window.confirm(`Remove the preview for ${env.repository} #${env.prNumber}? Its link will stop working.`)) return;
     setBusy(true);
     setError(null);
     try {
@@ -83,7 +83,7 @@ export function Dashboard() {
       }
       await reload();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Request failed.");
+      setError(caught instanceof Error ? caught.message : "Something went wrong. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -124,7 +124,7 @@ export function Dashboard() {
     >
       {config?.deployer === "fake" ? (
         <p className="notice" role="status">
-          Simulation mode: previews are recorded, not run.
+          Demo mode: previews are listed here but not actually started.
           {process.env.NEXT_PUBLIC_LIVE_DEMO_URL ? (
             <>
               {" "}
@@ -138,12 +138,12 @@ export function Dashboard() {
         <div>
           <h1>Welcome to Mayfly</h1>
           <p className="lede">
-            Ephemeral preview environments for every pull request — build, preview, sleep and destroy automatically.
+            Every pull request gets its own live preview to click through. Previews sleep when nobody&apos;s looking and clean themselves up when the work is merged.
           </p>
         </div>
         {signedIn ? (
           <a className="btn secondary" href="/admin#simulator">
-            Simulate PR
+            Try a pull request
           </a>
         ) : null}
       </section>
@@ -193,7 +193,7 @@ export function Dashboard() {
         </div>
         <div data-stat="savings">
           <dt className="stat-head">
-            <span>Estimated</span>
+            <span>Saved this month</span>
             <span className="stat-icon" aria-hidden="true">
               <StatIcon name="savings" />
             </span>
@@ -204,14 +204,14 @@ export function Dashboard() {
 
       <p className="board-settings">
         {config
-          ? `Sleeps after ${formatSleep(config.sleepSeconds)} · Max lifetime ${formatLifetime(config.ttlHours)}`
-          : "Sleeps after – · Max lifetime –"}
+          ? `Previews fall asleep after ${formatSleep(config.sleepSeconds)} without visitors and last up to ${formatLifetime(config.ttlHours)}.`
+          : "\u00a0"}
       </p>
 
       <div className="board-workspace" data-expanded={expanded ? "true" : "false"}>
         <section className="live-column">
           <div className="ledger-head board-env-head">
-            <h2>Active environments</h2>
+            <h2>Previews</h2>
             <div className="board-filter-pills" role="group" aria-label="Filter previews">
               {(
                 [
@@ -247,10 +247,10 @@ export function Dashboard() {
 
           <div className="stack env-card-stack" data-view={cardView}>
             {overview && current.length === 0 ? (
-              <p className="empty">No live previews. Open a pull request and it will show up here.</p>
+              <p className="empty">No previews yet. Open a pull request on GitHub and its preview will appear here.</p>
             ) : null}
             {overview && current.length > 0 && visible.length === 0 ? (
-              <p className="empty">No previews match this filter.</p>
+              <p className="empty">Nothing matches. Try another filter or search.</p>
             ) : null}
             {shown.map((env) => (
               <EnvironmentCard
@@ -282,19 +282,19 @@ export function Dashboard() {
             <div className="board-toolbar-main">
               <details className="advanced">
                 <summary>
-                  {dockerRuntime ? "Advanced: containers" : "Advanced: processes"}
+                  Behind the scenes
                   {overview && overview.deployments.length > 0 ? (
                     <span className="advanced-count">{overview.deployments.length}</span>
                   ) : null}
                 </summary>
                 <p className="advanced-help">
                   {dockerRuntime
-                    ? "Containers that are still listening on this machine."
-                    : "Gate and app processes that are still listening on this machine."}
+                    ? "The containers running on the server right now, one per preview."
+                    : "The programs running on the server right now, one per preview."}
                 </p>
                 <div className="stack advanced-list">
                   {overview && overview.deployments.length === 0 ? (
-                    <p className="empty">Nothing is listening. Closed, idle, and expired previews are gone.</p>
+                    <p className="empty">Nothing is running. Closed and expired previews have been cleaned up.</p>
                   ) : null}
                   {overview?.deployments.map((deployment) => (
                     <article className="deployment" key={deployment.deploymentId}>
@@ -358,15 +358,17 @@ export function Dashboard() {
         <aside className="board-rail">
           <section className="board-rail-card" aria-label="Estimated cost and usage">
             <div className="board-rail-head">
-              <h2 className="board-rail-title">Cost &amp; Usage</h2>
+              <h2 className="board-rail-title">Cost this month</h2>
               <a className="board-rail-link" href="/cost">
                 Details <span aria-hidden="true">→</span>
               </a>
             </div>
             <p className="savings-sub">
               {overview
-                ? `Estimated always awake ${formatEstMoney(alwaysAwakeEstimate, currency)} · Estimated with Mayfly ${formatEstMoney(withMayflyEstimate, currency)}`
-                : "Waiting for the first reaper sample…"}
+                ? alwaysAwakeEstimate < 0.005
+                  ? "Nothing spent yet this month."
+                  : `About ${formatEstMoney(withMayflyEstimate, currency)} with Mayfly, instead of ${formatEstMoney(alwaysAwakeEstimate, currency)} if every preview stayed on.`
+                : "The first numbers appear about a minute after start-up."}
             </p>
           </section>
 
@@ -402,7 +404,7 @@ export function Dashboard() {
 
       {config?.deployer === "fake" ? (
         <p className="footer">
-          This site keeps the record. The preview itself runs on the computer where Mayfly is running.
+          This site only keeps the list. The previews themselves run on the server where Mayfly is installed.
         </p>
       ) : null}
 

@@ -143,7 +143,7 @@ export function EnvironmentCard({
           )
         ) : state === "building" || state === "destroying" ? (
           <button type="button" className="open-preview" disabled>
-            {state === "building" ? "Building…" : "Destroying…"}
+            {state === "building" ? "Building…" : "Removing…"}
           </button>
         ) : canOpen ? (
           <a className="open-preview" href={href}>
@@ -156,7 +156,7 @@ export function EnvironmentCard({
         )}
         {onShowLifecycle ? (
           <button type="button" className="secondary env-card-lifecycle" onClick={() => onShowLifecycle(env)}>
-            Lifecycle
+            History
           </button>
         ) : null}
         {signedIn && !demo ? (
@@ -182,7 +182,7 @@ export function EnvironmentCard({
                     onAdminAction(env, "sleep");
                   }}
                 >
-                  Sleep
+                  Put to sleep
                 </button>
                 <button
                   type="button"
@@ -193,7 +193,7 @@ export function EnvironmentCard({
                     onAdminAction(env, "extend");
                   }}
                 >
-                  Extend
+                  Extend by 4 h
                 </button>
                 <button
                   type="button"
@@ -205,7 +205,7 @@ export function EnvironmentCard({
                     onAdminAction(env, "destroy");
                   }}
                 >
-                  Destroy
+                  Remove
                 </button>
               </div>
             ) : null}
@@ -617,17 +617,17 @@ export function CostUsageChart({
       {single ? <p className="cost-chart-note">The daily chart fills in as days pass.</p> : null}
       <dl className="cost-line-totals">
         <div>
-          <dt>Estimated if always awake</dt>
+          <dt>If previews never slept</dt>
           <dd>{formatEstMoney(alwaysTotal, currency)}</dd>
         </div>
         <div>
-          <dt>Estimated with Mayfly</dt>
+          <dt>With Mayfly (estimate)</dt>
           <dd>{formatEstMoney(mayflyTotal, currency)}</dd>
         </div>
       </dl>
       <figcaption className="cost-chart-legend">
         <span>
-          <i className="cost-swatch cost-swatch-always" aria-hidden="true" /> Estimated always awake
+          <i className="cost-swatch cost-swatch-always" aria-hidden="true" /> If previews never slept
         </span>
         <span>
           <i className="cost-swatch cost-swatch-actual" aria-hidden="true" /> Estimated with Mayfly
@@ -690,25 +690,25 @@ export function activityLabel(type: string, count = 1) {
     case "opened":
       return "opened";
     case "build_started":
-      return "build started";
+      return "started building";
     case "built":
-      return "built";
+      return "finished building";
     case "ready":
-      return "ready";
+      return "is ready to view";
     case "updated":
-      return "updated";
+      return "got a new commit";
     case "keep_awake":
       return "kept awake";
     case "keep_awake_off":
-      return "keep awake off";
+      return "allowed to sleep again";
     case "slept":
-      return "slept";
+      return "fell asleep";
     case "woke":
-      return count > 1 ? "woke" : "woken by a visit";
+      return count > 1 ? "woke up" : "woke up for a visitor";
     case "extended":
       return "extended";
     case "failed":
-      return "failed";
+      return "failed to build";
     case "destroyed":
       return "removed";
     default:
@@ -834,7 +834,7 @@ export function LifecycleDrawer({
           <header className="lifecycle-head">
             <div>
               <h2 id="lifecycle-title">
-                {demo ? "Demo" : `PR #${env.prNumber}`} — Lifecycle
+                {demo ? "Demo" : `PR #${env.prNumber}`} — History
               </h2>
               <p className="lifecycle-sub">
                 <span className="mono">{demo ? "demo" : env.branch}</span> · {env.repository}
@@ -852,7 +852,7 @@ export function LifecycleDrawer({
             <span className="mono">{env.sha.slice(0, 8)}</span>
           </p>
           {events.length === 0 ? (
-            <p className="empty">No history yet — events are recorded from now on.</p>
+            <p className="empty">Nothing has happened to this preview yet.</p>
           ) : (
             <ol className="lifecycle-list">
               {events.map((event, index) => (
@@ -866,7 +866,7 @@ export function LifecycleDrawer({
               ))}
             </ol>
           )}
-          <p className="lifecycle-foot">Mayfly keeps the last 50 events for each preview.</p>
+          <p className="lifecycle-foot">Mayfly remembers the last 50 things that happened to each preview.</p>
         </div>
       ) : null}
     </dialog>

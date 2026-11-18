@@ -124,9 +124,9 @@ export function formatLifespan(ms: number) {
 export const REMOVAL_LABELS: Record<DestroyReason, string> = {
   merged: "PR merged",
   closed: "PR closed",
-  expired: "Lifetime ended",
+  expired: "Time ran out",
   manual: "Removed by admin",
-  idle: "Idle",
-  failed: "Failed build cleaned up",
-  stuck: "Stuck build cleaned up",
+  idle: "Not used",
+  failed: "Build failed",
+  stuck: "Build got stuck",
 };
