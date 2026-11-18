@@ -451,6 +451,7 @@ export async function getOverview(): Promise<Overview> {
         sleepSeconds: policy.sleepSeconds ?? config.sleepSeconds,
         maxLifetimeHours: config.maxLifetimeHours,
         maxExtensions: policy.maxExtensions,
+        maxPerAuthor: policy.maxPerAuthor,
         keepLabel: policy.keepLabel,
         warnMinutes: policy.warnMinutes,
       },
@@ -640,6 +641,26 @@ async function reserve(event: PullRequestEvent): Promise<LifecycleResult> {
       return { ok: true, action: "updated", environment: clone(existing) };
     }
 
+    // Per-developer limit from TTL policies. Previews being removed don't count; the demo never does.
+    const perAuthor = currentPolicy().maxPerAuthor;
+    if (perAuthor !== null && normalized.author) {
+      const login = normalized.author.toLowerCase();
+      const mine = state.environments.filter(
+        (env) =>
+          env.status !== "destroying" &&
+          isLiveStatus(env.status) &&
+          !isDemo(env) &&
+          env.author?.toLowerCase() === login,
+      );
+      if (mine.length >= perAuthor) {
+        return {
+          ok: false,
+          code: "author_cap",
+          error: `${normalized.author} already has ${mine.length} live preview${mine.length === 1 ? "" : "s"} (limit ${perAuthor}).`,
+        };
+      }
+    }
+
     const config = getConfig();
     const live = state.environments.filter((env) => isLiveStatus(env.status)).length;
     if (live >= config.maxConcurrent) {
@@ -671,6 +692,7 @@ async function reserve(event: PullRequestEvent): Promise<LifecycleResult> {
       events: [{ at: now, type: "opened" }],
       labels: eventLabels(normalized) ?? [],
       extensions: 0,
+      ...(normalized.author ? { author: normalized.author } : {}),
     };
     if (hasKeepLabel(created.labels)) {
       pushEnvironmentEvent(created, { at: now, type: "kept", detail: currentPolicy().keepLabel });
@@ -693,6 +715,42 @@ function startDeploy(environment: Environment, action: "created" | "updated"): P
   };
   const work = action === "created" ? () => deployer.provision(request) : () => deployer.update(request);
   return runDeploy(environment, work, action);
+}
+
+/**
+ * Tell the developer on the PR why no preview started. Uses the one edit-in-place Mayfly comment, so
+ * repeated pushes don't add more comments.
+ */
+async function explainAuthorLimit(event: PullRequestEvent) {
+  const limit = currentPolicy().maxPerAuthor ?? 0;
+  const state = await exclusive(async () => loadState());
+  const login = (event.author ?? "").toLowerCase();
+  const others = state.environments.filter(
+    (env) => isLiveStatus(env.status) && !isDemo(env) && env.author?.toLowerCase() === login,
+  );
+  // Name only pull requests in this repository: another repository may be private.
+  const here = others.filter((env) => env.repository === event.repository).map((env) => `#${env.prNumber}`);
+  const elsewhere = others.length - here.length;
+  const where = [
+    here.length ? `${here.join(", ")} in this repository` : "",
+    elsewhere ? `${elsewhere} in other repositories` : "",
+  ]
+    .filter(Boolean)
+    .join(" and ");
+  const body = [
+    "**Mayfly preview not started**",
+    "",
+    `The author of this pull request already has ${others.length} live preview${others.length === 1 ? "" : "s"} (${where}), the most allowed per developer (${limit}).`,
+    "",
+    "Close or merge one of those pull requests, then push a new commit here to start this preview.",
+    "",
+    lastUpdatedLine(),
+  ].join("\n");
+  try {
+    await publishPullRequestComment(event.repository, event.prNumber, body, null);
+  } catch (error) {
+    console.error("Pull request comment failed", error);
+  }
 }
 
 /** A label was added or removed on the pull request: no rebuild, only the keep label matters. */
@@ -748,7 +806,10 @@ export async function applyPullRequestEvent(
   }
 
   const reserved = await reserve(event);
-  if (!reserved.ok) return reserved;
+  if (!reserved.ok) {
+    if (reserved.code === "author_cap") void explainAuthorLimit(normalizeEvent(event));
+    return reserved;
+  }
   if (reserved.action !== "created" && reserved.action !== "updated") return reserved;
 
   const pending = startDeploy(reserved.environment, reserved.action);

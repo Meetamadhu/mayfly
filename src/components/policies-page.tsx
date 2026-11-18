@@ -9,6 +9,7 @@ type Policy = {
   ttlHours: number | null;
   sleepSeconds: number | null;
   maxExtensions: number | null;
+  maxPerAuthor: number | null;
   keepLabel: string;
   warnMinutes: number;
   repoRules: RepoRule[];
@@ -28,6 +29,7 @@ type Draft = {
   ttlHours: string;
   sleepSeconds: string;
   maxExtensions: string;
+  maxPerAuthor: string;
   keepLabel: string;
   warnMinutes: string;
   repoRules: RuleDraft[];
@@ -41,6 +43,15 @@ const EXTENSION_CHOICES: { value: string; label: string }[] = [
   { value: "3", label: "3 times" },
   { value: "5", label: "5 times" },
   { value: "10", label: "10 times" },
+];
+
+const PER_AUTHOR_CHOICES: { value: string; label: string }[] = [
+  { value: "", label: "No limit" },
+  { value: "1", label: "1 preview" },
+  { value: "2", label: "2 previews" },
+  { value: "3", label: "3 previews" },
+  { value: "5", label: "5 previews" },
+  { value: "10", label: "10 previews" },
 ];
 
 const WARN_CHOICES: { value: string; label: string }[] = [
@@ -63,6 +74,7 @@ function toDraft(policy: Policy): Draft {
     ttlHours: text(policy.ttlHours),
     sleepSeconds: text(policy.sleepSeconds),
     maxExtensions: text(policy.maxExtensions),
+    maxPerAuthor: text(policy.maxPerAuthor),
     keepLabel: policy.keepLabel,
     warnMinutes: String(policy.warnMinutes),
     repoRules: policy.repoRules.map((rule) => ({
@@ -84,6 +96,7 @@ function toPayload(draft: Draft) {
     ttlHours: numberOrNull(draft.ttlHours),
     sleepSeconds: numberOrNull(draft.sleepSeconds),
     maxExtensions: numberOrNull(draft.maxExtensions),
+    maxPerAuthor: numberOrNull(draft.maxPerAuthor),
     keepLabel: draft.keepLabel.trim(),
     warnMinutes: Number(draft.warnMinutes),
     repoRules: draft.repoRules
@@ -306,7 +319,7 @@ export function PoliciesPage() {
               <section className="board-rail-card policy-card" aria-labelledby="policy-lifetime">
                 <h2 id="policy-lifetime" className="policy-title">
                   <PolicyIcon kind="clock" />
-                  Lifetime
+                  Lifetime &amp; limits
                 </h2>
                 <label htmlFor="policy-ttl">Default lifetime (hours)</label>
                 <input
@@ -338,6 +351,25 @@ export function PoliciesPage() {
                 <p id="policy-ext-help" className="help">
                   How many times Extend works on one preview. Extending never goes past{" "}
                   {formatHours(defaults.maxLifetimeHours)} after the preview opened (PREVIEW_MAX_LIFETIME_HOURS).
+                </p>
+
+                <label htmlFor="policy-per-author">Live previews per developer</label>
+                <select
+                  id="policy-per-author"
+                  value={draft.maxPerAuthor}
+                  onChange={(event) => update({ maxPerAuthor: event.target.value })}
+                  aria-describedby="policy-per-author-help"
+                >
+                  {PER_AUTHOR_CHOICES.map((choice) => (
+                    <option key={choice.value} value={choice.value}>
+                      {choice.label}
+                    </option>
+                  ))}
+                </select>
+                <p id="policy-per-author-help" className="help">
+                  Counted by the pull request&apos;s author on GitHub. Over the limit, Mayfly doesn&apos;t start the
+                  preview and says why in a PR comment; pushing again after closing another PR starts it. Previews
+                  already running are never removed.
                 </p>
               </section>
 
