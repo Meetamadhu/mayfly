@@ -31,9 +31,9 @@ export function cardState(env: Environment): CardState {
 export function statePillLabel(state: CardState) {
   switch (state) {
     case "running":
-      return "Running";
+      return "Awake";
     case "sleeping":
-      return "Sleeping";
+      return "Asleep";
     case "building":
       return "Building";
     case "failed":
@@ -48,6 +48,99 @@ function statePillIcon(state: CardState): StatIconName | null {
   if (state === "sleeping") return "sleeping";
   if (state === "building") return "building";
   return null;
+}
+
+type LifeState = "build" | "awake" | "asleep" | "unknown";
+
+/** Split a preview's life so far into building / awake / asleep stretches, from its own history. */
+function lifeSegments(env: Environment, start: number, now: number) {
+  const events = timelineOldestFirst(env.events);
+  const segments: { from: number; to: number; state: LifeState }[] = [];
+  const first = events[0] ? Date.parse(events[0].at) : now;
+  // Older history may have been trimmed (50 events kept): the part before it is unknown.
+  let state: LifeState = first - start > 60_000 ? "unknown" : "build";
+  let at = start;
+  const move = (t: number, next: LifeState) => {
+    const time = Math.min(Math.max(t, start), now);
+    if (time > at) segments.push({ from: at, to: time, state });
+    at = Math.max(at, time);
+    state = next;
+  };
+  for (const event of events) {
+    const t = Date.parse(event.at);
+    if (!Number.isFinite(t)) continue;
+    if (event.type === "opened" || event.type === "build_started" || event.type === "updated") move(t, "build");
+    else if (event.type === "ready" || event.type === "woke" || event.type === "keep_awake") move(t, "awake");
+    else if (event.type === "slept") move(t, "asleep");
+  }
+  if (env.sleep === "asleep" && (state as LifeState) === "awake") state = "asleep";
+  move(now, state);
+  return segments;
+}
+
+/** "in 5 days", "in 3 h", "in 12 min". */
+function formatIn(ms: number) {
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 1) return "any moment";
+  if (minutes < 90) return `in ${minutes} min`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `in ${hours} h`;
+  return `in ${Math.round(hours / 24)} days`;
+}
+
+/**
+ * The preview's life on one line, from opening to its end: solid where it was awake, faint where it slept,
+ * striped while it built, dashed for the time it has left. A mayfly lives for a day; so does a preview.
+ */
+export function Lifespan({ env, now, demo }: { env: Environment; now: number; demo: boolean }) {
+  const start = Date.parse(env.createdAt);
+  if (!Number.isFinite(start)) return null;
+  const endMs = Date.parse(env.expiresAt);
+  const openEnded = demo || Boolean(env.keptByLabel) || !Number.isFinite(endMs);
+  const end = openEnded ? now + Math.max(now - start, 60_000) * 0.25 : Math.max(endMs, now);
+  const span = Math.max(end - start, 1);
+  const pct = (t: number) => Math.min(100, Math.max(0, ((t - start) / span) * 100));
+  const nowPct = pct(now);
+  const segments = lifeSegments(env, start, now);
+  const usage = env.usage;
+  const total = usage ? usage.awakeSeconds + usage.asleepSeconds : 0;
+  const awakeShare = usage && total > 0 ? Math.round((usage.awakeSeconds / total) * 100) : null;
+  const right = demo
+    ? "Always on"
+    : env.keptByLabel
+      ? "Kept open by label"
+      : endMs <= now
+        ? "Ending now"
+        : `Ends ${formatIn(endMs - now)}`;
+  const label = [
+    `Opened ${formatAgo(env.createdAt, now)}.`,
+    `${right}.`,
+    awakeShare === null ? "" : `Awake ${awakeShare}% of the time so far.`,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <div className="lifespan" role="img" aria-label={label} data-open-ended={openEnded ? "true" : "false"}>
+      <div className="lifespan-track">
+        {segments.map((segment, index) => (
+          <span
+            key={index}
+            className="lifespan-seg"
+            data-life={segment.state}
+            style={{ left: `${pct(segment.from)}%`, width: `${pct(segment.to) - pct(segment.from)}%` }}
+          />
+        ))}
+        <span className="lifespan-left" style={{ left: `${nowPct}%`, width: `${100 - nowPct}%` }} />
+        <span className="lifespan-now" style={{ left: `${nowPct}%` }} />
+      </div>
+      <p className="lifespan-ends" aria-hidden="true">
+        <span>Opened {formatAgo(env.createdAt, now)}</span>
+        {awakeShare === null ? null : <span className="lifespan-share">{awakeShare}% awake</span>}
+        <span>{right}</span>
+      </p>
+    </div>
+  );
 }
 
 export function EnvironmentCard({
@@ -96,10 +189,10 @@ export function EnvironmentCard({
       <header className="env-card-head">
         <div className="env-card-titles">
           <h3>
-            PR #{env.prNumber}
-            {demo ? <span className="env-card-demo"> · demo</span> : null}
+            {demo ? "Demo preview" : `PR #${env.prNumber}`}
+            <span className="card-repo">{env.repository}</span>
           </h3>
-          <p className="card-repo">{env.repository}</p>
+          <p className="env-card-branch mono">{demo ? "demo" : env.branch}</p>
         </div>
         <span className="state-pill" data-state={state}>
           {pillIcon ? <StatIcon name={pillIcon} /> : null}
@@ -107,22 +200,11 @@ export function EnvironmentCard({
         </span>
       </header>
       <div className="card-body env-card-body">
-        <p className="env-card-meta">
-          <span>
-            <span className="fact-label">Branch</span>{" "}
-            <span className="mono">{demo ? "demo" : env.branch}</span>
-          </span>
-          <span>
-            <span className="fact-label">Commit</span>{" "}
-            <span className="mono">{env.sha.slice(0, 8)}</span>
-          </span>
-          <span>
-            <span className="fact-label">Built in</span>{" "}
-            {typeof env.buildMs === "number" && env.buildMs >= 0 ? formatDurationMs(env.buildMs) : "–"}
-          </span>
-          <span>
-            <span className="fact-label">Last visit</span> {formatAgo(env.lastActiveAt, now)}
-          </span>
+        <Lifespan env={env} now={now} demo={demo} />
+        <p className="env-card-facts">
+          Commit <span className="mono">{env.sha.slice(0, 7)}</span>
+          {typeof env.buildMs === "number" && env.buildMs >= 0 ? `, built in ${formatDurationMs(env.buildMs)}` : ""}.
+          {" "}Last visited {formatAgo(env.lastActiveAt, now)}.
         </p>
         {showError && env.error ? <pre className="fail-box">{env.error}</pre> : null}
       </div>
