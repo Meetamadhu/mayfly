@@ -442,7 +442,7 @@ export function AdminPanel() {
               const awakeUntil =
                 env.keepAwakeUntil && Date.parse(env.keepAwakeUntil) > now ? env.keepAwakeUntil : null;
               const tone = stateTone(env);
-              const expiresValue = demo ? "Always on" : formatExpiresValue(env.expiresAt, now);
+              const expiresValue = demo ? "Always on" : env.keptByLabel ? "Kept by label" : formatExpiresValue(env.expiresAt, now);
               const timeline = timelineNewestFirst(env.events);
               const sleepLabel =
                 typeof env.sleepSeconds === "number" ? `Sleeps after ${env.sleepSeconds} s` : null;

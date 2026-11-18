@@ -1,5 +1,6 @@
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { asStoredPolicy } from "./policy";
 import { loadStateMongo, saveStateMongo, usesMongo, withMongoExclusive } from "./store-mongo";
 
 const locks = globalThis as unknown as Record<string, Promise<unknown> | undefined>;
@@ -30,6 +31,7 @@ export function exclusive<T>(fn: () => Promise<T>): Promise<T> {
 export interface State {
   environments: import("./types").Environment[];
   usage?: import("./types").UsageMonth;
+  policy?: import("./policy").PreviewPolicy;
 }
 
 export function dataDir() {
@@ -90,7 +92,8 @@ function asState(value: unknown): State {
   const environments = (value as State).environments;
   if (!Array.isArray(environments)) return { environments: [] };
   const usage = asUsage((value as State).usage);
-  return usage ? { environments, usage } : { environments };
+  const policy = asStoredPolicy((value as State).policy);
+  return { environments, ...(usage ? { usage } : {}), ...(policy ? { policy } : {}) };
 }
 
 export async function readJson<T>(file: string, fallback: T): Promise<T> {

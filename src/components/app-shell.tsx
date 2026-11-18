@@ -5,12 +5,13 @@ import { MayflyMark } from "@/components/admin-header";
 import { PromoArt } from "@/components/board-parts";
 import { ThemeToggle } from "@/components/theme-toggle";
 
-export type AppPage = "dashboard" | "activity" | "cost" | "admin";
+export type AppPage = "dashboard" | "activity" | "cost" | "policies" | "admin";
 
 const NAV: { id: AppPage; href: string; label: string }[] = [
   { id: "dashboard", href: "/board", label: "Dashboard" },
   { id: "activity", href: "/activity", label: "Activity" },
   { id: "cost", href: "/cost", label: "Cost & savings" },
+  { id: "policies", href: "/policies", label: "TTL policies" },
   { id: "admin", href: "/admin", label: "Admin" },
 ];
 
@@ -50,6 +51,13 @@ function NavIcon({ page }: { page: AppPage }) {
           <path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" />
         </svg>
       );
+    case "policies":
+      return (
+        <svg {...common}>
+          <path d="M6.5 3h11M6.5 21h11" />
+          <path d="M7.5 3v3.5c0 2 4.5 3.5 4.5 5.5s-4.5 3.5-4.5 5.5V21M16.5 3v3.5c0 2-4.5 3.5-4.5 5.5s4.5 3.5 4.5 5.5V21" />
+        </svg>
+      );
     case "admin":
       return (
         <svg {...common}>
@@ -61,7 +69,7 @@ function NavIcon({ page }: { page: AppPage }) {
 }
 
 /**
- * The one sidebar + top bar every Mayfly screen shares (Dashboard, Activity, Cost & savings, Admin).
+ * The one sidebar + top bar every Mayfly screen shares (Dashboard, Activity, Cost & savings, TTL policies, Admin).
  *
  * `search`: pages that can filter pass a controlled search; elsewhere the box searches the Dashboard
  * (submitting goes to /board?q=…).
