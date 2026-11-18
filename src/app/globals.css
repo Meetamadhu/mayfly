@@ -4010,3 +4010,26 @@ body { background: var(--bg); }
 .sim-pr-band .sim-pr-title h3 { color: var(--ink); }
 .prc-picker { max-width: min(34rem, 100%); min-width: 0; }
 .prc-picker select { width: 100%; min-width: 0; }
+
+/* The top of each preview card has its own colour: light blue in light mode, mint in dark mode. */
+:root { --card-head: #dbeafe; --card-head-line: #bfd3f2; }
+html[data-theme="dark"] { --card-head: #17463f; --card-head-line: #23665a; }
+.env-card-head {
+  background: var(--card-head);
+  border-bottom: 1px solid var(--card-head-line);
+}
+.env-card-body { padding-top: 0.8rem; }
+.preview-list .env .card-body > .admin-card-head {
+  margin: -1rem -1.05rem 0.75rem;
+  padding: 0.85rem 1.05rem;
+  background: var(--card-head);
+  border-bottom: 1px solid var(--card-head-line);
+}
+.env-card-head .state-pill, .admin-card-head .state-pill { background: var(--paper); }
+html[data-theme="dark"] .env-card-head .card-repo,
+html[data-theme="dark"] .env-card-head .env-card-branch,
+html[data-theme="dark"] .admin-card-head .card-repo { color: #b9d8cf; }
+
+/* Page title and its one-line description side by side (Admin). */
+.board-welcome.page-head-inline > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 1rem; }
+.board-welcome.page-head-inline .lede { margin: 0; max-width: none; }
