@@ -465,6 +465,8 @@ export function formatLifetime(hours: number) {
 }
 
 export function formatSaved(amount: number, currency = "$") {
+  // Exactly nothing is "$0.00"; "< $0.01" is only for a real amount too small to show.
+  if (!Number.isFinite(amount) || amount <= 0) return `${currency}0.00`;
   if (amount < 0.01) return `< ${currency}0.01`;
   return `≈ ${currency}${amount.toFixed(2)}`;
 }
@@ -474,7 +476,8 @@ export function estimatedCost(seconds: number, costPerHour: number) {
 }
 
 export function formatEstMoney(amount: number, currency = "$") {
-  if (!Number.isFinite(amount) || amount < 0.01) return `< ${currency}0.01`;
+  if (!Number.isFinite(amount) || amount <= 0) return `${currency}0.00`;
+  if (amount < 0.01) return `< ${currency}0.01`;
   return `${currency}${amount.toFixed(2)}`;
 }
 
