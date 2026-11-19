@@ -3,206 +3,145 @@
 import { useEffect, useState } from "react";
 import { AdminHeader, MayflyMark } from "@/components/admin-header";
 
-const STEPS = [
-  { label: "Open a PR", note: "GitHub sends a signed webhook" },
-  { label: "Build", note: "The PR's own Dockerfile runs" },
-  { label: "Share", note: "One preview URL for the team" },
-  { label: "Sleep & wake", note: "Idle containers stop, then start on visit" },
-  { label: "Clean up", note: "Close or expiry removes the preview" },
+/**
+ * One preview's life, drawn the same way as the lifespan line on every preview card: this is the page's one
+ * picture. Widths are shares of the whole life; the moments below line up with where they happen.
+ */
+const LIFE: { state: "build" | "awake" | "asleep"; share: number }[] = [
+  { state: "build", share: 3 },
+  { state: "awake", share: 12 },
+  { state: "asleep", share: 52 },
+  { state: "awake", share: 9 },
+  { state: "asleep", share: 24 },
 ];
 
-const CAPTIONS = [
-  "A pull request opens. Mayfly receives the webhook and starts a preview.",
-  "It builds that exact commit from the repository's Dockerfile.",
-  "Reviewers open one link. No shared staging to fight over.",
-  "After a short idle stretch the container sleeps, then wakes on the next visit.",
-  "Closing the PR, or letting it expire, removes the container and its image.",
+const MOMENTS: { at: number; when: string; what: string }[] = [
+  { at: 0, when: "Mon 10:02", what: "Pull request #42 opens" },
+  { at: 3, when: "10:02", what: "Built from its own code in 14 s" },
+  { at: 15, when: "10:30", what: "Nobody's looking, so it falls asleep" },
+  { at: 67, when: "Tue 09:40", what: "A reviewer opens the link and it wakes up" },
+  { at: 100, when: "Tue 16:15", what: "Merged, and the preview is gone" },
 ];
+
+type Live = { up: number; awake: number } | null;
 
 export function Landing() {
-  const [step, setStep] = useState(0);
+  const [live, setLive] = useState<Live>(null);
 
   useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const timer = window.setInterval(() => {
-      setStep((current) => (current + 1) % STEPS.length);
-    }, 2800);
-    return () => window.clearInterval(timer);
+    let cancelled = false;
+    fetch("/api/environments", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body) => {
+        if (cancelled || !body?.summary) return;
+        const up = Number(body.summary.live) || 0;
+        setLive({ up, awake: Number(body.summary.awake) || 0 });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
-    <main className="landing">
+    <main className="landing landing-v2">
       <div className="landing-chrome wrap">
         <AdminHeader />
       </div>
 
       <div className="wrap">
-        <section className="landing-hero">
-          <div className="landing-hero-glow" aria-hidden="true" />
-          <div className="landing-hero-inner">
-            <div className="landing-hero-main">
-              <h1>Mayfly</h1>
-              <p className="landing-lede landing-lede-lead">Give every pull request a place to land.</p>
-              <p className="landing-lede">
-                Spin up a preview for every pull request. Review together. Clean up when you&apos;re done.
-              </p>
-              <div className="landing-actions">
-                <a className="btn" href="/board">
-                  Open the board
-                </a>
-                <a className="btn secondary" href="/admin/login">
-                  Admin sign-in
-                </a>
-              </div>
-            </div>
-            <div className="landing-hero-visual" aria-hidden="true">
-              <MayflyMark className="landing-hero-mark" />
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <div className="landing-orbit">
-        <div className="wrap landing-orbit-row">
-          <div className="landing-orbit-workflow">
-            <p className="landing-orbit-kicker">Designed around your workflow</p>
-            <ul className="landing-orbit-stack">
-              <li>
-                <span aria-hidden="true">⑂</span>
-                GitHub
-              </li>
-              <li>
-                <span aria-hidden="true">▰</span>
-                Docker
-              </li>
-            </ul>
-          </div>
-          <div className="landing-orbit-chips">
-            <span>GitHub webhooks</span>
-            <span>Docker builds</span>
-            <span>Sleep &amp; wake</span>
-            <span>Automatic cleanup</span>
-          </div>
-        </div>
-      </div>
-
-      <section className="landing-section wrap" id="workflow">
-        <div className="landing-section-head">
-          <h2>Here for the review. Gone when you&apos;re done.</h2>
-          <p>Follow a preview from the pull request to a clean exit.</p>
-        </div>
-        <div className="landing-workflow">
-          <ol className="landing-steps">
-            {STEPS.map((item, index) => (
-              <li key={item.label}>
-                <button
-                  type="button"
-                  className="landing-step"
-                  data-active={index === step ? "true" : "false"}
-                  data-done={index < step ? "true" : "false"}
-                  onClick={() => setStep(index)}
-                >
-                  <span className="landing-step-num">{index + 1}</span>
-                  <strong>{item.label}</strong>
-                  <small>{item.note}</small>
-                </button>
-              </li>
-            ))}
-          </ol>
-          <p className="landing-caption" aria-live="polite">
-            {CAPTIONS[step]}
+        <section className="lp-hero" aria-labelledby="lp-title">
+          <h1 id="lp-title">A preview for every pull request, gone when it&apos;s merged.</h1>
+          <p className="lp-lede">
+            Reviewers click one link and see the change running. When nobody&apos;s using it the preview sleeps, so
+            it costs almost nothing, and when the pull request closes Mayfly removes it.
           </p>
-        </div>
-      </section>
+          <div className="lp-actions">
+            <a className="btn" href="/board">
+              Open the board
+            </a>
+            <a className="btn secondary" href="/admin/login">
+              Admin sign-in
+            </a>
+            {live ? (
+              <span className="lp-live" aria-live="polite">
+                {live.up === 0
+                  ? "No previews are up right now."
+                  : `${live.up} preview${live.up === 1 ? " is" : "s are"} up right now, ${live.awake} awake.`}
+              </span>
+            ) : null}
+          </div>
 
-      <section className="landing-section wrap" id="features">
-        <div className="landing-section-head">
-          <h2>Less staging to manage. More signal in every review.</h2>
-          <p>Mayfly builds the PR&apos;s own code, then keeps capacity tied to active visits.</p>
-        </div>
-        <div className="landing-features">
-          <article>
-            <h3>Sleep when idle</h3>
-            <p>
-              After a short stretch without visitors the container stops. The next visit wakes it without a rebuild.
+          <figure className="lp-life">
+            <figcaption>The life of one preview</figcaption>
+            <div className="lp-line" role="img" aria-label="A preview builds in seconds, is awake while people look at it, sleeps for most of its life, and is removed when the pull request is merged.">
+              {LIFE.map((part, index) => (
+                <span key={index} data-life={part.state} style={{ flexGrow: part.share }} />
+              ))}
+              {MOMENTS.map((moment) => (
+                <i key={moment.what} className="lp-tick" style={{ left: `${moment.at}%` }} />
+              ))}
+            </div>
+            <ol className="lp-moments">
+              {MOMENTS.map((moment) => (
+                <li key={moment.what}>
+                  <span className="lp-when">{moment.when}</span>
+                  <span>{moment.what}</span>
+                </li>
+              ))}
+            </ol>
+            <p className="lp-key">
+              <span data-life="awake" /> awake <span data-life="asleep" /> asleep <span data-life="build" /> building
             </p>
-          </article>
-          <article>
-            <h3>Built from the PR</h3>
-            <p>
-              In Docker mode Mayfly clones the pull request, builds its Dockerfile, and runs that exact commit in its
-              own container.
-            </p>
-          </article>
-          <article>
-            <h3>A clean exit</h3>
-            <p>
-              Closing the PR, or letting the lifetime expire, removes the container and its image so nothing lingers.
-            </p>
-          </article>
-        </div>
-      </section>
+          </figure>
+        </section>
 
-      <div className="wrap">
-        <section className="landing-compare">
-          <h2>Staging shouldn&apos;t stay on forever.</h2>
-          <div className="landing-compare-grid">
-            <div>
-              <h3>Shared staging</h3>
-              <ul>
-                <li>One environment for competing changes</li>
-                <li>Resources keep running between reviews</li>
-                <li>Cleanup is easy to forget</li>
-              </ul>
-            </div>
-            <div>
-              <h3>Mayfly</h3>
-              <ul>
-                <li>An isolated preview for each pull request</li>
-                <li>Sleep on idle, wake on the next visit</li>
-                <li>Cleanup on close or expiry</li>
-              </ul>
-            </div>
+        <section className="lp-facts" aria-label="What Mayfly does">
+          <div>
+            <h2>Built from the pull request</h2>
+            <p>Mayfly builds the exact commit with the repository&apos;s own Dockerfile and runs it on its own.</p>
+          </div>
+          <div>
+            <h2>Asleep when idle</h2>
+            <p>After a short quiet spell the app stops. The next visit wakes it in a second or two, no rebuild.</p>
+          </div>
+          <div>
+            <h2>Cleans up after itself</h2>
+            <p>Merge or close the pull request, or let its time run out, and the preview is deleted.</p>
           </div>
         </section>
-      </div>
 
-      <section className="landing-section wrap" id="faq">
-        <div className="landing-section-head">
-          <h2>Before your first preview</h2>
-          <p>Short answers for the questions that come up first.</p>
-        </div>
-        <div className="landing-faq">
+        <section className="lp-faq" id="faq" aria-labelledby="lp-faq-title">
+          <h2 id="lp-faq-title">Questions people ask first</h2>
           <details>
-            <summary>What does Mayfly build?</summary>
+            <summary>Which pull requests get a preview?</summary>
             <p>
-              In Docker mode it builds the pull request&apos;s own Dockerfile for repositories on the allow-list. Pull
-              requests from forks are refused. The always-on Render board runs placeholder mode.
+              Pull requests on the repositories an admin has allowed. Pull requests from forks don&apos;t, to keep the
+              server safe.
             </p>
           </details>
           <details>
-            <summary>How does a preview start?</summary>
+            <summary>How long does a preview stay up?</summary>
             <p>
-              GitHub sends a signed webhook when a pull request opens or updates. Mayfly builds that commit and serves
-              a preview URL. Closing the PR removes it.
+              Until the pull request is merged or closed, or its lifetime runs out. Admins choose the lifetime for each
+              repository, and a <code>keep-preview</code> label keeps one open.
             </p>
           </details>
           <details>
-            <summary>What happens when nobody is looking?</summary>
+            <summary>What does it cost?</summary>
             <p>
-              After the configured idle time the container sleeps. The next visit starts it again. The preview still
-              expires when its lifetime runs out.
+              Only the time a preview is awake. The Cost page shows an estimate of what sleeping has saved this month.
             </p>
           </details>
           <details>
             <summary>Where can I try it?</summary>
             <p>
-              Open the public board for live previews, or sign in on Admin to simulate events. The full Docker path
-              runs in a Codespace when that environment is up.
+              Open the board to see the previews that are up now, or sign in as an admin to try a pull request without
+              going to GitHub.
             </p>
           </details>
-        </div>
-      </section>
+        </section>
+      </div>
 
       <footer className="landing-foot wrap">
         <a className="landing-brand" href="/">

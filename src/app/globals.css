@@ -4032,3 +4032,78 @@ html[data-theme="dark"] .admin-card-head .card-repo { color: #b9d8cf; }
 /* Page title and its one-line description side by side (Admin). */
 .board-welcome.page-head-inline > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 1rem; }
 .board-welcome.page-head-inline .lede { margin: 0; max-width: none; }
+
+/* Landing page: a headline, the life of one preview, three plain facts, questions. */
+.landing-v2 .wrap { max-width: 1120px; }
+.lp-hero { padding: 3.5rem 0 2.5rem; }
+.lp-hero h1 {
+  max-width: 20ch;
+  margin: 0;
+  font-size: clamp(2.1rem, 5vw, 3.6rem);
+  font-weight: 650;
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+.lp-lede { max-width: 58ch; margin: 1.1rem 0 0; color: var(--muted); font-size: 1.12rem; line-height: 1.55; }
+.lp-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 0.75rem; margin-top: 1.6rem; }
+.lp-live { margin-left: 0.5rem; color: var(--muted); font-size: 0.92rem; }
+.lp-life { margin: 3.2rem 0 0; }
+.lp-life figcaption { margin-bottom: 0.7rem; font-size: 0.92rem; font-weight: 600; }
+.lp-line { position: relative; display: flex; gap: 2px; height: 1.1rem; }
+.lp-line > span { border-radius: 3px; }
+.lp-line > [data-life="awake"], .lp-key [data-life="awake"] { background: var(--accent); }
+.lp-line > [data-life="asleep"] { align-self: center; height: 0.3rem; }
+.lp-line > [data-life="asleep"], .lp-key [data-life="asleep"] { background: color-mix(in srgb, var(--muted) 70%, transparent); }
+.lp-line > [data-life="build"], .lp-key [data-life="build"] {
+  background: repeating-linear-gradient(135deg, var(--building) 0 3px, transparent 3px 6px);
+}
+.lp-tick { position: absolute; top: -0.45rem; bottom: -0.45rem; width: 2px; margin-left: -1px; background: var(--ink); }
+.lp-tick:first-of-type { margin-left: 0; }
+.lp-tick:last-of-type { margin-left: -2px; }
+.lp-moments {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1.1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.lp-moments li { display: grid; gap: 0.2rem; font-size: 0.92rem; line-height: 1.4; }
+.lp-moments li:last-child { text-align: right; }
+.lp-when { color: var(--muted); font-size: 0.82rem; }
+.lp-key { display: flex; align-items: center; gap: 0.4rem; margin: 1.1rem 0 0; color: var(--muted); font-size: 0.82rem; }
+.lp-key span { display: inline-block; width: 1.4rem; height: 0.45rem; margin-left: 0.6rem; border-radius: 2px; }
+.lp-key span:first-child { margin-left: 0; }
+.lp-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 2rem 0 0;
+  padding: 2rem 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.lp-facts > div { padding: 0 1.5rem; border-left: 1px solid var(--line); }
+.lp-facts > div:first-child { padding-left: 0; border-left: 0; }
+.lp-facts h2 { margin: 0; font-size: 1.05rem; letter-spacing: -0.015em; }
+.lp-facts p { margin: 0.45rem 0 0; color: var(--muted); line-height: 1.5; }
+.lp-faq { max-width: 46rem; padding: 2.6rem 0 1rem; }
+.lp-faq h2 { margin: 0 0 0.8rem; font-size: 1.4rem; letter-spacing: -0.02em; }
+.lp-faq details { border-top: 1px solid var(--line); padding: 0.85rem 0; }
+.lp-faq details:last-of-type { border-bottom: 1px solid var(--line); }
+.lp-faq summary { cursor: pointer; font-weight: 600; }
+.lp-faq details p { margin: 0.5rem 0 0; color: var(--muted); line-height: 1.55; }
+@media (prefers-reduced-motion: no-preference) {
+  .lp-line > span { animation: lp-grow 900ms cubic-bezier(0.2, 0.7, 0.2, 1) both; transform-origin: left center; }
+  @keyframes lp-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+}
+@media (max-width: 760px) {
+  .lp-hero { padding-top: 2rem; }
+  .lp-live { flex-basis: 100%; margin-left: 0; }
+  .lp-moments { grid-template-columns: minmax(0, 1fr); gap: 0.6rem; }
+  .lp-moments li { grid-template-columns: 5.5rem minmax(0, 1fr); }
+  .lp-moments li:last-child { text-align: left; }
+  .lp-facts { grid-template-columns: minmax(0, 1fr); gap: 1.2rem; }
+  .lp-facts > div { padding: 0; border-left: 0; }
+}
+.landing-v2 .mast { border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; box-shadow: none; padding-left: 0; padding-right: 0; }
