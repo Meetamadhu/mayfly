@@ -1,0 +1,29 @@
+# A plain Ubuntu server (for example AWS EC2): puts HTTPS in front of Mayfly and restarts both after a reboot.
+# deploy/aws/setup.sh runs it as:
+#   docker compose -f docker-compose.yml -f deploy/aws/docker-compose.aws.yml up -d --build
+# Paths here are relative to the repository root, where the first compose file lives.
+services:
+  mayfly:
+    restart: unless-stopped
+    environment:
+      # Only Caddy (same machine) talks to Mayfly. Port 3000 is never reachable from outside.
+      HOST: 127.0.0.1
+      # Caddy on the same machine says the visitor used https; Mayfly passes that on to preview apps.
+      TRUST_PROXY: loopback
+
+  caddy:
+    image: caddy:2.10
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      - mayfly
+    environment:
+      MAYFLY_HOST: ${MAYFLY_HOST:?run deploy/aws/setup.sh first}
+    volumes:
+      - ./deploy/aws/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
