@@ -3899,9 +3899,8 @@ body { background: var(--bg); }
 }
 .board-headline {
   grid-column: 1;
-  max-width: 30ch;
   margin: 0;
-  font-size: clamp(1.7rem, 3.4vw, 2.6rem);
+  font-size: clamp(1.5rem, 2.5vw, 2.3rem);
   font-weight: 600;
   line-height: 1.12;
   letter-spacing: -0.03em;
