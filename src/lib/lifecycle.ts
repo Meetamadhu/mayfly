@@ -15,6 +15,7 @@ import {
 } from "./config";
 import { removedBecause } from "./timeline";
 import { getDeployer, previewUrl, publicPreviewUrl, type Deployment } from "./deployer";
+import { pruneEnvironments } from "./prune";
 import { postPullRequestNote, publishCommitStatus, publishPullRequestComment } from "./http";
 import {
   currentPolicy,
@@ -1570,6 +1571,15 @@ export async function reap(): Promise<ReapResult> {
         lastType = event.type;
         lastMs = at;
       }
+    }
+
+    // Keep the saved state small: forget long-removed previews and old comment versions.
+    const pruned = pruneEnvironments(state.environments, now);
+    if (pruned.removedRecords || pruned.trimmedComments) {
+      state.environments = pruned.environments;
+      console.log(
+        `Tidied saved state: ${pruned.removedRecords} old removed preview(s), ${pruned.trimmedComments} old comment version(s).`,
+      );
     }
 
     await saveState(state);
