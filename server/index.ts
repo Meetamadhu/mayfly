@@ -82,6 +82,9 @@ async function main() {
 
   const server = express();
   server.disable("x-powered-by");
+  // Behind a proxy on the same machine (deploy/aws sets TRUST_PROXY=loopback), read https from X-Forwarded-Proto
+  // so preview apps are told the real protocol. Unset everywhere else, which keeps the old behaviour.
+  if (process.env.TRUST_PROXY === "loopback") server.set("trust proxy", "loopback");
 
   // API + preview proxy live on Express. Mount before the Next.js catch-all.
   server.use(adminRouter);

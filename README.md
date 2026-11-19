@@ -80,6 +80,8 @@ Copy `.env.example` to `.env.local`. `.env.local` stays on this machine.
 
 ## Deploy temporarily
 
+For a test on an AWS (or any Ubuntu) server with real Docker builds and HTTPS, see [deploy/aws/README.md](deploy/aws/README.md). It sets everything up with one script.
+
 On a Linux server, build and run in production mode (not `npm run dev`):
 
 ```bash

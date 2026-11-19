@@ -1,0 +1,6 @@
+# Caddy gets a free HTTPS certificate for this address and passes every request to Mayfly.
+# The original Host header is kept, so Mayfly's same-origin check for admin actions still works.
+{$MAYFLY_HOST} {
+	encode gzip
+	reverse_proxy 127.0.0.1:3000
+}
