@@ -7,6 +7,10 @@
 # To add or replace the GitHub token, run it with --github-token. It asks for the token without showing it,
 # checks it, and saves it to .env.local.
 #
+# To get alerts in Slack, Discord or another chat, run it with --alert-webhook and paste the chat's incoming
+# webhook URL. Mayfly then posts when a build fails, a preview gets stuck, the disk runs low, Docker stops
+# answering, or Mayfly restarts.
+#
 # Run it as the normal login user (ubuntu), not root. Safe to run again: it keeps an existing .env.local,
 # updates the address if the server's IP changed, and rebuilds. Secrets are written to .env.local and never printed.
 set -euo pipefail
@@ -18,10 +22,12 @@ say() { printf '\n== %s\n' "$*"; }
 fail() { printf '\nSetup stopped: %s\n' "$*" >&2; exit 1; }
 
 set_token=""
+set_alert=""
 case "${1:-}" in
   "") ;;
   --github-token) set_token=1 ;;
-  *) fail "unknown option $1. The only option is --github-token." ;;
+  --alert-webhook) set_alert=1 ;;
+  *) fail "unknown option $1. The options are --github-token and --alert-webhook." ;;
 esac
 
 # Overridable so the token checks can be tested without GitHub.
@@ -148,6 +154,24 @@ if [ -n "$set_token" ]; then
   echo "Saved."
 fi
 
+if [ -n "$set_alert" ]; then
+  say "Saving the alert webhook"
+  [ -t 0 ] || fail "--alert-webhook needs a terminal to paste the URL into."
+  # A chat webhook URL lets anyone post to that channel, so treat it like a password.
+  read -rsp "Paste the chat's incoming webhook URL, then press Enter (it won't show): " new_url
+  echo
+  new_url="${new_url//[[:space:]]/}"
+  [[ $new_url =~ ^https://[A-Za-z0-9.-]+/[^\"\'\`]*$ ]] || fail "the URL wasn't saved: it must start with https:// and be one URL, pasted once."
+  [ "$(grep -o 'https://' <<<"$new_url" | wc -l)" -eq 1 ] || fail "the URL wasn't saved: it looks like it was pasted more than once."
+  (
+    umask 077
+    { grep -v '^ALERT_WEBHOOK_URL=' .env.local || true; printf 'ALERT_WEBHOOK_URL=%s\n' "$new_url"; } >.env.local.new
+  )
+  mv .env.local.new .env.local
+  unset new_url
+  echo "Saved. When Mayfly restarts in a moment, a \"started up\" message should appear in that chat."
+fi
+
 # Mayfly reads GITHUB_TOKEN, or MAYFLY_GITHUB_TOKEN when GITHUB_TOKEN isn't in the file.
 token=$(grep -m1 '^GITHUB_TOKEN=' .env.local | cut -d= -f2- || true)
 grep -q '^GITHUB_TOKEN=' .env.local || token=$(grep -m1 '^MAYFLY_GITHUB_TOKEN=' .env.local | cut -d= -f2- || true)
@@ -240,4 +264,10 @@ elif [ -n "$token_report" ]; then
      Fix it with
        bash $REPO_DIR/deploy/aws/setup.sh --github-token
 EOF
+fi
+if ! grep -Eq '^ALERT_WEBHOOK_URL=.+' .env.local; then
+  cat <<EOF2
+  Optional: get chat alerts for failed builds, low disk and restarts with
+       bash $REPO_DIR/deploy/aws/setup.sh --alert-webhook
+EOF2
 fi

@@ -45,6 +45,18 @@ State is kept in `~/mayfly/data/state.json`. Leave `MONGODB_URI` empty here, bec
 
 Only one Mayfly should receive a repository's webhook. When you point the webhooks here, a codespace that was using them stops getting events.
 
+## Alerts
+
+To get a message in Slack, Discord or another chat when something goes wrong:
+
+1. Create an **incoming webhook** for the channel. In Discord: channel settings → Integrations → Webhooks → New Webhook → Copy Webhook URL. In Slack: create an app with Incoming Webhooks turned on, and add one for the channel.
+2. On the server, run `bash ~/mayfly/deploy/aws/setup.sh --alert-webhook` and paste the URL. It isn't shown, and it's saved only in `.env.local`.
+3. Mayfly restarts and posts a **"started up"** message. If that appears, alerts work.
+
+You'll then hear about failed builds, stuck previews, low disk space, Docker problems and restarts. Anyone with the webhook URL can post to that channel, so don't share it.
+
+To be told when the whole server is down, which Mayfly can't report itself, point an uptime monitor such as UptimeRobot at `https://<address>/api/health`. It answers 200 when healthy and 503 when not. Check the monitor's terms if this is for a business.
+
 ## Update to the latest code
 
 ```bash
