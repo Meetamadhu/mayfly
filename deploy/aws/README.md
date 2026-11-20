@@ -33,7 +33,13 @@ At the end it prints the next steps:
 
 1. Show the admin token and webhook secret on the server.
 2. Point each sample repository's webhook at `https://<address>/api/webhooks/github`.
-3. Add your GitHub token with `nano ~/mayfly/.env.local`, then run `setup.sh` again.
+3. Add your GitHub token with `bash ~/mayfly/deploy/aws/setup.sh --github-token`. It asks for the token without showing it, refuses one that was pasted twice or cut off, saves it and rebuilds.
+
+## GitHub token
+
+Create a fine-grained token limited to the repositories in `PREVIEW_REPOS`, with **Contents: Read-only**, **Pull requests: Read and write** and **Commit statuses: Read and write**. Without Commit statuses, PR comments still work but the **Mayfly — Preview** check is refused with 403.
+
+Every run of `setup.sh` checks the saved token: that it looks like one token, and that GitHub accepts it for each repository in `PREVIEW_REPOS`. GitHub doesn't let it check write permissions, so a missing permission shows up only in the logs when Mayfly tries to post.
 
 State is kept in `~/mayfly/data/state.json`. Leave `MONGODB_URI` empty here, because only one Mayfly may use a database.
 

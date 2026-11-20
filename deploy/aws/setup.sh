@@ -4,6 +4,9 @@
 #   git clone https://github.com/Meetamadhu/mayfly.git ~/mayfly
 #   bash ~/mayfly/deploy/aws/setup.sh
 #
+# To add or replace the GitHub token, run it with --github-token. It asks for the token without showing it,
+# checks it, and saves it to .env.local.
+#
 # Run it as the normal login user (ubuntu), not root. Safe to run again: it keeps an existing .env.local,
 # updates the address if the server's IP changed, and rebuilds. Secrets are written to .env.local and never printed.
 set -euo pipefail
@@ -13,6 +16,38 @@ cd "$REPO_DIR"
 
 say() { printf '\n== %s\n' "$*"; }
 fail() { printf '\nSetup stopped: %s\n' "$*" >&2; exit 1; }
+
+set_token=""
+case "${1:-}" in
+  "") ;;
+  --github-token) set_token=1 ;;
+  *) fail "unknown option $1. The only option is --github-token." ;;
+esac
+
+# Overridable so the token checks can be tested without GitHub.
+GITHUB_API="${GITHUB_API:-https://api.github.com}"
+
+# Prints why a value isn't one GitHub token, or nothing when it looks like one.
+token_format_problem() {
+  local t="$1" copies
+  copies=$({ grep -o -E 'github_pat_|ghp_' <<<"$t" || true; } | wc -l)
+  if [ "$copies" -gt 1 ]; then
+    echo "it looks like the token was pasted $copies times. Paste it once."
+  elif [[ ! $t =~ ^(github_pat_|ghp_) ]]; then
+    echo "it doesn't start with github_pat_ or ghp_, so it isn't a GitHub token."
+  elif [[ ! $t =~ ^[A-Za-z0-9_]+$ ]]; then
+    echo "it has characters a GitHub token can't have (spaces, quotes or a cut-off copy)."
+  elif [[ $t == github_pat_* && ${#t} -ne 93 ]] || [[ $t == ghp_* && ${#t} -ne 40 ]]; then
+    echo "it's ${#t} characters long, which is the wrong length. Copy it again with GitHub's copy button."
+  fi
+}
+
+# HTTP status for a GitHub API path. The token goes to curl on stdin, so it never appears in the process list.
+github_status() {
+  printf 'header = "Authorization: Bearer %s"\n' "$1" |
+    curl -s -o /dev/null -w '%{http_code}' --max-time 10 -K - \
+      -H 'Accept: application/vnd.github+json' "$GITHUB_API$2" || true
+}
 
 [ "$(id -u)" -ne 0 ] || fail "run this as your normal user (ubuntu), not with sudo."
 [ -f docker-compose.yml ] || fail "can't find docker-compose.yml in $REPO_DIR."
@@ -96,6 +131,56 @@ EOF
 fi
 chmod 600 .env.local
 
+if [ -n "$set_token" ]; then
+  say "Saving your GitHub token"
+  [ -t 0 ] || fail "--github-token needs a terminal to paste the token into."
+  read -rsp "Paste the token, then press Enter (it won't show): " new_token
+  echo
+  new_token="${new_token//[[:space:]]/}"
+  problem=$(token_format_problem "$new_token")
+  [ -z "$problem" ] || fail "the token wasn't saved: $problem"
+  if grep -q '^GITHUB_TOKEN=' .env.local; then
+    sed -i "s|^GITHUB_TOKEN=.*|GITHUB_TOKEN=$new_token|" .env.local
+  else
+    printf 'GITHUB_TOKEN=%s\n' "$new_token" >>.env.local
+  fi
+  unset new_token
+  echo "Saved."
+fi
+
+# Mayfly reads GITHUB_TOKEN, or MAYFLY_GITHUB_TOKEN when GITHUB_TOKEN isn't in the file.
+token=$(grep -m1 '^GITHUB_TOKEN=' .env.local | cut -d= -f2- || true)
+grep -q '^GITHUB_TOKEN=' .env.local || token=$(grep -m1 '^MAYFLY_GITHUB_TOKEN=' .env.local | cut -d= -f2- || true)
+token=$(tr -d "\"'" <<<"$token")
+token_report=""
+if [ -z "$token" ]; then
+  token_report="missing"
+else
+  say "Checking the GitHub token"
+  problem=$(token_format_problem "$token")
+  if [ -n "$problem" ]; then
+    token_report="The saved GitHub token is wrong: $problem"
+  else
+    repos=$(grep -m1 '^PREVIEW_REPOS=' .env.local | cut -d= -f2- | tr -d "\"' " | tr ',' ' ' || true)
+    for repo in $repos; do
+      code=$(github_status "$token" "/repos/$repo")
+      case "$code" in
+        200) echo "  $repo: the token can read it" ;;
+        401) token_report="GitHub refused the token (401). It's expired, deleted or copied wrong."; break ;;
+        403|404) token_report="${token_report:+$token_report }The token can't see $repo. Add it under the token's repository access." ;;
+        000) token_report="Couldn't reach GitHub to check the token. Check the server's internet access."; break ;;
+        *) token_report="${token_report:+$token_report }GitHub answered $code for $repo." ;;
+      esac
+    done
+  fi
+  if [ -z "$token_report" ]; then
+    echo "  The token works. It also needs Commit statuses and Pull requests set to Read and write, which this script can't check."
+  else
+    echo "  $token_report"
+  fi
+fi
+unset token
+
 say "Cleaning up unused Docker images every day"
 sudo tee /etc/cron.daily/mayfly-docker-prune >/dev/null <<'EOF'
 #!/bin/sh
@@ -130,9 +215,6 @@ if [ -z "$ok" ]; then
   exit 1
 fi
 
-token_state="set"
-grep -Eq '^(GITHUB_TOKEN|MAYFLY_GITHUB_TOKEN)=.+' .env.local || token_state="missing"
-
 cat <<EOF
 
 Mayfly is up at https://$host
@@ -147,10 +229,15 @@ Next:
        Secret:       the GITHUB_WEBHOOK_SECRET value
        Events:       Pull requests
 EOF
-if [ "$token_state" = "missing" ]; then
+if [ "$token_report" = "missing" ]; then
   cat <<EOF
   4. GitHub token: missing, so Mayfly can't post PR comments yet. Add it with
-       nano $REPO_DIR/.env.local
-     then run this script again.
+       bash $REPO_DIR/deploy/aws/setup.sh --github-token
+EOF
+elif [ -n "$token_report" ]; then
+  cat <<EOF
+  4. GitHub token: $token_report
+     Fix it with
+       bash $REPO_DIR/deploy/aws/setup.sh --github-token
 EOF
 fi
