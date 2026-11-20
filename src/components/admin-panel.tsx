@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { BackupsPanel } from "@/components/backups-panel";
+import { ActivityLogPanel, TeamAccountsPanel } from "@/components/team-panels";
+import { signOutEverywhere } from "@/lib/use-session";
 import { Lifespan, cardState, statePillLabel } from "@/components/board-parts";
 import type { Environment, EnvironmentStatus, Overview } from "@/lib/types";
 import { removedLabel, timelineLabel, timelineNewestFirst } from "@/lib/timeline";
@@ -159,7 +161,9 @@ function recentActivity(environments: Environment[]) {
   return events.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 20);
 }
 
-export function AdminPanel() {
+/** The admin sees everything. A team member ("user") manages previews but can't remove them or change settings. */
+export function AdminPanel({ role = "admin", name = "admin" }: { role?: "admin" | "user"; name?: string }) {
+  const isAdmin = role === "admin";
   const [overview, setOverview] = useState<Overview | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -371,7 +375,7 @@ export function AdminPanel() {
   }
 
   async function signOut() {
-    await fetch("/api/admin/session", { method: "DELETE", credentials: "include" });
+    await signOutEverywhere();
     window.location.assign("/admin/login");
   }
 
@@ -393,8 +397,12 @@ export function AdminPanel() {
       <div className="admin-panel admin-in-shell">
       <section className="board-welcome page-head-inline">
         <div>
-          <h1>Admin</h1>
-          <p className="lede">Look after every preview by hand, and try out pull requests without going to GitHub.</p>
+          <h1>{isAdmin ? "Admin" : "Manage previews"}</h1>
+          <p className="lede">
+            {isAdmin
+              ? "Look after every preview by hand, and try out pull requests without going to GitHub."
+              : `Signed in as ${name}. Wake, sleep, extend and keep previews awake. Only the admin can remove one.`}
+          </p>
         </div>
       </section>
 
@@ -402,7 +410,10 @@ export function AdminPanel() {
         <div className="ledger-head">
           <div>
             <h2>Previews</h2>
-            <p className="help">Everything running now, plus any that failed to build. You&apos;ll always be asked before a preview is removed.</p>
+            <p className="help">
+              Everything running now, plus any that failed to build.
+              {isAdmin ? " You'll always be asked before a preview is removed." : ""}
+            </p>
           </div>
         </div>
         {loadError ? <p className="error" role="alert">{loadError}</p> : null}
@@ -514,9 +525,11 @@ export function AdminPanel() {
                       <button type="button" className="secondary" disabled={busy || demo} onClick={() => void extend(env)}>
                         Extend
                       </button>
-                      <button type="button" className="destroy" disabled={busy || env.status === "destroying"} onClick={() => void destroy(env)}>
-                        Remove
-                      </button>
+                      {isAdmin ? (
+                        <button type="button" className="destroy" disabled={busy || env.status === "destroying"} onClick={() => void destroy(env)}>
+                          Remove
+                        </button>
+                      ) : null}
                     </div>
                   </footer>
                 </li>
@@ -528,6 +541,7 @@ export function AdminPanel() {
         {notice ? <p className="notice" role="status">{notice}</p> : null}
       </section>
 
+      {isAdmin ? (
       <div className="workspace">
         <details id="simulator" className="panel simulator" open>
           <summary>Try a pull request</summary>
@@ -710,7 +724,11 @@ export function AdminPanel() {
         </section>
 
         <BackupsPanel />
+        <TeamAccountsPanel />
       </div>
+      ) : null}
+
+      <ActivityLogPanel />
 
       <section className="panel" aria-label="Recent activity">
         <h2>Recent activity</h2>

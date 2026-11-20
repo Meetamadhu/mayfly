@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { checkAdmin, delayWrongSignIn, sessionCookie, SESSION_MAX_AGE, signIn } from "@/lib/admin";
+import { recordAudit } from "@/lib/users";
 import { asyncHandler, sendJson, softJson } from "../lib/respond";
 
 export const adminRouter = Router();
@@ -27,6 +28,7 @@ adminRouter.post(
       return;
     }
     res.set("Set-Cookie", sessionCookie(value, SESSION_MAX_AGE));
+    await recordAudit({ name: "admin", role: "admin" }, "signin");
     sendJson(res, { ok: true });
   }),
 );

@@ -1,4 +1,5 @@
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { accountFields } from "./account-records";
 import path from "node:path";
 import { asStoredPolicy } from "./policy";
 import { loadStateMongo, saveStateMongo, usesMongo, withMongoExclusive } from "./store-mongo";
@@ -32,6 +33,10 @@ export interface State {
   environments: import("./types").Environment[];
   usage?: import("./types").UsageMonth;
   policy?: import("./policy").PreviewPolicy;
+  /** Team accounts (password hashes only). Never part of any API response. */
+  users?: import("./account-records").UserRecord[];
+  /** Who did what, newest last, capped at AUDIT_KEEP. */
+  audit?: import("./account-records").AuditEntry[];
 }
 
 export function dataDir() {
@@ -93,7 +98,12 @@ export function asState(value: unknown): State {
   if (!Array.isArray(environments)) return { environments: [] };
   const usage = asUsage((value as State).usage);
   const policy = asStoredPolicy((value as State).policy);
-  return { environments, ...(usage ? { usage } : {}), ...(policy ? { policy } : {}) };
+  return {
+    environments,
+    ...(usage ? { usage } : {}),
+    ...(policy ? { policy } : {}),
+    ...accountFields(value as { users?: unknown; audit?: unknown }),
+  };
 }
 
 export async function readJson<T>(file: string, fallback: T): Promise<T> {

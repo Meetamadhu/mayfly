@@ -109,9 +109,22 @@ Set `ALERT_WEBHOOK_URL` to a chat channel's incoming webhook (Slack, Discord, Go
 
 The same problem isn't posted again for six hours. Messages contain the repository, pull request, commit, the first line of the error and a link to the board, never tokens or full logs. A chat webhook that's down or wrong never affects builds. Without `ALERT_WEBHOOK_URL`, alerts go to the log only (lines starting `[alert]`).
 
+## Team accounts and the activity log
+
+There are two kinds of sign-in:
+
+- **Admin**: whoever has `MAYFLY_ADMIN_TOKEN`. Can do everything.
+- **Team members**: people who sign up at `/signup` with a username and password. Their account waits until the admin approves it on the Admin page. Once approved they can see everything, including PR comments, and wake, sleep, extend and keep previews awake. They can't remove previews, change lifetime rules, run the simulator, use backups or manage accounts.
+
+The admin can approve or decline sign-ups, sign someone out, turn an account off (which ends its sessions at once) or remove it. At most 20 sign-ups can wait at a time, and one address can sign up 5 times an hour. Sign-in stops for 15 minutes after 8 wrong passwords for a username, or 20 from one address.
+
+Passwords are stored only as scrypt hashes, in the same saved state as everything else (so they're in backups too). Sessions are signed cookies that last 12 hours and are tied to `MAYFLY_ADMIN_TOKEN`: changing the token signs everyone out. Anything that changes something must come from Mayfly's own pages (the `Origin` check), as for the admin.
+
+**Who did what** on the Admin page lists sign-ins and every change people make to previews and accounts, with who made it, newest first (the newest 500 are kept). Signed-in people can read it; the public can't.
+
 ## Backups
 
-Once a day Mayfly saves its state (every preview record, the month's usage and the lifetime rules) as a gzip file in `data/backups`, and keeps the newest `BACKUP_KEEP` (default 7). The first is taken a few minutes after it starts. It works the same with the JSON file and with MongoDB. Tokens and secrets aren't in the state, so they aren't in backups either. If a backup fails, an alert is sent (see above).
+Once a day Mayfly saves its state (every preview record, the month's usage and the lifetime rules) as a gzip file in `data/backups`, and keeps the newest `BACKUP_KEEP` (default 7). The first is taken a few minutes after it starts. It works the same with the JSON file and with MongoDB. Tokens stay in `.env.local` and aren't in backups; team accounts are, with passwords only as scrypt hashes, so keep downloaded backups private. If a backup fails, an alert is sent (see above).
 
 Admins see the last backup on the Admin page, can take one now, and can download the latest. These files sit on the same disk as Mayfly, so they protect against a bug or a bad change, not against losing the server. Download one now and then, or snapshot the disk.
 
@@ -149,7 +162,9 @@ To demo the time limit, set TTL minutes to `0`, choose **Open**, then choose **R
 
 ## Security
 
-`MAYFLY_ADMIN_TOKEN` protects `POST /api/environments/<id>?action=destroy`, `action=sleep`, `action=activity`, and `action=extend`, plus `POST /api/reaper` and `POST /api/events`. With no token configured those routes refuse every request; there is no exception for "local" requests, because the `Host` header is chosen by the sender. Scripts send the token as `Authorization: Bearer <token>` or `x-mayfly-admin`. People sign in on `/admin/login` and get a `mayfly_admin` cookie that holds an expiry and a signature, never the token. The cookie is `HttpOnly` and `SameSite=Lax` (and `Secure` in production), and lasts 8 hours. A request that changes anything and is authenticated by the cookie must also come from this host's own `Origin`, or it gets 403. The public board at `/board` is read-only. In production, webhook deliveries must be signed with `GITHUB_WEBHOOK_SECRET`.
+`MAYFLY_ADMIN_TOKEN` protects `POST /api/environments/<id>?action=destroy`, `POST /api/reaper`, `POST /api/events`, lifetime rules, backups and account management. `action=sleep`, `action=activity`, `action=extend` and `action=keep_awake` also accept an approved team member's session (see Team accounts). With no token configured those routes refuse every request; there is no exception for "local" requests, because the `Host` header is chosen by the sender. Scripts send the token as `Authorization: Bearer <token>` or `x-mayfly-admin`. People sign in on `/admin/login` and get a `mayfly_admin` cookie that holds an expiry and a signature, never the token. The cookie is `HttpOnly` and `SameSite=Lax` (and `Secure` in production), and lasts 8 hours. A request that changes anything and is authenticated by the cookie must also come from this host's own `Origin`, or it gets 403. The public board at `/board` is read-only. In production, webhook deliveries must be signed with `GITHUB_WEBHOOK_SECRET`.
+
+Previews are served from the same address as Mayfly, so the preview proxy removes Mayfly's own sign-in cookies (`mayfly_admin`, `mayfly_user`) from every request it forwards, and drops any attempt by a preview to set them. A pull request's code never sees an admin's or team member's session. The preview's own cookies pass through as normal.
 
 Preview processes receive only `PATH`, `NODE_ENV` and `PREVIEW_*` variables (plus the Windows system variables Node needs). `GITHUB_TOKEN`, `MAYFLY_GITHUB_TOKEN`, `GITHUB_WEBHOOK_SECRET` and `MAYFLY_ADMIN_TOKEN` never reach them.
 

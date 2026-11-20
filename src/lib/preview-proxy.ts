@@ -1,6 +1,7 @@
 import { request as forward, type IncomingHttpHeaders, type IncomingMessage } from "node:http";
 import type { Request, Response } from "express";
 import { ADMIN_COOKIE } from "./admin";
+import { USER_COOKIE } from "./users";
 import { findProxyTarget, recordActivity } from "./lifecycle";
 
 // Never forwarded in either direction. host is rewritten, x-mayfly-admin is a Mayfly secret.
@@ -22,11 +23,34 @@ const PREVIEW_SANDBOX_CSP =
 
 const MAYFLY_PAGE_HEADER = "x-mayfly-page";
 
-/** True when a Set-Cookie line would set or clear Mayfly's admin session cookie. */
+/** Mayfly's own sign-in cookies. Preview apps run pull-request code, so they must never see or set these. */
+const MAYFLY_COOKIES = new Set([ADMIN_COOKIE, USER_COOKIE]);
+
+/** True when a Set-Cookie line would set or clear one of Mayfly's sign-in cookies. */
 function isAdminSetCookie(value: string) {
   const eq = value.indexOf("=");
   const name = (eq === -1 ? value : value.slice(0, eq)).trim();
-  return name === ADMIN_COOKIE;
+  return MAYFLY_COOKIES.has(name);
+}
+
+/**
+ * The Cookie header to forward to a preview: the browser's cookies minus Mayfly's sign-in cookies, or undefined
+ * when nothing is left. Without this, a preview's server code would receive the admin's or a team member's session
+ * and could replay it against Mayfly's API.
+ */
+export function forwardableCookie(value: string | string[] | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const joined = Array.isArray(value) ? value.join("; ") : value;
+  const kept = joined
+    .split(";")
+    .map((part) => part.trim())
+    .filter((part) => {
+      if (!part) return false;
+      const eq = part.indexOf("=");
+      const name = (eq === -1 ? part : part.slice(0, eq)).trim();
+      return !MAYFLY_COOKIES.has(name);
+    });
+  return kept.length ? kept.join("; ") : undefined;
 }
 
 function headerValue(headers: IncomingHttpHeaders, name: string): string | undefined {
@@ -297,6 +321,9 @@ export async function proxyPreview(req: Request, res: Response): Promise<void> {
     if (HOP_BY_HOP.has(key) || REQUEST_ONLY_DROP.has(key) || value === undefined) continue;
     headers[key] = value;
   }
+  const cookie = forwardableCookie(req.headers.cookie);
+  if (cookie) headers.cookie = cookie;
+  else delete headers.cookie;
   headers.host = `127.0.0.1:${target.port}`;
   const originalHost = req.headers.host;
   if (originalHost) headers["x-forwarded-host"] = originalHost;

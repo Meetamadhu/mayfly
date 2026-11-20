@@ -12,7 +12,8 @@ import { asState, dataDir, loadState, saveState, type State } from "./store";
  * disk as Mayfly, so they protect against a bad change or a bug wiping data, not against losing the server: for
  * that, download one from the admin page or snapshot the disk (deploy/aws/README.md).
  *
- * The state holds no tokens or secrets (those stay in .env.local), only preview records and settings.
+ * The state holds no tokens (those stay in .env.local): preview records, settings, the activity log and team
+ * accounts, whose passwords are stored only as scrypt hashes. Still, treat backup files as private.
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
