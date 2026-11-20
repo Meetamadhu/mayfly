@@ -57,6 +57,23 @@ You'll then hear about failed builds, stuck previews, low disk space, Docker pro
 
 To be told when the whole server is down, which Mayfly can't report itself, point an uptime monitor such as UptimeRobot at `https://<address>/api/health`. It answers 200 when healthy and 503 when not. Check the monitor's terms if this is for a business.
 
+## Backups
+
+Mayfly saves a backup once a day and keeps the newest 7. The Admin page shows the last one, with **Download latest** and **Back up now**. On the server:
+
+```bash
+bash ~/mayfly/deploy/aws/backup.sh                 # list, newest first
+bash ~/mayfly/deploy/aws/backup.sh now             # take one now
+bash ~/mayfly/deploy/aws/backup.sh restore <name>  # shows what's in it, asks, then restores
+```
+
+Restore stops Mayfly for about a minute, puts the backup back, keeps a copy of what was there before, and starts it again.
+
+These backups are on the server's own disk, so terminating the server deletes them. To keep copies that survive the server, either:
+
+- **Download one** from the Admin page now and then, or
+- **Snapshot the disk daily** with AWS: EC2 → Elastic Block Store → **Lifecycle Manager** → Create lifecycle policy → EBS snapshot policy. Target the volume by a tag you add to it (for example `backup=daily`), schedule **Daily**, and keep a count of 7. Snapshot storage is billed (from your credit on the free plan), and for a disk this size it's small, but check the EBS pricing page.
+
 ## Update to the latest code
 
 ```bash

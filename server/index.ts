@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import type { Server } from "node:http";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { adminRouter } from "./routes/admin";
+import { backupsRouter } from "./routes/backups";
 import { environmentsRouter } from "./routes/environments";
 import { eventsRouter } from "./routes/events";
 import { healthRouter } from "./routes/health";
@@ -95,6 +96,7 @@ async function main() {
   // API + preview proxy live on Express. Mount before the Next.js catch-all.
   server.use(healthRouter);
   server.use(adminRouter);
+  server.use(backupsRouter);
   server.use(environmentsRouter);
   server.use(webhooksRouter);
   server.use(eventsRouter);

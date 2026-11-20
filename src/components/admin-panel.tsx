@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { BackupsPanel } from "@/components/backups-panel";
 import { Lifespan, cardState, statePillLabel } from "@/components/board-parts";
 import type { Environment, EnvironmentStatus, Overview } from "@/lib/types";
 import { removedLabel, timelineLabel, timelineNewestFirst } from "@/lib/timeline";
@@ -707,6 +708,8 @@ export function AdminPanel() {
             </p>
           ) : null}
         </section>
+
+        <BackupsPanel />
       </div>
 
       <section className="panel" aria-label="Recent activity">

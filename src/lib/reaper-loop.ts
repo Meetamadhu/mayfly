@@ -1,3 +1,4 @@
+import { maybeBackup } from "./backup";
 import { getConfig } from "./config";
 import { markReaperOk, reaperFailed, reaperRecovered, watchHealth } from "./health";
 import { reap } from "./lifecycle";
@@ -28,6 +29,8 @@ export function startReaperLoop() {
     } catch (error) {
       console.error("Health check failed", error);
     }
+    // Once a day; it checks the age of the newest backup itself and never throws.
+    await maybeBackup();
   };
 
   const timer = setInterval(() => {
