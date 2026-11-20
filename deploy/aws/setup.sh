@@ -33,6 +33,24 @@ esac
 # Overridable so the token checks can be tested without GitHub.
 GITHUB_API="${GITHUB_API:-https://api.github.com}"
 
+# Some browser terminals (EC2 Instance Connect among them) sometimes deliver one paste twice. When a value is
+# nothing but the same text repeated 2 to 4 times, keep one copy. Anything else is left alone for the checks below.
+collapse_repeats() {
+  local v="$1" k len part whole i
+  len=${#v}
+  for k in 2 3 4; do
+    [ $((len % k)) -eq 0 ] || continue
+    part=${v:0:$((len / k))}
+    whole=""
+    for ((i = 0; i < k; i++)); do whole+="$part"; done
+    if [ "$whole" = "$v" ]; then
+      printf '%s' "$part"
+      return
+    fi
+  done
+  printf '%s' "$v"
+}
+
 # Prints why a value isn't one GitHub token, or nothing when it looks like one.
 token_format_problem() {
   local t="$1" copies
@@ -143,6 +161,7 @@ if [ -n "$set_token" ]; then
   read -rsp "Paste the token, then press Enter (it won't show): " new_token
   echo
   new_token="${new_token//[[:space:]]/}"
+  new_token=$(collapse_repeats "$new_token")
   problem=$(token_format_problem "$new_token")
   [ -z "$problem" ] || fail "the token wasn't saved: $problem"
   if grep -q '^GITHUB_TOKEN=' .env.local; then
@@ -161,8 +180,9 @@ if [ -n "$set_alert" ]; then
   read -rsp "Paste the chat's incoming webhook URL, then press Enter (it won't show): " new_url
   echo
   new_url="${new_url//[[:space:]]/}"
+  new_url=$(collapse_repeats "$new_url")
   [[ $new_url =~ ^https://[A-Za-z0-9.-]+/[^\"\'\`]*$ ]] || fail "the URL wasn't saved: it must start with https:// and be one URL, pasted once."
-  [ "$(grep -o 'https://' <<<"$new_url" | wc -l)" -eq 1 ] || fail "the URL wasn't saved: it looks like it was pasted more than once."
+  [ "$(grep -o 'https://' <<<"$new_url" | wc -l)" -eq 1 ] || fail "the URL wasn't saved: it contains two different URLs. Copy it again from Discord or Slack and paste it once."
   (
     umask 077
     { grep -v '^ALERT_WEBHOOK_URL=' .env.local || true; printf 'ALERT_WEBHOOK_URL=%s\n' "$new_url"; } >.env.local.new
