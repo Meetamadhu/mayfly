@@ -22,6 +22,7 @@ import {
 } from "@/components/board-parts";
 import type { Environment } from "@/lib/types";
 import { useOverview } from "@/lib/use-overview";
+import { useSession } from "@/lib/use-session";
 
 const DASHBOARD_PREVIEW_LIMIT = 2;
 
@@ -60,7 +61,9 @@ export function Dashboard() {
   const [showRemoved, setShowRemoved] = useState(false);
   const [boardFilter, setBoardFilter] = useState<BoardFilter>("all");
   const [boardQuery, setBoardQuery] = useState("");
-  const [signedIn, setSignedIn] = useState(false);
+  const session = useSession();
+  const signedIn = Boolean(session.role);
+  const isAdmin = session.role === "admin";
   const [cardView, setCardView] = useState<"grid" | "list">("grid");
   const [busy, setBusy] = useState(false);
   const [lifecycleId, setLifecycleId] = useState<string | null>(null);
@@ -71,21 +74,6 @@ export function Dashboard() {
     // Searches started from another page arrive as /board?q=…
     const q = new URLSearchParams(window.location.search).get("q");
     if (q) setBoardQuery(q);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetch("/api/admin/session", { credentials: "include", cache: "no-store" })
-      .then((res) => res.json())
-      .then((body: { signedIn?: boolean }) => {
-        if (!cancelled) setSignedIn(Boolean(body.signedIn));
-      })
-      .catch(() => {
-        if (!cancelled) setSignedIn(false);
-      });
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   function chooseCardView(next: "grid" | "list") {
@@ -171,7 +159,7 @@ export function Dashboard() {
             ? `Previews fall asleep after ${formatSleep(config.sleepSeconds)} without visitors and last up to ${formatLifetime(config.ttlHours)}.`
             : ""}
         </p>
-        {signedIn ? (
+        {isAdmin ? (
           <a className="btn secondary board-hero-action" href="/admin#simulator">
             Try a pull request
           </a>
@@ -229,6 +217,7 @@ export function Dashboard() {
                 now={now}
                 demo={demoKey === `${env.repository}#${env.prNumber}`}
                 signedIn={signedIn}
+                canRemove={isAdmin}
                 busy={busy}
                 onAdminAction={(item, action) => void adminAction(item, action)}
                 onShowLifecycle={(item) => setLifecycleId(item.id)}
@@ -314,6 +303,7 @@ export function Dashboard() {
                   now={now}
                   demo={config?.demo === `${env.repository}#${env.prNumber}`}
                   signedIn={signedIn}
+                canRemove={isAdmin}
                   busy={busy}
                   onAdminAction={(item, action) => void adminAction(item, action)}
                   onShowLifecycle={(item) => setLifecycleId(item.id)}

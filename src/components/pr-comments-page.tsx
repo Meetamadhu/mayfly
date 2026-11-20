@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { AppShell } from "@/components/app-shell";
+import { signOutEverywhere } from "@/lib/use-session";
 import { cardState, previewHref, statePillLabel } from "@/components/board-parts";
 import { formatEventTime, removedLabel } from "@/lib/timeline";
 import { isLiveStatus, type Environment } from "@/lib/types";
@@ -128,7 +129,7 @@ export function PrCommentsPage() {
   }
 
   async function signOut() {
-    await fetch("/api/admin/session", { method: "DELETE", credentials: "include" });
+    await signOutEverywhere();
     window.location.assign("/admin/login");
   }
 

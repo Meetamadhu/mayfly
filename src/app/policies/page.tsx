@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { PoliciesPage } from "@/components/policies-page";
-import { ADMIN_COOKIE, sessionIsValid } from "@/lib/admin";
+import { pageActor } from "@/lib/page-access";
 
 export const metadata: Metadata = {
   title: "Lifetime rules · Mayfly",
@@ -12,9 +11,9 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function Policies() {
-  const jar = await cookies();
-  const value = jar.get(ADMIN_COOKIE)?.value ?? "";
-  const token = (process.env["MAYFLY_ADMIN_TOKEN"] ?? "").trim();
-  if (!token || !sessionIsValid(value, token)) redirect("/admin/login?next=/policies");
+  const actor = await pageActor();
+  if (!actor) redirect("/admin/login?next=/policies");
+  // Team members can't change lifetime rules; send them to the page they can use.
+  if (actor.role !== "admin") redirect("/admin");
   return <PoliciesPage />;
 }
