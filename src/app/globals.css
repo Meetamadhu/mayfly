@@ -4107,3 +4107,7 @@ html[data-theme="dark"] .admin-card-head .card-repo { color: #b9d8cf; }
   .lp-facts > div { padding: 0; border-left: 0; }
 }
 .landing-v2 .mast { border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; box-shadow: none; padding-left: 0; padding-right: 0; }
+
+/* Backups panel on the admin page */
+.backup-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 0.9rem 0 0.4rem; }
+.backup-actions .btn { text-decoration: none; }

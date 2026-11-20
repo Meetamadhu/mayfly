@@ -87,7 +87,7 @@ function asUsage(value: unknown): import("./types").UsageMonth | undefined {
   };
 }
 
-function asState(value: unknown): State {
+export function asState(value: unknown): State {
   if (!value || typeof value !== "object") return { environments: [] };
   const environments = (value as State).environments;
   if (!Array.isArray(environments)) return { environments: [] };

@@ -109,6 +109,22 @@ Set `ALERT_WEBHOOK_URL` to a chat channel's incoming webhook (Slack, Discord, Go
 
 The same problem isn't posted again for six hours. Messages contain the repository, pull request, commit, the first line of the error and a link to the board, never tokens or full logs. A chat webhook that's down or wrong never affects builds. Without `ALERT_WEBHOOK_URL`, alerts go to the log only (lines starting `[alert]`).
 
+## Backups
+
+Once a day Mayfly saves its state (every preview record, the month's usage and the lifetime rules) as a gzip file in `data/backups`, and keeps the newest `BACKUP_KEEP` (default 7). The first is taken a few minutes after it starts. It works the same with the JSON file and with MongoDB. Tokens and secrets aren't in the state, so they aren't in backups either. If a backup fails, an alert is sent (see above).
+
+Admins see the last backup on the Admin page, can take one now, and can download the latest. These files sit on the same disk as Mayfly, so they protect against a bug or a bad change, not against losing the server. Download one now and then, or snapshot the disk.
+
+Restore only while Mayfly is stopped, so it can't overwrite the restored state:
+
+```bash
+node dist/restore.js list
+node dist/restore.js show <name>
+node dist/restore.js restore <name> --yes
+```
+
+`restore` refuses while Mayfly answers on `PORT`, and saves the current state as a `-before-restore` backup first, so a restore can be undone the same way. On the AWS setup, `deploy/aws/backup.sh` stops and starts Mayfly around it.
+
 ## Connect GitHub
 
 Create a webhook on the repository.
