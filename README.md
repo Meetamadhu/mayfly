@@ -94,6 +94,21 @@ npm start
 
 Set at least these on the server: `MAYFLY_ADMIN_TOKEN`, `GITHUB_WEBHOOK_SECRET`, `PREVIEW_BASE_URL` (the public address people open), and `PREVIEW_TTL_HOURS=168`. The simulator is off in production unless `ALLOW_SIMULATOR=true`.
 
+## Alerts and health
+
+`GET /api/health` answers **200** when Mayfly can do its job and **503** when it can't, so any uptime monitor can watch it. Everyone sees only `ok` and `status`; a signed-in admin (cookie or `Authorization: Bearer <MAYFLY_ADMIN_TOKEN>`) also sees each check: saved state readable, free disk space, Docker answering (Docker runtime only), and the clean-up loop finishing its rounds. Results are cached for 15 seconds.
+
+Set `ALERT_WEBHOOK_URL` to a chat channel's incoming webhook (Slack, Discord, Google Chat, Mattermost or anything that accepts `{"text": "…"}`) and Mayfly posts a short message when:
+
+- a preview fails to build (once per commit)
+- a preview gets stuck and is removed
+- free disk space drops below `ALERT_DISK_PERCENT` (default 15), and again when it recovers
+- Docker stops answering for two checks in a row, and again when it answers
+- the clean-up loop fails, and again when it recovers
+- Mayfly starts, so an unexpected restart doesn't go unnoticed
+
+The same problem isn't posted again for six hours. Messages contain the repository, pull request, commit, the first line of the error and a link to the board, never tokens or full logs. A chat webhook that's down or wrong never affects builds. Without `ALERT_WEBHOOK_URL`, alerts go to the log only (lines starting `[alert]`).
+
 ## Connect GitHub
 
 Create a webhook on the repository.

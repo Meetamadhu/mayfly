@@ -16,6 +16,7 @@ import {
 import { removedBecause } from "./timeline";
 import { getDeployer, previewUrl, publicPreviewUrl, type Deployment } from "./deployer";
 import { pruneEnvironments } from "./prune";
+import { sendAlert } from "./alerts";
 import { postPullRequestNote, publishCommitStatus, publishPullRequestComment } from "./http";
 import {
   currentPolicy,
@@ -566,6 +567,13 @@ async function runDeploy(
       });
       const failBody = failed.comments.at(-1)?.body;
       if (failBody) await commentQuietly(failed, failBody);
+      if (!isDemo(failed)) {
+        void sendAlert(`build:${failed.id}:${failed.sha}`, `a preview failed to build`, [
+          `${failed.repository} #${failed.prNumber} (${failed.branch}, ${failed.sha.slice(0, 8)})`,
+          firstLine(message),
+          `https://github.com/${failed.repository}/pull/${failed.prNumber}`,
+        ]);
+      }
     }
     return {
       ok: false,
@@ -1632,6 +1640,13 @@ export async function reap(): Promise<ReapResult> {
     const result = await destroyEnvironment(target.id, target.reason, { wait: true });
     if (result.ok && result.environment.status === "destroyed") destroyed.push(result.environment);
     else if (!result.ok) failed.push({ id: target.id, error: result.error });
+    if (target.reason === "stuck" && result.ok) {
+      const env = result.environment;
+      void sendAlert(`stuck:${env.id}:${env.sha}`, "a preview got stuck and was removed", [
+        `${env.repository} #${env.prNumber} (${env.branch}) didn't finish within ${Math.round(getConfig().stuckMs / 60_000)} minutes.`,
+        "Push a new commit to try again. If it keeps happening, check the server log.",
+      ]);
+    }
   }
   await ensureDemo();
   return { ok: true, destroyed, failed };

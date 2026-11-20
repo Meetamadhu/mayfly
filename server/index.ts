@@ -4,6 +4,7 @@ import express, { type NextFunction, type Request, type Response } from "express
 import { adminRouter } from "./routes/admin";
 import { environmentsRouter } from "./routes/environments";
 import { eventsRouter } from "./routes/events";
+import { healthRouter } from "./routes/health";
 import { policyRouter } from "./routes/policy";
 import { previewRouter } from "./routes/preview";
 import { webhooksRouter } from "./routes/webhooks";
@@ -67,6 +68,11 @@ async function startBackgroundWork() {
   await removeOrphanPreviewContainers();
   await restorePreviews();
   startReaperLoop();
+  // A restart nobody asked for usually means a crash, so say when Mayfly comes up.
+  const { sendAlert } = await import("@/lib/alerts");
+  void sendAlert("started", "started up", [
+    "Expected after an update or a server restart. Otherwise it may have crashed: check the server log.",
+  ]);
 }
 
 async function main() {
@@ -87,6 +93,7 @@ async function main() {
   if (process.env.TRUST_PROXY === "loopback") server.set("trust proxy", "loopback");
 
   // API + preview proxy live on Express. Mount before the Next.js catch-all.
+  server.use(healthRouter);
   server.use(adminRouter);
   server.use(environmentsRouter);
   server.use(webhooksRouter);
