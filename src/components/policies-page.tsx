@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { AppShell } from "@/components/app-shell";
-import { signOutEverywhere } from "@/lib/use-session";
 
 type RepoRule = { repository: string; ttlHours: number | null; sleepSeconds: number | null };
 
@@ -238,7 +237,7 @@ export function PoliciesPage() {
   }
 
   async function signOut() {
-    await signOutEverywhere();
+    await fetch("/api/admin/session", { method: "DELETE", credentials: "include" });
     window.location.assign("/admin/login");
   }
 

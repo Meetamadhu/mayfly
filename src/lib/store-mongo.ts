@@ -1,5 +1,4 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { accountFields } from "./account-records";
 import { randomUUID } from "node:crypto";
 import net from "node:net";
 import { MongoClient, type Collection, type Db, type Filter } from "mongodb";
@@ -96,12 +95,7 @@ function asState(value: unknown): State {
   if (!Array.isArray(environments)) return { environments: [] };
   const usage = asUsage((value as State).usage);
   const policy = asStoredPolicy((value as State).policy);
-  return {
-    environments,
-    ...(usage ? { usage } : {}),
-    ...(policy ? { policy } : {}),
-    ...accountFields(value as { users?: unknown; audit?: unknown }),
-  };
+  return { environments, ...(usage ? { usage } : {}), ...(policy ? { policy } : {}) };
 }
 
 async function getClient(): Promise<MongoClient> {

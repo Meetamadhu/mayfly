@@ -3,7 +3,6 @@ import type { Server } from "node:http";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { adminRouter } from "./routes/admin";
 import { backupsRouter } from "./routes/backups";
-import { usersRouter } from "./routes/users";
 import { environmentsRouter } from "./routes/environments";
 import { eventsRouter } from "./routes/events";
 import { healthRouter } from "./routes/health";
@@ -98,7 +97,6 @@ async function main() {
   server.use(healthRouter);
   server.use(adminRouter);
   server.use(backupsRouter);
-  server.use(usersRouter);
   server.use(environmentsRouter);
   server.use(webhooksRouter);
   server.use(eventsRouter);

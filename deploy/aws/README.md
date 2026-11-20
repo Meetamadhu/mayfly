@@ -57,10 +57,6 @@ You'll then hear about failed builds, stuck previews, low disk space, Docker pro
 
 To be told when the whole server is down, which Mayfly can't report itself, point an uptime monitor such as UptimeRobot at `https://<address>/api/health`. It answers 200 when healthy and 503 when not. Check the monitor's terms if this is for a business.
 
-## Team accounts
-
-Send your team `https://<address>/signup`. Each person picks a username and password, then you approve them under **Team accounts** on the Admin page. They can manage previews but not remove them or change settings. **Who did what** on the same page shows what everyone did.
-
 ## Backups
 
 Mayfly saves a backup once a day and keeps the newest 7. The Admin page shows the last one, with **Download latest** and **Back up now**. On the server:
