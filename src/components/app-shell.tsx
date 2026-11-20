@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { MayflyMark } from "@/components/admin-header";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { signOutEverywhere, useSession } from "@/lib/use-session";
 
 export type AppPage = "dashboard" | "activity" | "cost" | "policies" | "comments" | "admin";
 
@@ -96,14 +95,27 @@ export function AppShell({
   onSignOut?: () => void | Promise<void>;
 }) {
   const [theme, setTheme] = useState<"light" | "dark">("light");
-  const session = useSession();
-  const [signedOut, setSignedOut] = useState(false);
-  const signedIn = Boolean(session.role) && !signedOut;
+  const [signedIn, setSignedIn] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light");
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/admin/session", { credentials: "include", cache: "no-store" })
+      .then((res) => res.json())
+      .then((body: { signedIn?: boolean }) => {
+        if (!cancelled) setSignedIn(Boolean(body.signedIn));
+      })
+      .catch(() => {
+        if (!cancelled) setSignedIn(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -132,8 +144,8 @@ export function AppShell({
       await onSignOut();
       return;
     }
-    await signOutEverywhere();
-    setSignedOut(true);
+    await fetch("/api/admin/session", { method: "DELETE", credentials: "include" });
+    setSignedIn(false);
   }
 
   return (
@@ -158,11 +170,10 @@ export function AppShell({
           </button>
         </div>
         <nav id="board-side-nav" className="board-side-nav" aria-label="Pages">
-          {/* Lifetime rules are the admin's; team members don't see the link. */}
-          {NAV.filter((item) => item.id !== "policies" || session.role !== "user").map((item) => (
+          {NAV.map((item) => (
             <a key={item.id} href={item.href} aria-current={item.id === active ? "page" : undefined}>
               <NavIcon page={item.id} />
-              <span>{item.id === "admin" && session.role === "user" ? "Manage previews" : item.label}</span>
+              <span>{item.label}</span>
             </a>
           ))}
         </nav>
@@ -199,17 +210,12 @@ export function AppShell({
             ) : null}
             <ThemeToggle theme={theme} onChange={chooseTheme} />
             {signedIn ? (
-              <>
-                <span className="board-who" title={session.role === "admin" ? "Signed in with the admin token" : "Team account"}>
-                  {session.role === "admin" ? "Admin" : session.name}
-                </span>
-                <button type="button" className="secondary board-auth-btn" onClick={() => void signOut()}>
-                  Sign out
-                </button>
-              </>
+              <button type="button" className="secondary board-auth-btn" onClick={() => void signOut()}>
+                Sign out
+              </button>
             ) : (
               <a className="btn secondary board-auth-btn" href="/admin/login">
-                Sign in
+                Admin sign-in
               </a>
             )}
           </div>

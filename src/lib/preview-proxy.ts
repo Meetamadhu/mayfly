@@ -1,7 +1,6 @@
 import { request as forward, type IncomingHttpHeaders, type IncomingMessage } from "node:http";
 import type { Request, Response } from "express";
 import { ADMIN_COOKIE } from "./admin";
-import { USER_COOKIE } from "./users";
 import { findProxyTarget, recordActivity } from "./lifecycle";
 
 // Never forwarded in either direction. host is rewritten, x-mayfly-admin is a Mayfly secret.
@@ -24,7 +23,8 @@ const PREVIEW_SANDBOX_CSP =
 const MAYFLY_PAGE_HEADER = "x-mayfly-page";
 
 /** Mayfly's own sign-in cookies. Preview apps run pull-request code, so they must never see or set these. */
-const MAYFLY_COOKIES = new Set([ADMIN_COOKIE, USER_COOKIE]);
+// "mayfly_user" was the team-account cookie; still stripped so a leftover one never reaches a preview.
+const MAYFLY_COOKIES = new Set([ADMIN_COOKIE, "mayfly_user"]);
 
 /** True when a Set-Cookie line would set or clear one of Mayfly's sign-in cookies. */
 function isAdminSetCookie(value: string) {

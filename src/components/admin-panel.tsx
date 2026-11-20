@@ -3,8 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { BackupsPanel } from "@/components/backups-panel";
-import { ActivityLogPanel, TeamAccountsPanel } from "@/components/team-panels";
-import { signOutEverywhere } from "@/lib/use-session";
 import { Lifespan, cardState, statePillLabel } from "@/components/board-parts";
 import type { Environment, EnvironmentStatus, Overview } from "@/lib/types";
 import { removedLabel, timelineLabel, timelineNewestFirst } from "@/lib/timeline";
@@ -161,9 +159,7 @@ function recentActivity(environments: Environment[]) {
   return events.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 20);
 }
 
-/** The admin sees everything. A team member ("user") manages previews but can't remove them or change settings. */
-export function AdminPanel({ role = "admin", name = "admin" }: { role?: "admin" | "user"; name?: string }) {
-  const isAdmin = role === "admin";
+export function AdminPanel() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -375,7 +371,7 @@ export function AdminPanel({ role = "admin", name = "admin" }: { role?: "admin" 
   }
 
   async function signOut() {
-    await signOutEverywhere();
+    await fetch("/api/admin/session", { method: "DELETE", credentials: "include" });
     window.location.assign("/admin/login");
   }
 
@@ -397,12 +393,8 @@ export function AdminPanel({ role = "admin", name = "admin" }: { role?: "admin" 
       <div className="admin-panel admin-in-shell">
       <section className="board-welcome page-head-inline">
         <div>
-          <h1>{isAdmin ? "Admin" : "Manage previews"}</h1>
-          <p className="lede">
-            {isAdmin
-              ? "Look after every preview by hand, and try out pull requests without going to GitHub."
-              : `Signed in as ${name}. Wake, sleep, extend and keep previews awake. Only the admin can remove one.`}
-          </p>
+          <h1>Admin</h1>
+          <p className="lede">Look after every preview by hand, and try out pull requests without going to GitHub.</p>
         </div>
       </section>
 
@@ -410,10 +402,7 @@ export function AdminPanel({ role = "admin", name = "admin" }: { role?: "admin" 
         <div className="ledger-head">
           <div>
             <h2>Previews</h2>
-            <p className="help">
-              Everything running now, plus any that failed to build.
-              {isAdmin ? " You'll always be asked before a preview is removed." : ""}
-            </p>
+            <p className="help">Everything running now, plus any that failed to build. You&apos;ll always be asked before a preview is removed.</p>
           </div>
         </div>
         {loadError ? <p className="error" role="alert">{loadError}</p> : null}
@@ -525,11 +514,9 @@ export function AdminPanel({ role = "admin", name = "admin" }: { role?: "admin" 
                       <button type="button" className="secondary" disabled={busy || demo} onClick={() => void extend(env)}>
                         Extend
                       </button>
-                      {isAdmin ? (
-                        <button type="button" className="destroy" disabled={busy || env.status === "destroying"} onClick={() => void destroy(env)}>
-                          Remove
-                        </button>
-                      ) : null}
+                      <button type="button" className="destroy" disabled={busy || env.status === "destroying"} onClick={() => void destroy(env)}>
+                        Remove
+                      </button>
                     </div>
                   </footer>
                 </li>
@@ -541,7 +528,6 @@ export function AdminPanel({ role = "admin", name = "admin" }: { role?: "admin" 
         {notice ? <p className="notice" role="status">{notice}</p> : null}
       </section>
 
-      {isAdmin ? (
       <div className="workspace">
         <details id="simulator" className="panel simulator" open>
           <summary>Try a pull request</summary>
@@ -724,11 +710,7 @@ export function AdminPanel({ role = "admin", name = "admin" }: { role?: "admin" 
         </section>
 
         <BackupsPanel />
-        <TeamAccountsPanel />
       </div>
-      ) : null}
-
-      <ActivityLogPanel />
 
       <section className="panel" aria-label="Recent activity">
         <h2>Recent activity</h2>

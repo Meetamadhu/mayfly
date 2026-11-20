@@ -1,9 +1,12 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { AdminPanel } from "@/components/admin-panel";
-import { pageActor } from "@/lib/page-access";
+import { ADMIN_COOKIE, sessionIsValid } from "@/lib/admin";
 
 export async function AdminScreen() {
-  const actor = await pageActor();
-  if (!actor) redirect("/admin/login");
-  return <AdminPanel role={actor.role} name={actor.name} />;
+  const jar = await cookies();
+  const value = jar.get(ADMIN_COOKIE)?.value ?? "";
+  const token = (process.env["MAYFLY_ADMIN_TOKEN"] ?? "").trim();
+  if (!token || !sessionIsValid(value, token)) redirect("/admin/login");
+  return <AdminPanel />;
 }

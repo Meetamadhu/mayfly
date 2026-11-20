@@ -148,7 +148,6 @@ export function EnvironmentCard({
   now,
   demo,
   signedIn,
-  canRemove = true,
   busy,
   onAdminAction,
   onShowLifecycle,
@@ -157,8 +156,6 @@ export function EnvironmentCard({
   now: number;
   demo: boolean;
   signedIn: boolean;
-  /** Only the admin can remove previews; team members get the rest of the menu. */
-  canRemove?: boolean;
   busy: boolean;
   onAdminAction: (env: Environment, action: "sleep" | "extend" | "destroy") => void;
   onShowLifecycle?: (env: Environment) => void;
@@ -280,20 +277,18 @@ export function EnvironmentCard({
                 >
                   Extend by 4 h
                 </button>
-                {canRemove ? (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="danger"
-                    disabled={busy}
-                    onClick={() => {
-                      setMenuOpen(false);
-                      onAdminAction(env, "destroy");
-                    }}
-                  >
-                    Remove
-                  </button>
-                ) : null}
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="danger"
+                  disabled={busy}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onAdminAction(env, "destroy");
+                  }}
+                >
+                  Remove
+                </button>
               </div>
             ) : null}
           </div>
