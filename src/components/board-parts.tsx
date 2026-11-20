@@ -151,12 +151,15 @@ export function EnvironmentCard({
   busy,
   onAdminAction,
   onShowLifecycle,
+  onPickAuthor,
 }: {
   env: Environment;
   now: number;
   demo: boolean;
   signedIn: boolean;
   busy: boolean;
+  /** When given, the "@login" on the card shows only that person's previews. */
+  onPickAuthor?: (login: string) => void;
   onAdminAction: (env: Environment, action: "sleep" | "extend" | "destroy") => void;
   onShowLifecycle?: (env: Environment) => void;
 }) {
@@ -202,6 +205,7 @@ export function EnvironmentCard({
       <div className="card-body env-card-body">
         <Lifespan env={env} now={now} demo={demo} />
         <p className="env-card-facts">
+          <OpenedBy env={env} onPick={onPickAuthor} />
           Commit <span className="mono">{env.sha.slice(0, 7)}</span>
           {typeof env.buildMs === "number" && env.buildMs >= 0 ? `, built in ${formatDurationMs(env.buildMs)}` : ""}.
           {" "}Last visited {formatAgo(env.lastActiveAt, now)}.
@@ -745,14 +749,55 @@ export function matchesBoardFilter(env: Environment, filter: BoardFilter, now: n
   return true;
 }
 
+/** "Opened by @login. " at the start of a card's facts, or nothing when the preview has no author. */
+export function OpenedBy({ env, onPick }: { env: Environment; onPick?: (login: string) => void }) {
+  const login = env.author?.trim();
+  if (!login) return null;
+  return (
+    <>
+      Opened by{" "}
+      {onPick ? (
+        <button
+          type="button"
+          className="author-link"
+          title={`Show only previews opened by @${login}`}
+          onClick={() => onPick(login.toLowerCase())}
+        >
+          @{login}
+        </button>
+      ) : (
+        <span className="author-name">@{login}</span>
+      )}
+      .{" "}
+    </>
+  );
+}
+
+/** GitHub login of whoever opened the pull request, lower-cased, or null (simulator previews have none). */
+export function authorOf(env: Environment) {
+  const login = env.author?.trim().toLowerCase();
+  return login ? login : null;
+}
+
+/** Only previews whose pull request this person opened. null shows everyone's. */
+export function matchesBoardAuthor(env: Environment, author: string | null) {
+  return !author || authorOf(env) === author.toLowerCase();
+}
+
 export function matchesBoardSearch(env: Environment, query: string) {
   const q = query.trim().toLowerCase();
   if (!q) return true;
+  // "@madhu" searches people only; "madhu" matches people as well as repos and branches.
+  if (q.startsWith("@")) {
+    const login = q.slice(1);
+    return !login || (authorOf(env) ?? "").includes(login);
+  }
   return (
     env.repository.toLowerCase().includes(q) ||
     env.branch.toLowerCase().includes(q) ||
     String(env.prNumber).includes(q) ||
-    env.sha.toLowerCase().includes(q)
+    env.sha.toLowerCase().includes(q) ||
+    (authorOf(env) ?? "").includes(q)
   );
 }
 

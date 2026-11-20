@@ -13,6 +13,8 @@ import {
   formatLifetime,
   formatSaved,
   formatSleep,
+  authorOf,
+  matchesBoardAuthor,
   matchesBoardFilter,
   matchesBoardSearch,
   previewPath,
@@ -60,6 +62,7 @@ export function Dashboard() {
   const [showRemoved, setShowRemoved] = useState(false);
   const [boardFilter, setBoardFilter] = useState<BoardFilter>("all");
   const [boardQuery, setBoardQuery] = useState("");
+  const [boardAuthor, setBoardAuthor] = useState<string | null>(null);
   const [signedIn, setSignedIn] = useState(false);
   const [cardView, setCardView] = useState<"grid" | "list">("grid");
   const [busy, setBusy] = useState(false);
@@ -69,9 +72,25 @@ export function Dashboard() {
   useEffect(() => {
     setCardView(readStoredView());
     // Searches started from another page arrive as /board?q=…
-    const q = new URLSearchParams(window.location.search).get("q");
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("q");
     if (q) setBoardQuery(q);
+    // /board?by=<github login> opens straight to one person's previews, so the link can be shared.
+    const by = params.get("by")?.trim().toLowerCase().replace(/^@/, "");
+    if (by && /^[a-z0-9-]{1,39}$/.test(by)) setBoardAuthor(by);
   }, []);
+
+  function pickAuthor(login: string | null) {
+    setBoardAuthor(login);
+    try {
+      const url = new URL(window.location.href);
+      if (login) url.searchParams.set("by", login);
+      else url.searchParams.delete("by");
+      window.history.replaceState(null, "", url);
+    } catch {
+      // The filter still applies; only the address bar isn't updated.
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -122,10 +141,22 @@ export function Dashboard() {
   const current = overview?.environments.filter((env) => env.status !== "destroyed") ?? [];
   const demoKey = config?.demo ?? null;
   const visible = current.filter(
-    (env) => matchesBoardFilter(env, boardFilter, now, demoKey) && matchesBoardSearch(env, boardQuery),
+    (env) =>
+      matchesBoardFilter(env, boardFilter, now, demoKey) &&
+      matchesBoardSearch(env, boardQuery) &&
+      matchesBoardAuthor(env, boardAuthor),
   );
+  // Everyone who has a preview up, with how many, for the "Opened by" menu.
+  const authorCounts = new Map<string, number>();
+  for (const env of current) {
+    const login = authorOf(env);
+    if (login) authorCounts.set(login, (authorCounts.get(login) ?? 0) + 1);
+  }
+  const authors = [...authorCounts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  // Keep a person picked from a link in the menu even when they have nothing up right now.
+  if (boardAuthor && !authorCounts.has(boardAuthor)) authors.unshift([boardAuthor, 0]);
   // The Dashboard shows two previews; the rest sit behind "Show all". Searching or filtering shows every match.
-  const narrowing = boardFilter !== "all" || boardQuery.trim() !== "";
+  const narrowing = boardFilter !== "all" || boardQuery.trim() !== "" || boardAuthor !== null;
   const shown = showAllCards || narrowing ? visible : visible.slice(0, DASHBOARD_PREVIEW_LIMIT);
   const hiddenCount = visible.length - shown.length;
   // "Show all" gives the previews the whole width: the Cost & Usage and Recent activity cards step aside.
@@ -147,7 +178,7 @@ export function Dashboard() {
     <AppShell
       active="dashboard"
       githubConnected={Boolean(config?.githubConnected)}
-      search={{ value: boardQuery, onChange: setBoardQuery, placeholder: "Search repo or branch" }}
+      search={{ value: boardQuery, onChange: setBoardQuery, placeholder: "Search repo, branch or @person" }}
     >
       {config?.deployer === "fake" ? (
         <p className="notice" role="status">
@@ -202,6 +233,19 @@ export function Dashboard() {
                 </button>
               ))}
             </div>
+            {authors.length > 0 ? (
+              <label className="board-author-filter">
+                <span>Opened by</span>
+                <select value={boardAuthor ?? ""} onChange={(event) => pickAuthor(event.target.value || null)}>
+                  <option value="">Everyone</option>
+                  {authors.map(([login, count]) => (
+                    <option key={login} value={login}>
+                      @{login} ({count})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
             <div className="board-view-toggle" role="group" aria-label="Card layout">
               <button type="button" aria-pressed={cardView === "grid"} onClick={() => chooseCardView("grid")}>
                 Grid
@@ -232,6 +276,7 @@ export function Dashboard() {
                 busy={busy}
                 onAdminAction={(item, action) => void adminAction(item, action)}
                 onShowLifecycle={(item) => setLifecycleId(item.id)}
+                onPickAuthor={pickAuthor}
               />
             ))}
           </div>
