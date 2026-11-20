@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { BackupsPanel } from "@/components/backups-panel";
-import { Lifespan, cardState, statePillLabel } from "@/components/board-parts";
+import { Lifespan, OpenedBy, cardState, statePillLabel } from "@/components/board-parts";
 import type { Environment, EnvironmentStatus, Overview } from "@/lib/types";
 import { removedLabel, timelineLabel, timelineNewestFirst } from "@/lib/timeline";
 
@@ -437,6 +437,7 @@ export function AdminPanel() {
                     </p>
                     <Lifespan env={env} now={now} demo={demo} />
                     <p className="env-card-facts">
+                      <OpenedBy env={env} />
                       {demo ? null : (
                         <>
                           Commit <span className="mono">{env.sha.slice(0, 7)}</span>.{" "}

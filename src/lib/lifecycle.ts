@@ -634,6 +634,8 @@ async function reserve(event: PullRequestEvent): Promise<LifecycleResult> {
       existing.status = "updating";
       existing.sha = normalized.sha;
       existing.branch = normalized.branch;
+      // Previews opened before authors were recorded pick it up from their next commit.
+      if (!existing.author && normalized.author) existing.author = normalized.author;
       existing.updatedAt = now;
       existing.lastActiveAt = now;
       // Keep the later of the current expiry and a fresh TTL so an extended preview is not shortened.

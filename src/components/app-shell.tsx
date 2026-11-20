@@ -196,9 +196,9 @@ export function AppShell({
           ) : (
             <form className="board-search board-search-top" action="/board" method="get" role="search">
               <label className="visually-hidden" htmlFor="shell-search">
-                Search previews by repo or branch
+                Search previews by repo, branch or person
               </label>
-              <input id="shell-search" ref={searchRef} type="search" name="q" placeholder="Search repo or branch" />
+              <input id="shell-search" ref={searchRef} type="search" name="q" placeholder="Search repo, branch or @person" />
               <kbd className="board-search-kbd">Ctrl K</kbd>
             </form>
           )}
