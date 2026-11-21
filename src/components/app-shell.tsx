@@ -204,6 +204,16 @@ export function AppShell({
               <span>{item.label}</span>
             </a>
           ))}
+          <button
+            type="button"
+            className="board-side-intro"
+            onClick={() => {
+              setNavOpen(false);
+              window.dispatchEvent(new Event(SHOW_INTRO_EVENT));
+            }}
+          >
+            Show the intro
+          </button>
         </nav>
       </aside>
 

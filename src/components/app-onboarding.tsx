@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { MayflyMark } from "@/components/admin-header";
-import { isAppMode } from "@/lib/app-mode";
 
 /** Set when the intro is finished or skipped. Kept for this app session only, so it shows on every launch. */
 export const ONBOARDED_KEY = "mayfly-onboarded";
@@ -90,9 +89,10 @@ function Art({ kind }: { kind: Slide["art"] }) {
 }
 
 /**
- * The intro, shown only inside the Mayfly app (not on the website). Three slides you can swipe, with
- * Skip and Next, then Get started. Shown each time the app is opened (once per session, not on every page);
- * "Show the intro again" in the More sheet brings it back.
+ * The intro, on every device and in the app as well as the website: full screen on phones, a centred card on
+ * tablets and computers. Three slides you can swipe (or move with the arrow keys), with Skip and Next, then
+ * Get started; Escape skips. Shown once per visit (and on every launch of the Android app), not on every page.
+ * "Show the intro again" (app More sheet) and "Show the intro" (website sidebar) bring it back.
  */
 export function AppOnboarding() {
   const [open, setOpen] = useState(false);
@@ -101,7 +101,6 @@ export function AppOnboarding() {
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!isAppMode()) return;
     let seen = false;
     try {
       seen = sessionStorage.getItem(ONBOARDED_KEY) === "1";
@@ -147,6 +146,15 @@ export function AppOnboarding() {
     setIndex(next);
   }
 
+  // Keyboard: arrows move between slides, Escape skips.
+  function onKeyDown(event: KeyboardEvent) {
+    if (event.key === "ArrowRight" && index < SLIDES.length - 1) goTo(index + 1);
+    else if (event.key === "ArrowLeft" && index > 0) goTo(index - 1);
+    else if (event.key === "Escape") finish();
+    else return;
+    event.preventDefault();
+  }
+
   // Swiping moves the track; keep the dots and the button in step with it.
   function onScroll() {
     const track = trackRef.current;
@@ -159,57 +167,69 @@ export function AppOnboarding() {
   const last = index === SLIDES.length - 1;
 
   return (
-    <div className="onb" role="dialog" aria-modal="true" aria-label="Welcome to Mayfly" tabIndex={-1} ref={dialogRef}>
-      <div className="onb-top">
-        <span className="onb-brand">
-          <MayflyMark className="onb-mark" />
-          Mayfly
-        </span>
-        {last ? null : (
-          <button type="button" className="onb-skip" onClick={finish}>
-            Skip
-          </button>
-        )}
-      </div>
+    <div className="onb">
+      <div
+        className="onb-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Welcome to Mayfly"
+        tabIndex={-1}
+        ref={dialogRef}
+        onKeyDown={onKeyDown}
+      >
+        <div className="onb-top">
+          <span className="onb-brand">
+            <MayflyMark className="onb-mark" />
+            Mayfly
+          </span>
+          {last ? null : (
+            <button type="button" className="onb-skip" onClick={finish}>
+              Skip
+            </button>
+          )}
+        </div>
 
-      <div className="onb-track" ref={trackRef} onScroll={onScroll}>
-        {SLIDES.map((slide, i) => (
-          <section
-            key={slide.art}
-            className="onb-slide"
-            aria-roledescription="slide"
-            aria-label={`${i + 1} of ${SLIDES.length}`}
-            aria-hidden={i !== index}
-          >
-            <div className="onb-stage">
-              <Art kind={slide.art} />
-            </div>
-            <h2>{slide.title}</h2>
-            <p>{slide.body}</p>
-          </section>
-        ))}
-      </div>
-
-      <div className="onb-foot">
-        <div className="onb-dots" role="tablist" aria-label="Choose a slide">
+        <div className="onb-track" ref={trackRef} onScroll={onScroll}>
           {SLIDES.map((slide, i) => (
-            <button
+            <section
               key={slide.art}
-              type="button"
-              role="tab"
-              aria-selected={i === index}
-              aria-label={`Slide ${i + 1}`}
-              onClick={() => goTo(i)}
-            />
+              className="onb-slide"
+              aria-roledescription="slide"
+              aria-label={`${i + 1} of ${SLIDES.length}`}
+              aria-hidden={i !== index}
+            >
+              <div className="onb-stage">
+                <Art kind={slide.art} />
+              </div>
+              <div className="onb-copy">
+                <h2>{slide.title}</h2>
+                <p>{slide.body}</p>
+              </div>
+            </section>
           ))}
         </div>
-        <button
-          type="button"
-          className="onb-next"
-          onClick={() => (last ? finish() : goTo(index + 1))}
-        >
-          {last ? "Get started" : "Next"}
-        </button>
+
+        <div className="onb-foot">
+          <div className="onb-dots" role="tablist" aria-label="Choose a slide">
+            {SLIDES.map((slide, i) => (
+              <button
+                key={slide.art}
+                type="button"
+                role="tab"
+                aria-selected={i === index}
+                aria-label={`Slide ${i + 1}`}
+                onClick={() => goTo(i)}
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            className="onb-next"
+            onClick={() => (last ? finish() : goTo(index + 1))}
+          >
+            {last ? "Get started" : "Next"}
+          </button>
+        </div>
       </div>
     </div>
   );

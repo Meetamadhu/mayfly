@@ -4371,7 +4371,12 @@ html[data-onboarding="open"] body { overflow: hidden; }
   inset: 0;
   z-index: 40;
   display: grid;
+  background: var(--paper);
+}
+.onb-panel {
+  display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0;
   background: var(--paper);
   color: var(--ink);
   padding-top: env(safe-area-inset-top);
@@ -4420,6 +4425,7 @@ html[data-onboarding="open"] body { overflow: hidden; }
   font-weight: 700;
   max-width: 18ch;
 }
+.onb-copy { display: grid; }
 .onb-slide p { margin: 0; color: var(--muted); font-size: 1rem; line-height: 1.55; max-width: 36ch; }
 
 /* The stage: always deep navy, the app's own colour, whatever the theme. */
@@ -4525,3 +4531,56 @@ html[data-onboarding="open"] body { overflow: hidden; }
   .onb-stage { min-height: 11rem; }
   .onb-slide h2 { margin-top: 1rem; }
 }
+
+/* Tablets and computers: a centred card over the dimmed page. Portrait tablets keep the picture above the words. */
+@media (min-width: 600px) and (min-height: 520px) {
+  .onb {
+    place-items: center;
+    padding: 2rem;
+    background: rgba(2, 6, 24, 0.6);
+    backdrop-filter: blur(4px);
+  }
+  .onb-panel {
+    width: min(560px, 100%);
+    height: min(820px, 100%);
+    border-radius: 28px;
+    box-shadow: 0 30px 80px rgba(2, 6, 24, 0.45);
+    overflow: hidden;
+    padding: 0;
+  }
+  .onb-top { padding: 1.25rem 1.75rem 0; }
+  .onb-slide { padding: 1rem 1.75rem 0; }
+  .onb-foot { padding: 1.25rem 1.75rem 1.5rem; }
+}
+/* Wide screens: picture on the left, words on the right. */
+@media (min-width: 900px) and (min-height: 520px) {
+  .onb-panel { width: min(960px, 100%); height: min(600px, 100%); }
+  .onb-slide {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 2.5rem;
+    overflow: hidden;
+  }
+  .onb-stage { height: 100%; max-height: none; min-height: 0; }
+  .onb-slide h2 { margin-top: 0; font-size: clamp(1.8rem, 3.2vw, 2.4rem); }
+  .onb-slide p { font-size: 1.05rem; }
+  .onb-foot { grid-template-columns: 1fr auto; align-items: center; }
+  .onb-dots { justify-content: flex-start; }
+  .onb-next { min-width: 13rem; padding-inline: 2rem; }
+}
+
+/* Website sidebar: replay the intro. Quiet, below the pages. */
+.board-side-intro {
+  margin-top: 0.75rem;
+  min-height: 40px;
+  padding: 0.4rem 0.7rem;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+}
+.board-side-intro:hover { color: var(--ink); background: var(--soft); }
