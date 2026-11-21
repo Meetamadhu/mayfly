@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { MayflyMark } from "@/components/admin-header";
 import { isAppMode } from "@/lib/app-mode";
 
-/** Set once the intro has been finished or skipped, so it shows on the first launch only. */
+/** Set when the intro is finished or skipped. Kept for this app session only, so it shows on every launch. */
 export const ONBOARDED_KEY = "mayfly-onboarded";
 /** Fired by "Show the intro again" in the app's More sheet. */
 export const SHOW_INTRO_EVENT = "mayfly:show-intro";
@@ -90,8 +90,9 @@ function Art({ kind }: { kind: Slide["art"] }) {
 }
 
 /**
- * First-launch intro, shown only inside the Mayfly app (not on the website). Three slides you can swipe, with
- * Skip and Next, then Get started. Remembered per phone; "Show the intro again" in the More sheet brings it back.
+ * The intro, shown only inside the Mayfly app (not on the website). Three slides you can swipe, with
+ * Skip and Next, then Get started. Shown each time the app is opened (once per session, not on every page);
+ * "Show the intro again" in the More sheet brings it back.
  */
 export function AppOnboarding() {
   const [open, setOpen] = useState(false);
@@ -103,9 +104,9 @@ export function AppOnboarding() {
     if (!isAppMode()) return;
     let seen = false;
     try {
-      seen = localStorage.getItem(ONBOARDED_KEY) === "1";
+      seen = sessionStorage.getItem(ONBOARDED_KEY) === "1";
     } catch {
-      // Storage blocked: show it, and it will show again next time, which is harmless.
+      // Storage blocked: show it; it may show again on the next page, which is harmless.
     }
     if (!seen) setOpen(true);
     const show = () => {
@@ -128,7 +129,7 @@ export function AppOnboarding() {
 
   function finish() {
     try {
-      localStorage.setItem(ONBOARDED_KEY, "1");
+      sessionStorage.setItem(ONBOARDED_KEY, "1");
     } catch {
       // Ignore: see above.
     }
