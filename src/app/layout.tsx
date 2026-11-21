@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { APP_THEME, iconUrl } from "@/lib/app-icons";
+import { APP_MODE_SCRIPT } from "@/lib/app-mode";
 import { IBM_Plex_Mono, Schibsted_Grotesk } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
@@ -45,6 +46,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body>
         <Script id="mayfly-theme" strategy="beforeInteractive">
           {`try{var t=localStorage.getItem("mayfly-theme");if(t!=="light"&&t!=="dark")t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=t}catch(e){}`}
+        </Script>
+        {/* Inside the Android app, mark the page before it paints so app screens never flash the website. */}
+        <Script id="mayfly-app-mode" strategy="beforeInteractive">
+          {APP_MODE_SCRIPT}
         </Script>
         {children}
       </body>

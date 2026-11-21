@@ -4196,3 +4196,332 @@ html[data-theme="dark"] .admin-card-head .card-repo { color: #b9d8cf; }
   .page-stats > div:first-child:nth-last-child(3) + div { padding-left: 0; border-left: 0; }
   .page-stats > div:first-child:nth-last-child(3) ~ div:last-child { padding-left: 1.1rem; border-left: 1px solid var(--line); }
 }
+
+/* ───────────────────────── App mode ─────────────────────────
+   Only inside the Mayfly Android app (html[data-app="1"], set by APP_MODE_SCRIPT before the first paint).
+   The website never shows any of this. */
+.app-title,
+.app-tabbar { display: none; }
+
+html[data-app="1"] {
+  --tabbar-h: 4.25rem;
+}
+html[data-app="1"] body { overscroll-behavior-y: none; }
+html[data-app="1"] .board-app { grid-template-columns: minmax(0, 1fr); }
+html[data-app="1"] .board-sidebar,
+html[data-app="1"] .board-search-shared,
+html[data-app="1"] .board-topbar-actions,
+html[data-app="1"] .board-search-kbd { display: none; }
+
+/* Header: the page's name, big and left-aligned, with the board's search under it where there is one. */
+html[data-app="1"] .board-topbar {
+  position: sticky;
+  top: 0;
+  padding: calc(0.7rem + env(safe-area-inset-top)) 1rem 0.75rem;
+  gap: 0.6rem;
+}
+html[data-app="1"] .app-title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: 1 1 100%;
+  min-height: 2.25rem;
+}
+html[data-app="1"] .app-title-mark { width: 1.6rem; height: auto; color: var(--ink); }
+html[data-app="1"] .app-title-text {
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+html[data-app="1"] .board-search-top { flex: 1 1 100%; }
+html[data-app="1"] .board-search-top input { min-height: 44px; border-radius: 12px; }
+
+/* The header already names the page, so each page's own big title is kept for screen readers only. */
+html[data-app="1"] .board-welcome h1 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+html[data-app="1"] .board-welcome .lede { margin-top: 0; font-size: 0.95rem; }
+html[data-app="1"] .board-content {
+  width: calc(100% - 1.5rem);
+  padding: 1rem 0 calc(var(--tabbar-h) + 1.5rem + env(safe-area-inset-bottom));
+}
+
+/* Bottom tabs */
+html[data-app="1"] .app-tabbar {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  min-height: var(--tabbar-h);
+  padding: 0.35rem 0.5rem calc(0.35rem + env(safe-area-inset-bottom));
+  background: var(--paper);
+  border-top: 1px solid var(--line);
+}
+.app-tabbar a,
+.app-tabbar button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  min-height: 48px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  padding: 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.app-tabbar svg {
+  box-sizing: content-box;
+  padding: 0.3rem 1.1rem;
+  border-radius: 999px;
+  transition: background-color 160ms ease;
+}
+.app-tabbar [aria-current="page"],
+.app-tabbar [data-current="true"],
+.app-tabbar [aria-expanded="true"] { color: var(--ink); }
+.app-tabbar [aria-current="page"] svg,
+.app-tabbar [data-current="true"] svg,
+.app-tabbar [aria-expanded="true"] svg {
+  background: var(--mint-bg);
+  color: var(--success);
+}
+html[data-theme="dark"] .app-tabbar [aria-current="page"] svg,
+html[data-theme="dark"] .app-tabbar [data-current="true"] svg,
+html[data-theme="dark"] .app-tabbar [aria-expanded="true"] svg {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--accent);
+}
+
+/* More sheet */
+.app-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(2, 6, 24, 0.55);
+}
+.app-sheet {
+  width: 100%;
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.6rem 1rem calc(1rem + env(safe-area-inset-bottom));
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 20px 20px 0 0;
+  animation: app-sheet-up 200ms ease-out;
+}
+@keyframes app-sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-sheet { animation: none; }
+  .app-tabbar svg { transition: none; }
+}
+.app-sheet-handle {
+  justify-self: center;
+  width: 2.5rem;
+  height: 4px;
+  margin-bottom: 0.4rem;
+  border-radius: 999px;
+  background: var(--line);
+}
+.app-sheet nav { display: grid; }
+.app-sheet nav a,
+.app-sheet-link,
+.app-sheet-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-height: 52px;
+  padding: 0 0.35rem;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+  text-align: left;
+  text-decoration: none;
+  border-radius: 0;
+}
+.app-sheet nav a[aria-current="page"] { color: var(--success); font-weight: 650; }
+html[data-theme="dark"] .app-sheet nav a[aria-current="page"] { color: var(--accent); }
+.app-sheet-row { justify-content: space-between; }
+.app-sheet-link { color: var(--muted); justify-content: flex-start; }
+.app-sheet > :last-child { border-bottom: 0; }
+
+/* ───── First-launch intro ───── */
+html[data-onboarding="open"] body { overflow: hidden; }
+.onb {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: var(--paper);
+  color: var(--ink);
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  outline: none;
+}
+.onb-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 3.5rem;
+  padding: 0.5rem 1.25rem 0;
+}
+.onb-brand { display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 1.05rem; }
+.onb-mark { width: 1.5rem; height: auto; }
+.onb-skip {
+  min-height: 44px;
+  padding: 0 0.5rem;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+}
+.onb-track {
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.onb-track::-webkit-scrollbar { display: none; }
+.onb-slide {
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem 1.25rem 0;
+  overflow-y: auto;
+}
+.onb-slide h2 {
+  margin: 1.5rem 0 0.6rem;
+  font-size: clamp(1.6rem, 7vw, 2rem);
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  font-weight: 700;
+  max-width: 18ch;
+}
+.onb-slide p { margin: 0; color: var(--muted); font-size: 1rem; line-height: 1.55; max-width: 36ch; }
+
+/* The stage: always deep navy, the app's own colour, whatever the theme. */
+.onb-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 15rem;
+  max-height: 24rem;
+  border-radius: 24px;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 80% at 80% 10%, rgba(61, 214, 165, 0.22), transparent 60%),
+    #020618;
+}
+.onb-art { position: absolute; inset: 0; }
+.onb-card {
+  position: absolute;
+  left: 50%;
+  display: grid;
+  gap: 0.3rem;
+  width: min(15rem, 70%);
+  padding: 0.85rem 1rem;
+  border-radius: 16px;
+  background: #f5faf7;
+  color: #0c1a16;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+}
+/* A loose stack: each card behind shows its top row (PR number and state). */
+.onb-card-back { top: 10%; transform: translateX(-58%) rotate(-6deg); opacity: 0.7; }
+.onb-card-mid { top: 27%; transform: translateX(-44%) rotate(4deg); opacity: 0.88; }
+.onb-card-front { top: 46%; transform: translateX(-50%) rotate(-1.5deg); }
+.onb-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.onb-pr { font-weight: 700; font-size: 1rem; }
+.onb-branch { font-family: var(--font-mono), monospace; font-size: 0.8rem; color: #3d524a; }
+.onb-link { font-size: 0.85rem; font-weight: 600; color: #0f8f6b; }
+.onb-pill {
+  justify-self: start;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.onb-pill[data-tone="ready"] { background: #d8f3e8; color: #0f6b4a; }
+.onb-pill[data-tone="work"] { background: #e2eefc; color: #1d4f91; }
+.onb-pill[data-tone="asleep"] { background: #f8efd4; color: #8a5a12; }
+.onb-sleep { top: 14%; background: #1a2438; color: #e8edf5; }
+.onb-sleep .onb-branch { color: #94a3b8; }
+.onb-sleep svg { color: #f0c46b; }
+.onb-wake { top: 50%; }
+.onb-meter { height: 8px; border-radius: 999px; background: #d7e6df; overflow: hidden; }
+.onb-meter span { display: block; width: 72%; height: 100%; border-radius: inherit; background: #0f8f6b; }
+.onb-savings { top: 50%; transform: translate(-50%, -50%); gap: 0.4rem; }
+.onb-big { font-size: 2.2rem; font-weight: 700; letter-spacing: -0.03em; color: #0f6b4a; line-height: 1; }
+.onb-bars { display: flex; align-items: flex-end; gap: 1rem; height: 5.5rem; padding-top: 0.4rem; }
+.onb-bars span { flex: 1; border-radius: 6px 6px 0 0; background: #c5d5cd; }
+.onb-bars span[data-tone="mayfly"] { background: #0f8f6b; }
+.onb-bar-labels { display: flex; gap: 1rem; font-size: 0.72rem; color: #3d524a; }
+.onb-bar-labels span { flex: 1; }
+
+.onb-foot {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem 1.25rem 1.25rem;
+}
+.onb-dots { display: flex; justify-content: center; gap: 0.25rem; }
+.onb-dots button {
+  width: 28px;
+  height: 28px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  display: grid;
+  place-items: center;
+}
+.onb-dots button::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--line);
+  transition: width 200ms ease, background-color 200ms ease;
+}
+.onb-dots button[aria-selected="true"]::before { width: 22px; background: var(--ink); }
+.onb-next {
+  min-height: 54px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--ink);
+  color: var(--on-ink);
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.onb-next:hover,
+.onb-next:focus { background: var(--ink); color: var(--on-ink); }
+.onb-next:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  .onb-dots button::before { transition: none; }
+}
+/* Short phones in landscape or with big text: let the stage shrink first. */
+@media (max-height: 620px) {
+  .onb-stage { min-height: 11rem; }
+  .onb-slide h2 { margin-top: 1rem; }
+}
