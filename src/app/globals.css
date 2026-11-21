@@ -4170,25 +4170,23 @@ html[data-theme="dark"] .admin-card-head .card-repo { color: #b9d8cf; }
   .prc-url { display: inline-block; padding: 0.6rem 0; }
 }
 
-/* Phones and small tablets: keep "Previews" and its filter buttons on one line; the other controls go below. */
+/* Phones and small tablets: "Previews" with Grid/List on the first line, the four filter buttons together on
+   the next, then "Opened by". */
 @media (max-width: 800px) {
   .ledger-head.board-env-head { display: flex; flex-wrap: wrap; align-items: center; }
-  /* Wide enough that nothing else fits beside them, so "Opened by" and Grid/List start the next line. */
-  .board-env-head .board-filter-pills { flex: 1 1 calc(100% - 6rem); min-width: 0; flex-wrap: nowrap; }
+  .board-env-head h2 { order: 0; }
+  .board-env-head .board-view-toggle { order: 1; margin-left: auto; }
+  .board-env-head .board-filter-pills { order: 2; flex: 1 1 100%; min-width: 0; flex-wrap: nowrap; }
   .board-env-head .board-filter-pill { flex: none; white-space: nowrap; }
+  .board-env-head .board-author-filter { order: 3; }
 }
 @media (max-width: 440px) {
-  .board-env-head { column-gap: 0.5rem; }
   .board-env-head .board-filter-pills { gap: 0.25rem; }
-  .board-env-head .board-filter-pill { padding-inline: 0.5rem; font-size: 0.78rem; }
+  .board-env-head .board-filter-pill { padding-inline: 0.55rem; font-size: 0.8rem; }
 }
-/* Small phones: "Expiring soon" reads "Expiring" so the four buttons fit beside the heading. */
-@media (max-width: 400px) {
+/* The narrowest phones: "Expiring soon" reads "Expiring" so all four buttons still fit on one line. */
+@media (max-width: 350px) {
   .board-env-head .pill-long { display: none; }
-}
-/* The very narrowest phones: let the buttons wrap rather than run off the edge. */
-@media (max-width: 345px) {
-  .board-env-head .board-filter-pills { flex-wrap: wrap; }
 }
 /* Phones: the numbers at the top of Cost & savings sit two to a row. */
 @media (max-width: 600px) {
