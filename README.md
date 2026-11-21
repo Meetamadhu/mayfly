@@ -113,6 +113,21 @@ The same problem isn't posted again for six hours. Messages contain the reposito
 
 Each preview records the GitHub username of whoever opened the pull request, and its card says **Opened by @username**. On the board, the **Opened by** menu shows one person's previews; clicking a name on a card does the same. The address becomes `/board?by=<username>`, so the link can be shared. The search box matches people too, and `@name` searches people only. Previews opened before this was recorded (or from the admin simulator) have no name until their next commit.
 
+## Install as an app, and the Android APK
+
+Mayfly has a web app manifest (`/manifest.webmanifest`), so once its icons are in `public/icons` (see the README there), Chrome offers **Install app** on desktop and Android and Safari can add it to the iPhone home screen.
+
+The Android APK wraps the site in a Trusted Web Activity built with Bubblewrap. Its settings are in `android/twa-manifest.json` (package `com.meetamadhu.mayfly`, opening `https://mayfly-pkgs.onrender.com/board`). To build it:
+
+1. Add the icons to `public/icons` and deploy, so `/icons/icon-512.png` and `/icons/maskable-512.png` load on that site.
+2. Create a signing key once and keep a backup of it, because every later version must be signed with the same key or phones refuse the update. On any machine with Docker:
+   `docker run --rm -it -v "$PWD":/k -w /k eclipse-temurin:17 keytool -genkeypair -v -keystore mayfly.keystore -alias mayfly -keyalg RSA -keysize 2048 -validity 10000`
+3. Add three repository secrets: `ANDROID_KEYSTORE_BASE64` (the output of `base64 -w0 mayfly.keystore`), `ANDROID_KEYSTORE_PASSWORD` and `ANDROID_KEY_PASSWORD`.
+4. Run **Actions → Android app → Run workflow** with a version number. The signed APK is attached to the run, and the run summary shows the key's fingerprint.
+5. On the site the app opens, set `ANDROID_PACKAGE_NAME=com.meetamadhu.mayfly` and `ANDROID_CERT_SHA256=<that fingerprint>`. Mayfly then serves `/.well-known/assetlinks.json`, and the app opens full screen without a browser bar.
+
+The APK only shows what the site serves, so it needs that site to be up. To point it at another address, change `host` and the URLs in `android/twa-manifest.json` and build again.
+
 ## Backups
 
 Once a day Mayfly saves its state (every preview record, the month's usage and the lifetime rules) as a gzip file in `data/backups`, and keeps the newest `BACKUP_KEEP` (default 7). The first is taken a few minutes after it starts. It works the same with the JSON file and with MongoDB. Tokens and secrets aren't in the state, so they aren't in backups either. If a backup fails, an alert is sent (see above).
