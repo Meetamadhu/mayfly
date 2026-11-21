@@ -108,7 +108,10 @@ export function AppOnboarding() {
     } catch {
       // Storage blocked: show it; it may show again on the next page, which is harmless.
     }
-    if (!seen) setOpen(true);
+    // Tapping the app icon opens the start page with an android-app:// referrer; pages opened inside the app don't
+    // have one. So that's a fresh launch even when Android kept the previous session's storage.
+    const launchedFromIcon = document.referrer.startsWith("android-app://");
+    if (!seen || launchedFromIcon) setOpen(true);
     const show = () => {
       setIndex(0);
       setOpen(true);
