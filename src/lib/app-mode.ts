@@ -8,13 +8,14 @@
  *
  * Signals, any one is enough:
  * - the Android app opened the page (its referrer is android-app://<package>, on the first page only)
- * - the page runs full-screen from the home screen (display-mode: standalone), which the app also reports
+ * - the page runs full-screen from a phone's home screen (display-mode: standalone on a touch screen), which
+ *   the app also reports. A desktop install (Chrome/Edge "Install app") keeps the website layout in its own window.
  * - ?app=1 in the address, handy for trying the app screens in a desktop browser
  * Once seen, it's kept in sessionStorage so later pages in the same app session stay in app mode.
  */
 export const APP_MODE_KEY = "mayfly-app";
 
-export const APP_MODE_SCRIPT = `try{var a=false;try{a=sessionStorage.getItem("${APP_MODE_KEY}")==="1"}catch(e){}if(/[?&]app=0(&|$)/.test(location.search)){a=false;try{sessionStorage.removeItem("${APP_MODE_KEY}")}catch(e){}}else if(!a){a=document.referrer.indexOf("android-app://")===0||matchMedia("(display-mode: standalone)").matches||/[?&]app=1(&|$)/.test(location.search)}if(a){document.documentElement.dataset.app="1";try{sessionStorage.setItem("${APP_MODE_KEY}","1")}catch(e){}if(location.pathname==="/")location.replace("/board")}}catch(e){}`;
+export const APP_MODE_SCRIPT = `try{var a=false;try{a=sessionStorage.getItem("${APP_MODE_KEY}")==="1"}catch(e){}if(/[?&]app=0(&|$)/.test(location.search)){a=false;try{sessionStorage.removeItem("${APP_MODE_KEY}")}catch(e){}}else if(!a){a=document.referrer.indexOf("android-app://")===0||(matchMedia("(display-mode: standalone)").matches&&matchMedia("(pointer: coarse)").matches)||/[?&]app=1(&|$)/.test(location.search)}if(a){document.documentElement.dataset.app="1";try{sessionStorage.setItem("${APP_MODE_KEY}","1")}catch(e){}if(location.pathname==="/")location.replace("/board")}}catch(e){}`;
 
 export function isAppMode() {
   return typeof document !== "undefined" && document.documentElement.dataset.app === "1";
