@@ -122,7 +122,7 @@ The Android APK wraps the site in a Trusted Web Activity built with Bubblewrap. 
 1. Add the icons to `public/icons` and deploy, so `/icons/icon-512.png` and `/icons/maskable-512.png` load on that site.
 2. Create a signing key once and keep a backup of it, because every later version must be signed with the same key or phones refuse the update. On any machine with Docker:
    `docker run --rm -it -v "$PWD":/k -w /k eclipse-temurin:17 keytool -genkeypair -v -keystore mayfly.keystore -alias mayfly -keyalg RSA -keysize 2048 -validity 10000`
-3. Add three repository secrets: `ANDROID_KEYSTORE_BASE64` (the output of `base64 -w0 mayfly.keystore`), `ANDROID_KEYSTORE_PASSWORD` and `ANDROID_KEY_PASSWORD`.
+3. Add two repository secrets: `ANDROID_KEYSTORE_BASE64` (the output of `base64 -w0 mayfly.keystore`) and `ANDROID_KEYSTORE_PASSWORD`. Add `ANDROID_KEY_PASSWORD` only if you gave the key its own, different password.
 4. Run **Actions → Android app → Run workflow** with a version number. The signed APK is attached to the run, and the run summary shows the key's fingerprint.
 5. On the site the app opens, set `ANDROID_PACKAGE_NAME=com.meetamadhu.mayfly` and `ANDROID_CERT_SHA256=<that fingerprint>`. Mayfly then serves `/.well-known/assetlinks.json`, and the app opens full screen without a browser bar.
 
