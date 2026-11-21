@@ -227,9 +227,16 @@ export function Dashboard() {
                   type="button"
                   className="board-filter-pill"
                   aria-pressed={boardFilter === id}
+                  aria-label={label}
                   onClick={() => setBoardFilter(id)}
                 >
-                  {label}
+                  {id === "expiring" ? (
+                    <>
+                      Expiring<span className="pill-long">{"\u00a0"}soon</span>
+                    </>
+                  ) : (
+                    label
+                  )}
                 </button>
               ))}
             </div>

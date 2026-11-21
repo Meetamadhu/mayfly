@@ -4169,3 +4169,32 @@ html[data-theme="dark"] .admin-card-head .card-repo { color: #b9d8cf; }
   }
   .prc-url { display: inline-block; padding: 0.6rem 0; }
 }
+
+/* Phones and small tablets: keep "Previews" and its filter buttons on one line; the other controls go below. */
+@media (max-width: 800px) {
+  .ledger-head.board-env-head { display: flex; flex-wrap: wrap; align-items: center; }
+  /* Wide enough that nothing else fits beside them, so "Opened by" and Grid/List start the next line. */
+  .board-env-head .board-filter-pills { flex: 1 1 calc(100% - 6rem); min-width: 0; flex-wrap: nowrap; }
+  .board-env-head .board-filter-pill { flex: none; white-space: nowrap; }
+}
+@media (max-width: 440px) {
+  .board-env-head { column-gap: 0.5rem; }
+  .board-env-head .board-filter-pills { gap: 0.25rem; }
+  .board-env-head .board-filter-pill { padding-inline: 0.5rem; font-size: 0.78rem; }
+}
+/* Small phones: "Expiring soon" reads "Expiring" so the four buttons fit beside the heading. */
+@media (max-width: 400px) {
+  .board-env-head .pill-long { display: none; }
+}
+/* The very narrowest phones: let the buttons wrap rather than run off the edge. */
+@media (max-width: 345px) {
+  .board-env-head .board-filter-pills { flex-wrap: wrap; }
+}
+/* Phones: the numbers at the top of Cost & savings sit two to a row. */
+@media (max-width: 600px) {
+  .page-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .page-stats:has(> div:nth-child(4)) > div[data-stat="savings"] { grid-column: auto; }
+  /* Activity: the first number spans the row, so the dividing line belongs on the third, not the second. */
+  .page-stats > div:first-child:nth-last-child(3) + div { padding-left: 0; border-left: 0; }
+  .page-stats > div:first-child:nth-last-child(3) ~ div:last-child { padding-left: 1.1rem; border-left: 1px solid var(--line); }
+}
