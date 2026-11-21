@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { MayflyMark } from "@/components/admin-header";
+import { AppOnboarding, SHOW_INTRO_EVENT } from "@/components/app-onboarding";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export type AppPage = "dashboard" | "activity" | "cost" | "policies" | "comments" | "admin";
@@ -14,6 +15,23 @@ const NAV: { id: AppPage; href: string; label: string }[] = [
   { id: "comments", href: "/pr-comments", label: "PR comments" },
   { id: "admin", href: "/admin", label: "Admin" },
 ];
+
+/** The app's bottom tabs. Everything else sits in the More sheet. */
+const TABS: { id: AppPage; href: string; label: string }[] = [
+  { id: "dashboard", href: "/board", label: "Board" },
+  { id: "activity", href: "/activity", label: "Activity" },
+  { id: "cost", href: "/cost", label: "Savings" },
+];
+const MORE: AppPage[] = ["policies", "comments", "admin"];
+
+const TITLES: Record<AppPage, string> = {
+  dashboard: "Previews",
+  activity: "Activity",
+  cost: "Savings",
+  policies: "Lifetime rules",
+  comments: "PR comments",
+  admin: "Admin",
+};
 
 function NavIcon({ page }: { page: AppPage }) {
   const common = {
@@ -97,6 +115,7 @@ export function AppShell({
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [signedIn, setSignedIn] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -128,6 +147,15 @@ export function AppShell({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setMoreOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [moreOpen]);
 
   function chooseTheme(next: "light" | "dark") {
     document.documentElement.dataset.theme = next;
@@ -181,6 +209,11 @@ export function AppShell({
 
       <div className="board-main">
         <header className="board-topbar">
+          {/* App only: a compact title in place of the website's search-first bar. */}
+          <div className="app-title">
+            <MayflyMark className="app-title-mark" />
+            <span className="app-title-text" aria-hidden="true">{TITLES[active]}</span>
+          </div>
           {search ? (
             <label className="board-search board-search-top">
               <span className="visually-hidden">{search.placeholder}</span>
@@ -194,7 +227,7 @@ export function AppShell({
               <kbd className="board-search-kbd">Ctrl K</kbd>
             </label>
           ) : (
-            <form className="board-search board-search-top" action="/board" method="get" role="search">
+            <form className="board-search board-search-top board-search-shared" action="/board" method="get" role="search">
               <label className="visually-hidden" htmlFor="shell-search">
                 Search previews by repo, branch or person
               </label>
@@ -223,6 +256,85 @@ export function AppShell({
 
         <main className="board-content">{children}</main>
       </div>
+
+      {/* App only (hidden on the website): bottom tabs and the More sheet. */}
+      <nav className="app-tabbar" aria-label="App pages">
+        {TABS.map((tab) => (
+          <a key={tab.id} href={tab.href} aria-current={tab.id === active ? "page" : undefined}>
+            <NavIcon page={tab.id} />
+            <span>{tab.label}</span>
+          </a>
+        ))}
+        <button
+          type="button"
+          aria-expanded={moreOpen}
+          aria-controls="app-more"
+          data-current={MORE.includes(active) ? "true" : undefined}
+          onClick={() => setMoreOpen((open) => !open)}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <circle cx="5" cy="12" r="1.9" />
+            <circle cx="12" cy="12" r="1.9" />
+            <circle cx="19" cy="12" r="1.9" />
+          </svg>
+          <span>More</span>
+        </button>
+      </nav>
+
+      {moreOpen ? (
+        <div className="app-sheet-backdrop" onClick={() => setMoreOpen(false)}>
+          <div
+            id="app-more"
+            className="app-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label="More"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <span className="app-sheet-handle" aria-hidden="true" />
+            <nav aria-label="More pages">
+              {NAV.filter((item) => MORE.includes(item.id)).map((item) => (
+                <a key={item.id} href={item.href} aria-current={item.id === active ? "page" : undefined}>
+                  <NavIcon page={item.id} />
+                  <span>{item.label}</span>
+                </a>
+              ))}
+            </nav>
+            <div className="app-sheet-row">
+              <span>Appearance</span>
+              <ThemeToggle theme={theme} onChange={chooseTheme} />
+            </div>
+            <button
+              type="button"
+              className="app-sheet-link"
+              onClick={() => {
+                setMoreOpen(false);
+                window.dispatchEvent(new Event(SHOW_INTRO_EVENT));
+              }}
+            >
+              Show the intro again
+            </button>
+            {signedIn ? (
+              <button
+                type="button"
+                className="app-sheet-link"
+                onClick={() => {
+                  setMoreOpen(false);
+                  void signOut();
+                }}
+              >
+                Sign out
+              </button>
+            ) : (
+              <a className="app-sheet-link" href="/admin/login">
+                Admin sign-in
+              </a>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      <AppOnboarding />
     </div>
   );
 }
