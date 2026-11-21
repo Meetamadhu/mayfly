@@ -4364,7 +4364,7 @@ html[data-theme="dark"] .app-sheet nav a[aria-current="page"] { color: var(--acc
 .app-sheet-link { color: var(--muted); justify-content: flex-start; }
 .app-sheet > :last-child { border-bottom: 0; }
 
-/* ───── First-launch intro ───── */
+/* ───── Intro (each time the app opens) ───── */
 html[data-onboarding="open"] body { overflow: hidden; }
 .onb {
   position: fixed;
