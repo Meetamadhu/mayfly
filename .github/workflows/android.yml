@@ -63,6 +63,8 @@ jobs:
           unzip -q /tmp/tools.zip -d /tmp/tools
           cp -r /tmp/tools/cmdline-tools/* "$SDK_DIR"/
           yes | "$SDK_DIR/bin/sdkmanager" --licenses --sdk_root="$SDK_DIR" > /dev/null
+          # Bubblewrap installs build-tools itself but not the platform its project compiles against.
+          "$SDK_DIR/bin/sdkmanager" --sdk_root="$SDK_DIR" "platforms;android-36" > /dev/null
           mkdir -p ~/.bubblewrap
           printf '{"jdkPath":"%s","androidSdkPath":"%s"}\n' "$JAVA_HOME" "$SDK_DIR" > ~/.bubblewrap/config.json
 
