@@ -3,16 +3,22 @@
 import { useEffect, useState } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
+/**
+ * Mayfly's mark: a rounded "m" with a mint "live" dot, the same drawing as the app icon in public/icons
+ * (temporary until the final logo). The m follows the text colour; the dot is always mint.
+ */
 export function MayflyMark({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 40 36" aria-hidden="true">
+    <svg className={className} viewBox="26 26 64 58" aria-hidden="true">
       <path
-        d="M19 30V13M20 18C-1 13 1-5 16 9l4 9C41-3 43 12 21 20M20 20C1 15 6 31 18 25M22 20c19-8 13 12 0 5M17 7l-3-5m8 5 4-5"
+        d="M33 76 V52 a10.5 10.5 0 0 1 21 0 V76 M54 52 a10.5 10.5 0 0 1 21 0 V76"
         fill="none"
-        stroke="currentColor"
-        strokeWidth="2.4"
+        stroke="var(--ink, currentColor)"
+        strokeWidth="9"
         strokeLinecap="round"
+        strokeLinejoin="round"
       />
+      <circle cx="82" cy="36" r="5.6" fill="var(--mint, currentColor)" />
     </svg>
   );
 }
