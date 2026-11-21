@@ -4118,3 +4118,54 @@ html[data-theme="dark"] .admin-card-head .card-repo { color: #b9d8cf; }
 .author-name { font-weight: 600; }
 .board-author-filter { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.85rem; color: var(--muted); }
 .board-author-filter select { min-height: 34px; padding: 0.2rem 0.5rem; font-size: 0.85rem; max-width: 12rem; }
+
+/* Phones: tables become one block per row with the column name beside each value, so nothing hides off to the side. */
+@media (max-width: 600px) {
+  .cost-table.stack-on-phone { min-width: 0; }
+  .cost-table.stack-on-phone thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .cost-table.stack-on-phone,
+  .cost-table.stack-on-phone tbody,
+  .cost-table.stack-on-phone tr,
+  .cost-table.stack-on-phone th,
+  .cost-table.stack-on-phone td { display: block; }
+  .cost-table.stack-on-phone tr { padding: 0.75rem 0; border-bottom: 1px solid var(--line); }
+  .cost-table.stack-on-phone th,
+  .cost-table.stack-on-phone td { padding: 0.2rem 0; border-bottom: 0; text-align: left; }
+  .cost-table.stack-on-phone tbody th { padding-bottom: 0.4rem; overflow-wrap: anywhere; }
+  .cost-table.stack-on-phone td[data-label] {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 1rem;
+  }
+  .cost-table.stack-on-phone td[data-label]::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+  .cost-table.stack-on-phone td[data-label] .cost-table-sub { flex-basis: 100%; margin: 0; text-align: right; }
+
+  /* Activity: three numbers fit as one wide and two halves instead of leaving a gap. */
+  .page-stats > div:first-child:nth-last-child(3) { grid-column: 1 / -1; }
+}
+
+/* Touch screens: controls that are easy to miss with a finger get at least 44px of height. */
+@media (pointer: coarse) {
+  .lp-faq summary,
+  .simulator summary { padding-block: 0.6rem; }
+  .env-timeline > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 44px;
+  }
+  .lp-faq details { padding: 0.25rem 0; }
+  .board-rail-link,
+  .activity-subject {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  .prc-url { display: inline-block; padding: 0.6rem 0; }
+}

@@ -529,7 +529,7 @@ export function PoliciesPage() {
                 </h2>
                 <p className="help">With the settings on this page{dirty ? ", including unsaved changes" : ""}.</p>
                 <div className="cost-table-wrap">
-                  <table className="cost-table policy-effect-table">
+                  <table className="cost-table policy-effect-table stack-on-phone">
                     <thead>
                       <tr>
                         <th scope="col">Repository</th>
@@ -543,11 +543,11 @@ export function PoliciesPage() {
                           <th scope="row" className="mono">
                             {row.repository}
                           </th>
-                          <td>
+                          <td data-label="Lifetime">
                             {formatHours(row.ttl.value)}
                             <span className="cost-table-sub">{row.ttl.from}</span>
                           </td>
-                          <td>
+                          <td data-label="Sleeps after">
                             {formatSeconds(row.sleep.value)}
                             <span className="cost-table-sub">{row.sleep.from}</span>
                           </td>

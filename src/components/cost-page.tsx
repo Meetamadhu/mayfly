@@ -86,7 +86,7 @@ export function CostPage() {
     <AppShell
       active="cost"
       githubConnected={Boolean(config?.githubConnected)}
-      search={{ value: query, onChange: setQuery, placeholder: "Filter previews by PR number, repo or branch" }}
+      search={{ value: query, onChange: setQuery, placeholder: "Search PR, repo or branch" }}
     >
       <section className="board-welcome">
         <div>
@@ -222,7 +222,7 @@ export function CostPage() {
         ) : null}
         {rows.length > 0 ? (
           <div className="cost-table-wrap">
-            <table className="cost-table">
+            <table className="cost-table stack-on-phone">
               <thead>
                 <tr>
                   <th scope="col">Preview</th>
@@ -249,7 +249,7 @@ export function CostPage() {
                         </button>
                         <span className="cost-table-sub mono">{env.branch}</span>
                       </th>
-                      <td>
+                      <td data-label="Now">
                         {state ? (
                           <span className="state-pill" data-state={state}>
                             {statePillLabel(state)}
@@ -258,9 +258,9 @@ export function CostPage() {
                           <span className="cost-table-removed">Removed</span>
                         )}
                       </td>
-                      <td className="num">{usage ? formatSpan(usage.awakeSeconds) : "—"}</td>
-                      <td className="num">{usage ? formatSpan(usage.asleepSeconds) : "—"}</td>
-                      <td className="num">{usage ? formatEstMoney(saved, currency) : "—"}</td>
+                      <td className="num" data-label="Awake">{usage ? formatSpan(usage.awakeSeconds) : "—"}</td>
+                      <td className="num" data-label="Asleep">{usage ? formatSpan(usage.asleepSeconds) : "—"}</td>
+                      <td className="num" data-label="Saved (est.)">{usage ? formatEstMoney(saved, currency) : "—"}</td>
                     </tr>
                   );
                 })}

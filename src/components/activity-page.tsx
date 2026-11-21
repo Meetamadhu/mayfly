@@ -118,7 +118,7 @@ export function ActivityPage() {
     <AppShell
       active="activity"
       githubConnected={Boolean(config?.githubConnected)}
-      search={{ value: query, onChange: setQuery, placeholder: "Filter by PR number, repo, branch or commit" }}
+      search={{ value: query, onChange: setQuery, placeholder: "Search PR, repo, branch or commit" }}
     >
       <section className="board-welcome">
         <div>
