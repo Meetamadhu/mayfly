@@ -84,7 +84,9 @@ jobs:
           BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           # A keytool key made with the defaults has one password for both, so this falls back to the keystore's.
           BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD || secrets.ANDROID_KEYSTORE_PASSWORD }}
+          # The GitHub runner already sets ANDROID_SDK_ROOT to its own SDK; Gradle stops if the two disagree.
           ANDROID_HOME: ${{ env.SDK_DIR }}
+          ANDROID_SDK_ROOT: ${{ env.SDK_DIR }}
         run: |
           echo "$KS" | base64 -d > android.keystore
           bubblewrap update --skipVersionUpgrade
