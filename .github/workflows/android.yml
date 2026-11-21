@@ -63,8 +63,12 @@ jobs:
           unzip -q /tmp/tools.zip -d /tmp/tools
           cp -r /tmp/tools/cmdline-tools/* "$SDK_DIR"/
           yes | "$SDK_DIR/bin/sdkmanager" --licenses --sdk_root="$SDK_DIR" > /dev/null
-          # Bubblewrap installs build-tools itself but not the platform its project compiles against.
-          "$SDK_DIR/bin/sdkmanager" --sdk_root="$SDK_DIR" "platforms;android-36" > /dev/null
+          # Bubblewrap installs build-tools 36.1.0 but not the platform its project compiles against, nor the
+          # build-tools 35.0.0 that its Android Gradle Plugin asks for.
+          "$SDK_DIR/bin/sdkmanager" --sdk_root="$SDK_DIR" "platforms;android-36" "build-tools;35.0.0" "build-tools;36.1.0" > /dev/null
+          # Bubblewrap wants sdkmanager in $SDK_DIR/bin, but the command-line tools' own source.properties at the
+          # SDK root makes Gradle read the whole folder as one package and miss the platform. Gradle doesn't need it.
+          rm "$SDK_DIR/source.properties"
           mkdir -p ~/.bubblewrap
           printf '{"jdkPath":"%s","androidSdkPath":"%s"}\n' "$JAVA_HOME" "$SDK_DIR" > ~/.bubblewrap/config.json
 
@@ -76,7 +80,7 @@ jobs:
         run: |
           echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "::error::Version must look like 1.0.1"; exit 1; }
           # The version code must go up with every build, or phones refuse the update; the run number always does.
-          jq --arg v "$VERSION" --argjson c "$CODE" '.appVersionName = $v | .appVersionCode = $c' twa-manifest.json > t.json
+          jq --arg v "$VERSION" --argjson c "$CODE" '.appVersion = $v | .appVersionCode = $c' twa-manifest.json > t.json
           mv t.json twa-manifest.json
 
       - name: Build and sign
