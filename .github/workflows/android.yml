@@ -1,0 +1,105 @@
+# Builds the Mayfly Android app (a Trusted Web Activity around the site in android/twa-manifest.json).
+# Run it by hand: Actions > Android app > Run workflow. The signed APK is attached to the run as a download.
+#
+# Needs three repository secrets (Settings > Secrets and variables > Actions):
+#   ANDROID_KEYSTORE_BASE64    the signing keystore, base64-encoded
+#   ANDROID_KEYSTORE_PASSWORD  the keystore's password
+#   ANDROID_KEY_PASSWORD       the "mayfly" key's password (often the same)
+# and the icons in public/icons to be live on the site the app opens.
+name: Android app
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version shown to people, e.g. 1.0.1"
+        required: true
+        default: "1.0.0"
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CMDLINE_TOOLS: "13114758"
+      SDK_DIR: ${{ github.workspace }}/.android-sdk
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check secrets are set
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KSP: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KP: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          missing=""
+          [ -n "$KS" ] || missing="$missing ANDROID_KEYSTORE_BASE64"
+          [ -n "$KSP" ] || missing="$missing ANDROID_KEYSTORE_PASSWORD"
+          [ -n "$KP" ] || missing="$missing ANDROID_KEY_PASSWORD"
+          if [ -n "$missing" ]; then echo "::error::Missing repository secrets:$missing"; exit 1; fi
+
+      - name: Check the site has its icons
+        run: |
+          for url in $(jq -r '.iconUrl, .maskableIconUrl, .webManifestUrl' android/twa-manifest.json); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 "$url")
+            if [ "$code" != "200" ]; then echo "::error::$url answered $code. Add the icons to public/icons and deploy first."; exit 1; fi
+          done
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install Bubblewrap and the Android command-line tools
+        run: |
+          npm install -g @bubblewrap/cli@1.27.0
+          mkdir -p "$SDK_DIR"
+          curl -sSL -o /tmp/tools.zip "https://dl.google.com/android/repository/commandlinetools-linux-${CMDLINE_TOOLS}_latest.zip"
+          unzip -q /tmp/tools.zip -d /tmp/tools
+          cp -r /tmp/tools/cmdline-tools/* "$SDK_DIR"/
+          yes | "$SDK_DIR/bin/sdkmanager" --licenses --sdk_root="$SDK_DIR" > /dev/null
+          mkdir -p ~/.bubblewrap
+          printf '{"jdkPath":"%s","androidSdkPath":"%s"}\n' "$JAVA_HOME" "$SDK_DIR" > ~/.bubblewrap/config.json
+
+      - name: Set the version
+        working-directory: android
+        env:
+          VERSION: ${{ inputs.version }}
+          CODE: ${{ github.run_number }}
+        run: |
+          echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "::error::Version must look like 1.0.1"; exit 1; }
+          # The version code must go up with every build, or phones refuse the update; the run number always does.
+          jq --arg v "$VERSION" --argjson c "$CODE" '.appVersionName = $v | .appVersionCode = $c' twa-manifest.json > t.json
+          mv t.json twa-manifest.json
+
+      - name: Build and sign
+        working-directory: android
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_HOME: ${{ env.SDK_DIR }}
+        run: |
+          echo "$KS" | base64 -d > android.keystore
+          bubblewrap update --skipVersionUpgrade
+          bubblewrap build --skipPwaValidation
+          # The fingerprint is public; Mayfly needs it as ANDROID_CERT_SHA256 so the app opens without a browser bar.
+          echo "### Signing key fingerprint" >> "$GITHUB_STEP_SUMMARY"
+          keytool -list -v -keystore android.keystore -alias mayfly -storepass "$BUBBLEWRAP_KEYSTORE_PASSWORD" \
+            | grep -m1 'SHA256:' | sed 's/^[[:space:]]*SHA256:[[:space:]]*/ANDROID_CERT_SHA256=/' | tee -a "$GITHUB_STEP_SUMMARY"
+          rm -f android.keystore
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mayfly-android-${{ inputs.version }}
+          path: |
+            android/app-release-signed.apk
+            android/app-release-bundle.aab
+          if-no-files-found: error

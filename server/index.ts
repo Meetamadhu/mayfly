@@ -3,6 +3,7 @@ import type { Server } from "node:http";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { adminRouter } from "./routes/admin";
 import { backupsRouter } from "./routes/backups";
+import { wellKnownRouter } from "./routes/well-known";
 import { environmentsRouter } from "./routes/environments";
 import { eventsRouter } from "./routes/events";
 import { healthRouter } from "./routes/health";
@@ -94,6 +95,7 @@ async function main() {
   if (process.env.TRUST_PROXY === "loopback") server.set("trust proxy", "loopback");
 
   // API + preview proxy live on Express. Mount before the Next.js catch-all.
+  server.use(wellKnownRouter);
   server.use(healthRouter);
   server.use(adminRouter);
   server.use(backupsRouter);
