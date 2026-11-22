@@ -287,6 +287,7 @@ export function Dashboard() {
                 onShowLifecycle={(item) => setLifecycleId(item.id)}
                 onPickAuthor={pickAuthor}
                 resources={env.deploymentId ? resources?.previews?.[env.deploymentId] : undefined}
+                measured={Boolean(resources?.previews)}
               />
             ))}
           </div>
