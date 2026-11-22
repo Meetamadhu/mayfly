@@ -11,7 +11,8 @@ export interface BuildRequest {
   sha: string;
 }
 
-const LOG_LINES = 20;
+// Kept on the preview record for the card's build log: enough to see the real error, small enough to store.
+const LOG_LINES = 80;
 const GIT_LIMIT_MS = 2 * 60 * 1000;
 const MB = 1024 * 1024;
 
