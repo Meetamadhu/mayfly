@@ -9,6 +9,7 @@ import { eventsRouter } from "./routes/events";
 import { healthRouter } from "./routes/health";
 import { policyRouter } from "./routes/policy";
 import { previewRouter } from "./routes/preview";
+import { previewAccessRouter } from "./routes/preview-access";
 import { resourcesRouter } from "./routes/resources";
 import { webhooksRouter } from "./routes/webhooks";
 import { sendJson } from "./lib/respond";
@@ -105,6 +106,7 @@ async function main() {
   server.use(eventsRouter);
   server.use(policyRouter);
   server.use(resourcesRouter);
+  server.use(previewAccessRouter);
   server.use(previewRouter);
   server.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
     if (res.headersSent) {

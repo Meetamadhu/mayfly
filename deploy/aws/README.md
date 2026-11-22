@@ -57,6 +57,18 @@ You'll then hear about failed builds, stuck previews, low disk space, memory run
 
 To be told when the whole server is down, which Mayfly can't report itself, point an uptime monitor such as UptimeRobot at `https://<address>/api/health`. It answers 200 when healthy and 503 when not. Check the monitor's terms if this is for a business.
 
+## Keep previews private
+
+By default anyone with a preview's link can open it. To ask for a team password first, add a line to
+`~/mayfly/.env.local`:
+
+```bash
+PREVIEW_PASSWORD=choose-a-long-password
+```
+
+then run `bash ~/mayfly/deploy/aws/setup.sh` to restart. Share the password with your team privately, not in the
+pull request. Admins signed in to Mayfly are never asked.
+
 ## Backups
 
 Mayfly saves a backup once a day and keeps the newest 7. The Admin page shows the last one, with **Download latest** and **Back up now**. On the server:

@@ -71,6 +71,8 @@ Copy `.env.example` to `.env.local`. `.env.local` stays on this machine.
 | `PREVIEW_RUNTIME` | `docker` runs the preview app in a container. `process` runs it as plain Node. This machine uses Docker. Render sets `process`. |
 | `PREVIEW_MEMORY`, `PREVIEW_CPUS` | Container limits for docker previews. Defaults `256m` (no swap) and `0.5` CPU, plus 100 processes, user `1000:1000`, all capabilities dropped, no new privileges, read-only filesystem, and a 16 MB `/tmp`. |
 | `MEMORY_ALERT_PERCENT` | Alert when the server's memory stays at or above this for three checks in a row (about three minutes). 50–99, default `90`. The Admin page shows server CPU and memory; preview cards show each awake preview's CPU and memory against its limits (Docker previews only). |
+| `PREVIEW_PASSWORD` | Optional team password for every preview link. Visitors enter it once per browser; signed-in admins are never asked. Leave empty for public previews. Changing it signs everyone out. |
+| `PREVIEW_ACCESS_DAYS` | How long a browser stays let in after the password. 1–90, default `7`. |
 | `PREVIEW_FAKE_DELAY_MS` | Artificial delay for the fake deployer. Example: `700`. |
 | `PREVIEW_BASE_URL` | Origin used in preview links. Example: `http://localhost:3000`. |
 | `MONGODB_URI` | Optional. MongoDB connection string. When set, board/admin environment state is stored in MongoDB (`mayfly.state` plus locks) instead of `data/state.json`. Empty keeps the JSON file. |
