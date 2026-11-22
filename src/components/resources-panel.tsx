@@ -71,7 +71,7 @@ export function ResourcesPanel({ environments }: { environments: Environment[] }
       <h3 className="res-subhead">Previews using the most memory</h3>
       {view && view.previews === null ? (
         <p className="help">
-          Shown when previews run in Docker. Here they&apos;re simulated, so there&apos;s nothing to measure.
+          Previews here are simulated, so there&apos;s nothing to measure.
         </p>
       ) : top.length === 0 ? (
         <p className="help">No preview is awake right now. Sleeping previews use no CPU or memory.</p>
@@ -83,8 +83,8 @@ export function ResourcesPanel({ environments }: { environments: Environment[] }
                 PR #{env.prNumber} <span className="muted">{env.repository}</span>
               </span>
               <span className="res-list-nums">
-                CPU {Math.round(usage.cpuPercent)}% · {formatBytes(usage.memUsedBytes)} of{" "}
-                {formatBytes(usage.memLimitBytes)}
+                CPU {Math.round(usage.cpuPercent)}% · {formatBytes(usage.memUsedBytes)}
+                {usage.memLimitBytes !== null ? ` of ${formatBytes(usage.memLimitBytes)}` : ""}
               </span>
             </li>
           ))}

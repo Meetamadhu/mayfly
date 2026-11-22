@@ -1,15 +1,16 @@
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import os from "node:os";
 import { getConfig, previewRuntime } from "./config";
+import type { DeploymentRecord } from "./types";
 
 /**
  * CPU and memory: for the server Mayfly runs on (Admin page, low-memory alert) and for each running preview
  * container (on its card). Numbers only; nothing here can change anything.
  *
  * Server numbers come from the container's own limits when it has them (cgroup v2, e.g. Render), otherwise from
- * the whole machine (/proc, e.g. the AWS server). Preview numbers come from `docker stats`, which the Docker
- * socket proxy already allows (CONTAINERS=1), so they exist only when previews run in Docker.
+ * the whole machine (/proc, e.g. the AWS server). Preview numbers come from `docker stats` when previews run in
+ * Docker (the socket proxy already allows it), or from /proc for previews that run as plain processes (Render).
  */
 
 export interface ServerResources {
@@ -26,10 +27,13 @@ export interface ServerResources {
 }
 
 export interface PreviewResources {
+  /** Share of the preview's CPU allowance: its Docker limit, or one CPU for a plain process. */
   cpuPercent: number;
   memUsedBytes: number;
-  memLimitBytes: number;
-  memPercent: number;
+  /** The container's memory limit. Null for a plain process, which has none. */
+  memLimitBytes: number | null;
+  /** memUsedBytes of memLimitBytes. Null when there's no limit. */
+  memPercent: number | null;
 }
 
 const CGROUP = "/sys/fs/cgroup";
@@ -112,6 +116,7 @@ type ResourceMemory = {
   cpuPercent: number | null;
   server: { at: number; value: ServerResources } | null;
   previews: { at: number; value: Map<string, PreviewResources> | null; pending: Promise<Map<string, PreviewResources> | null> | null };
+  processCpu: Map<string, { at: number; ticks: number }>;
 };
 
 function memory(): ResourceMemory {
@@ -122,6 +127,7 @@ function memory(): ResourceMemory {
     cpuPercent: null,
     server: null,
     previews: { at: 0, value: null, pending: null },
+    processCpu: new Map(),
   };
   return holder.__mayflyResources;
 }
@@ -231,7 +237,7 @@ export function previewCpuLimit(raw = process.env.PREVIEW_CPUS) {
 }
 
 export function previewStatsAvailable() {
-  return previewRuntime() === "docker" && getConfig().deployer !== "fake";
+  return getConfig().deployer !== "fake" && (previewRuntime() === "docker" || process.platform === "linux");
 }
 
 function dockerStats(): Promise<Map<string, PreviewResources> | null> {
@@ -257,21 +263,129 @@ function dockerStats(): Promise<Map<string, PreviewResources> | null> {
   });
 }
 
+/** /proc/<pid>/stat: parent pid and CPU time (user + system, in clock ticks). The name may contain spaces. */
+export function procPidStat(text: string) {
+  const end = text.lastIndexOf(")");
+  if (end < 0) return null;
+  const rest = text.slice(end + 2).split(" ");
+  const ppid = Number(rest[1]);
+  const ticks = Number(rest[11]) + Number(rest[12]);
+  if (!Number.isFinite(ppid) || !Number.isFinite(ticks)) return null;
+  return { ppid, ticks };
+}
+
+/** /proc/<pid>/status: resident memory in bytes. */
+export function procRss(status: string | null) {
+  const kb = Number(/^VmRSS:\s+(\d+) kB$/m.exec(status ?? "")?.[1]);
+  return Number.isFinite(kb) ? kb * 1024 : null;
+}
+
+/** Every process below `root` (not root itself), from a pid → parent map. */
+export function descendantsOf(root: number, parents: Map<number, number>) {
+  const children = new Map<number, number[]>();
+  for (const [pid, ppid] of parents) children.set(ppid, [...(children.get(ppid) ?? []), pid]);
+  const out: number[] = [];
+  const queue = [...(children.get(root) ?? [])];
+  while (queue.length > 0) {
+    const pid = queue.shift()!;
+    out.push(pid);
+    queue.push(...(children.get(pid) ?? []));
+  }
+  return out;
+}
+
+const CLOCK_TICKS_PER_SECOND = 100; // Linux's USER_HZ on every common distribution.
+
 /**
- * CPU and memory of each running preview container, keyed by container name (mayfly-app-<port>). Null when
- * previews don't run in Docker or Docker didn't answer. Cached for 10 seconds; callers at the same moment share one
- * `docker stats` run, which takes a couple of seconds.
+ * Plain-process previews (PREVIEW_RUNTIME=process, as on Render): the preview app is started by its gate process,
+ * so it's everything below the gate's pid. CPU is the change in CPU time since the last reading, as a share of one
+ * CPU; the first reading waits a second to have two.
  */
-export async function previewResources(now = Date.now()): Promise<Map<string, PreviewResources> | null> {
+async function processStats(deployments: DeploymentRecord[], now: number) {
+  const parents = new Map<number, number>();
+  const ticks = new Map<number, number>();
+  let names: string[];
+  try {
+    names = await readdir("/proc");
+  } catch {
+    return null;
+  }
+  await Promise.all(
+    names
+      .filter((name) => /^\d+$/.test(name))
+      .map(async (name) => {
+        const stat = procPidStat((await readText(`/proc/${name}/stat`)) ?? "");
+        if (!stat) return;
+        parents.set(Number(name), stat.ppid);
+        ticks.set(Number(name), stat.ticks);
+      }),
+  );
+
+  const mem = memory();
+  for (const [key, value] of mem.processCpu) if (now - value.at > 10 * 60_000) mem.processCpu.delete(key);
+  const out = new Map<string, PreviewResources>();
+  for (const deployment of deployments) {
+    if (typeof deployment.pid !== "number" || !parents.has(deployment.pid)) continue;
+    const pids = descendantsOf(deployment.pid, parents);
+    if (pids.length === 0) continue; // Asleep: the gate is there but the app isn't running.
+    let rss = 0;
+    let cpuTicks = 0;
+    for (const pid of pids) {
+      rss += procRss(await readText(`/proc/${pid}/status`)) ?? 0;
+      cpuTicks += ticks.get(pid) ?? 0;
+    }
+    const key = `${deployment.deploymentId}:${pids[0]}`;
+    const last = mem.processCpu.get(key);
+    mem.processCpu.set(key, { at: now, ticks: cpuTicks });
+    let cpuPercent = 0;
+    if (last && now > last.at && cpuTicks >= last.ticks) {
+      const cpuSeconds = (cpuTicks - last.ticks) / CLOCK_TICKS_PER_SECOND;
+      cpuPercent = Math.round(Math.min(100, (cpuSeconds / ((now - last.at) / 1000)) * 100) * 10) / 10;
+    }
+    out.set(deployment.deploymentId, { cpuPercent, memUsedBytes: rss, memLimitBytes: null, memPercent: null });
+  }
+  return out;
+}
+
+async function measure(deployments: DeploymentRecord[]) {
+  if (previewRuntime() === "docker") {
+    const byContainer = await dockerStats();
+    if (!byContainer) return null;
+    const out = new Map<string, PreviewResources>();
+    for (const deployment of deployments) {
+      if (typeof deployment.port !== "number") continue;
+      const usage = byContainer.get(previewContainerName(deployment.port));
+      if (usage) out.set(deployment.deploymentId, usage);
+    }
+    return out;
+  }
+  const first = memory().processCpu.size === 0;
+  const result = await processStats(deployments, Date.now());
+  if (!first || !result || result.size === 0) return result;
+  // First reading: wait a second so CPU has something to compare with.
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  return processStats(deployments, Date.now());
+}
+
+/**
+ * CPU and memory of each running preview, keyed by deployment id. Null when there's nothing to measure (simulated
+ * previews) or Docker didn't answer. Cached for 10 seconds; callers at the same moment share one reading.
+ */
+export async function previewResources(
+  deployments: DeploymentRecord[],
+  now = Date.now(),
+): Promise<Map<string, PreviewResources> | null> {
   if (!previewStatsAvailable()) return null;
   const cache = memory().previews;
   if (cache.value && now - cache.at < 10_000) return cache.value;
-  cache.pending ??= dockerStats().then((value) => {
-    cache.value = value;
-    cache.at = Date.now();
-    cache.pending = null;
-    return value;
-  });
+  cache.pending ??= measure(deployments)
+    .catch(() => null)
+    .then((value) => {
+      cache.value = value;
+      cache.at = Date.now();
+      cache.pending = null;
+      return value;
+    });
   return cache.pending;
 }
 
