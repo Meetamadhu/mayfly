@@ -14,8 +14,11 @@ async function main() {
     parseStatsLine,
     previewContainerName,
     previewCpuLimit,
+    descendantsOf,
     procCpu,
     procMemory,
+    procPidStat,
+    procRss,
   } = await import("../src/lib/resources");
 
   let passed = 0;
@@ -88,6 +91,27 @@ async function main() {
     assert.equal(memoryAlertPercent("80"), 80);
     assert.equal(memoryAlertPercent("20"), 90, "too low is ignored");
     assert.equal(memoryAlertPercent("100"), 90, "too high is ignored");
+  });
+
+  check("/proc/<pid>/stat: parent and CPU ticks, even with spaces in the name", () => {
+    const line = "4242 (node preview) S 4200 4242 4242 0 -1 4194560 100 0 0 0 150 25 0 0 20 0 11 0 9999";
+    assert.deepEqual(procPidStat(line), { ppid: 4200, ticks: 175 });
+    assert.equal(procPidStat("garbage"), null);
+  });
+  check("/proc/<pid>/status: resident memory", () => {
+    assert.equal(procRss("Name:\tnode\nVmRSS:\t   51200 kB\n"), 51200 * 1024);
+    assert.equal(procRss("Name:\tkthreadd\n"), null);
+  });
+  check("a gate's preview app is everything below it, not the gate", () => {
+    const parents = new Map([
+      [10, 1], // gate
+      [11, 10], // app
+      [12, 11], // app's child
+      [20, 1], // another gate, asleep
+      [30, 99],
+    ]);
+    assert.deepEqual(descendantsOf(10, parents), [11, 12]);
+    assert.deepEqual(descendantsOf(20, parents), []);
   });
 
   console.log(`\n${passed} checks passed.`);

@@ -309,8 +309,12 @@ export function EnvironmentCard({
 }
 
 /** Icons for the dashboard metric tiles (Live / Running / Sleeping / Building). */
-/** On an awake preview's card: CPU and memory, each as a share of the limit the preview runs with. */
+/**
+ * On an awake preview's card: CPU and memory. In Docker both are shares of the container's limits; a plain-process
+ * preview has no memory limit, so it shows the amount used and CPU as a share of one CPU.
+ */
 function CardResources({ usage }: { usage: PreviewResources }) {
+  const limited = usage.memLimitBytes !== null && usage.memPercent !== null;
   return (
     <div className="card-res" aria-label="Resource use">
       <span className="card-res-item" data-tone={loadTone(usage.cpuPercent)}>
@@ -322,11 +326,17 @@ function CardResources({ usage }: { usage: PreviewResources }) {
       </span>
       <span className="card-res-item" data-tone={loadTone(usage.memPercent)}>
         <span className="card-res-label">Memory</span>
-        <span className="card-res-bar" aria-hidden="true">
-          <span style={{ width: `${Math.min(100, usage.memPercent)}%` }} />
-        </span>
+        {limited ? (
+          <span className="card-res-bar" aria-hidden="true">
+            <span style={{ width: `${Math.min(100, usage.memPercent ?? 0)}%` }} />
+          </span>
+        ) : (
+          <span />
+        )}
         <span className="card-res-value">
-          {formatBytes(usage.memUsedBytes)} / {formatBytes(usage.memLimitBytes)}
+          {limited
+            ? `${formatBytes(usage.memUsedBytes)} / ${formatBytes(usage.memLimitBytes ?? 0)}`
+            : `${formatBytes(usage.memUsedBytes)} used`}
         </span>
       </span>
     </div>
