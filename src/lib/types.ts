@@ -127,6 +127,8 @@ export interface OrchestratorConfigView {
   deployer: "process" | "fake";
   webhookVerification: "signed" | "open-in-development";
   demo: string | null;
+  /** PREVIEW_PASSWORD is set: preview links ask for the team password. */
+  privatePreviews?: boolean;
   /** Repositories PREVIEW_REPOS allows to be built. Null when any repository can open a placeholder preview. */
   allowedRepositories: string[] | null;
   /** True when Mayfly runs on Render, where settings live in the Render dashboard. */

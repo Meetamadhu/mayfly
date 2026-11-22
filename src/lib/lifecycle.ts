@@ -1,3 +1,4 @@
+import { previewsProtected } from "./preview-access";
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { imageTag, isBuilding } from "./builder";
@@ -448,6 +449,7 @@ export async function getOverview(): Promise<Overview> {
       allowedRepositories: buildsPullRequests() ? previewRepos() : null,
       onRender: Boolean(process.env.RENDER),
       githubConnected: githubConfigured(),
+      privatePreviews: previewsProtected(),
       currency,
       policy: {
         ttlHours: policy.ttlHours ?? config.ttlHours,

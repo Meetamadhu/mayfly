@@ -1,6 +1,7 @@
 import { request as forward, type IncomingHttpHeaders, type IncomingMessage } from "node:http";
 import type { Request, Response } from "express";
 import { ADMIN_COOKIE } from "./admin";
+import { hasPreviewAccess, passwordPage, PREVIEW_ACCESS_COOKIE, safeNext } from "./preview-access";
 import { findProxyTarget, recordActivity } from "./lifecycle";
 
 // Never forwarded in either direction. host is rewritten, x-mayfly-admin is a Mayfly secret.
@@ -24,7 +25,7 @@ const MAYFLY_PAGE_HEADER = "x-mayfly-page";
 
 /** Mayfly's own sign-in cookies. Preview apps run pull-request code, so they must never see or set these. */
 // "mayfly_user" was the team-account cookie; still stripped so a leftover one never reaches a preview.
-const MAYFLY_COOKIES = new Set([ADMIN_COOKIE, "mayfly_user"]);
+const MAYFLY_COOKIES = new Set([ADMIN_COOKIE, "mayfly_user", PREVIEW_ACCESS_COOKIE]);
 
 /** True when a Set-Cookie line would set or clear one of Mayfly's sign-in cookies. */
 function isAdminSetCookie(value: string) {
@@ -291,6 +292,21 @@ export async function proxyPreview(req: Request, res: Response): Promise<void> {
     repository = `${decodeURIComponent(owner)}/${decodeURIComponent(name)}`;
   } catch {
     noPreview(res, `${owner}/${name}`, pr, notAPreview);
+    return;
+  }
+
+  // Team password (PREVIEW_PASSWORD): checked before anything else, so without it nobody can tell which previews exist.
+  if (!hasPreviewAccess({ method: req.method, headers: req.headers })) {
+    const method = req.method.toUpperCase();
+    if (method !== "GET" && method !== "HEAD") {
+      sendText(res, 401, "This preview is private. Open it in a browser and enter the team password.");
+      return;
+    }
+    res.status(401);
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-Robots-Tag", "noindex");
+    res.end(passwordPage({ repository, pr, next: safeNext(req.originalUrl) ?? `/p/${owner}/${name}/${pr}/` }));
     return;
   }
 

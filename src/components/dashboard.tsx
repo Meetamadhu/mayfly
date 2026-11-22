@@ -203,6 +203,7 @@ export function Dashboard() {
           {config
             ? `Previews fall asleep after ${formatSleep(config.sleepSeconds)} without visitors and last up to ${formatLifetime(config.ttlHours)}.`
             : ""}
+          {config?.privatePreviews ? " Preview links ask for the team password." : ""}
         </p>
         {signedIn ? (
           <a className="btn secondary board-hero-action" href="/admin#simulator">
