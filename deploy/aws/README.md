@@ -53,7 +53,7 @@ To get a message in Slack, Discord or another chat when something goes wrong:
 2. On the server, run `bash ~/mayfly/deploy/aws/setup.sh --alert-webhook` and paste the URL. It isn't shown, and it's saved only in `.env.local`.
 3. Mayfly restarts and posts a **"started up"** message. If that appears, alerts work.
 
-You'll then hear about failed builds, stuck previews, low disk space, Docker problems and restarts. Anyone with the webhook URL can post to that channel, so don't share it.
+You'll then hear about failed builds, stuck previews, low disk space, memory running low, Docker problems and restarts. Anyone with the webhook URL can post to that channel, so don't share it.
 
 To be told when the whole server is down, which Mayfly can't report itself, point an uptime monitor such as UptimeRobot at `https://<address>/api/health`. It answers 200 when healthy and 503 when not. Check the monitor's terms if this is for a business.
 

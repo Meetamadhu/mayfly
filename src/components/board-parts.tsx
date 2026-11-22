@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { PreviewResources } from "@/lib/resources";
 import type { Environment, EnvironmentStatus, UsageDay, UsageMonth } from "@/lib/types";
+import { formatBytes, loadTone } from "@/lib/use-resources";
 import {
   formatAgoRounded,
   formatEventTime,
@@ -152,8 +154,11 @@ export function EnvironmentCard({
   onAdminAction,
   onShowLifecycle,
   onPickAuthor,
+  resources,
 }: {
   env: Environment;
+  /** CPU and memory while it's awake; absent when unknown (asleep, or previews aren't in Docker). */
+  resources?: PreviewResources;
   now: number;
   demo: boolean;
   signedIn: boolean;
@@ -210,6 +215,7 @@ export function EnvironmentCard({
           {typeof env.buildMs === "number" && env.buildMs >= 0 ? `, built in ${formatDurationMs(env.buildMs)}` : ""}.
           {" "}Last visited {formatAgo(env.lastActiveAt, now)}.
         </p>
+        {resources && state !== "sleeping" ? <CardResources usage={resources} /> : null}
         {showError && env.error ? <pre className="fail-box">{env.error}</pre> : null}
       </div>
       <footer className="card-foot env-card-foot">
@@ -303,6 +309,30 @@ export function EnvironmentCard({
 }
 
 /** Icons for the dashboard metric tiles (Live / Running / Sleeping / Building). */
+/** On an awake preview's card: CPU and memory, each as a share of the limit the preview runs with. */
+function CardResources({ usage }: { usage: PreviewResources }) {
+  return (
+    <div className="card-res" aria-label="Resource use">
+      <span className="card-res-item" data-tone={loadTone(usage.cpuPercent)}>
+        <span className="card-res-label">CPU</span>
+        <span className="card-res-bar" aria-hidden="true">
+          <span style={{ width: `${Math.min(100, usage.cpuPercent)}%` }} />
+        </span>
+        <span className="card-res-value">{Math.round(usage.cpuPercent)}%</span>
+      </span>
+      <span className="card-res-item" data-tone={loadTone(usage.memPercent)}>
+        <span className="card-res-label">Memory</span>
+        <span className="card-res-bar" aria-hidden="true">
+          <span style={{ width: `${Math.min(100, usage.memPercent)}%` }} />
+        </span>
+        <span className="card-res-value">
+          {formatBytes(usage.memUsedBytes)} / {formatBytes(usage.memLimitBytes)}
+        </span>
+      </span>
+    </div>
+  );
+}
+
 export function StatIcon({ name }: { name: StatIconName }) {
   const props = {
     width: 18,

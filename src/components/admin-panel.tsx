@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { BackupsPanel } from "@/components/backups-panel";
+import { ResourcesPanel } from "@/components/resources-panel";
 import { Lifespan, OpenedBy, cardState, statePillLabel } from "@/components/board-parts";
 import type { Environment, EnvironmentStatus, Overview } from "@/lib/types";
 import { removedLabel, timelineLabel, timelineNewestFirst } from "@/lib/timeline";
@@ -709,6 +710,8 @@ export function AdminPanel() {
             </p>
           ) : null}
         </section>
+
+        <ResourcesPanel environments={rows} />
 
         <BackupsPanel />
       </div>

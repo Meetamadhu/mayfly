@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { statfs } from "node:fs/promises";
 import { Watch, diskAlertPercent, sendAlert } from "./alerts";
 import { getConfig, previewRuntime } from "./config";
+import { memoryAlertPercent, serverResources } from "./resources";
 import { dataDir, loadState } from "./store";
 
 /**
@@ -31,6 +32,7 @@ type HealthMemory = {
   disk: Watch;
   docker: Watch;
   reaper: Watch;
+  memory: Watch;
 };
 
 function memory(): HealthMemory {
@@ -43,6 +45,8 @@ function memory(): HealthMemory {
     // A single slow answer from Docker isn't worth a message; two checks in a row is.
     docker: new Watch(2),
     reaper: new Watch(1),
+    // Memory spikes during a build; only a reading that stays high for three rounds in a row is worth a message.
+    memory: new Watch(3),
   };
   return holder.__mayflyHealth;
 }
@@ -148,12 +152,34 @@ export async function watchHealth() {
     await sendAlert("disk-ok", "disk space is back to normal", [disk.detail], { repeatAfterMs: 0 });
   }
 
+  try {
+    const resources = await serverResources();
+    const limit = memoryAlertPercent();
+    const where = resources.scope === "container" ? "Mayfly's container" : "the server";
+    const used = `${where} is using ${resources.memPercent}% of its memory (${gib(resources.memUsedBytes)} of ${gib(resources.memTotalBytes)}).`;
+    const memoryChange = mem.memory.update(resources.memPercent < limit);
+    if (memoryChange === "down") {
+      await sendAlert("memory-high", "the server is running low on memory", [
+        used,
+        "Previews may be stopped by the system or fail to start. Remove unused previews, lower PREVIEW_MEMORY or use a bigger server.",
+      ]);
+    } else if (memoryChange === "up") {
+      await sendAlert("memory-ok", "memory use is back to normal", [used], { repeatAfterMs: 0 });
+    }
+  } catch (error) {
+    console.error("Memory check failed", error);
+  }
+
   const dockerChange = mem.docker.update(docker.ok);
   if (dockerChange === "down") {
     await sendAlert("docker-down", "Docker isn't answering", [docker.detail]);
   } else if (dockerChange === "up") {
     await sendAlert("docker-up", "Docker is answering again", [docker.detail], { repeatAfterMs: 0 });
   }
+}
+
+function gib(bytes: number) {
+  return bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${Math.round(bytes / 1024 ** 2)} MB`;
 }
 
 /** Called by the reaper loop when a whole round throws. */
