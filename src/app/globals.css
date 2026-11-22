@@ -4584,3 +4584,54 @@ html[data-onboarding="open"] body { overflow: hidden; }
   text-align: left;
 }
 .board-side-intro:hover { color: var(--ink); background: var(--soft); }
+
+/* ───── CPU and memory ───── */
+.res-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem 1.5rem; margin: 0.75rem 0 0.5rem; }
+.res-meter-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+.res-meter-head strong { font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+.res-bar,
+.card-res-bar {
+  display: block;
+  height: 8px;
+  margin: 0.4rem 0 0.3rem;
+  border-radius: 999px;
+  background: var(--soft);
+  overflow: hidden;
+}
+.res-bar span,
+.card-res-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--success);
+  transition: width 400ms ease;
+}
+[data-tone="high"] > .res-bar span,
+[data-tone="high"] > .card-res-bar span { background: #c98a1b; }
+[data-tone="full"] > .res-bar span,
+[data-tone="full"] > .card-res-bar span { background: var(--danger, #c0392b); }
+.res-detail { margin: 0; color: var(--muted); font-size: 0.85rem; }
+.res-subhead { margin: 1.25rem 0 0.4rem; font-size: 0.95rem; }
+.res-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.res-list li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.res-list li:last-child { border-bottom: 0; }
+.res-list-nums { font-variant-numeric: tabular-nums; color: var(--muted); }
+.res-list li[data-tone="full"] .res-list-nums { color: var(--danger, #c0392b); font-weight: 600; }
+
+/* On preview cards */
+.card-res { display: grid; gap: 0.35rem; margin-top: 0.6rem; }
+.card-res-item { display: grid; grid-template-columns: 4.2rem minmax(0, 1fr) auto; align-items: center; gap: 0.6rem; font-size: 0.8rem; }
+.card-res-label { color: var(--muted); }
+.card-res-bar { height: 6px; margin: 0; }
+.card-res-value { font-variant-numeric: tabular-nums; color: var(--ink); }
+@media (prefers-reduced-motion: reduce) {
+  .res-bar span,
+  .card-res-bar span { transition: none; }
+}

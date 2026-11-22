@@ -24,6 +24,7 @@ import {
 } from "@/components/board-parts";
 import type { Environment } from "@/lib/types";
 import { useOverview } from "@/lib/use-overview";
+import { useResources } from "@/lib/use-resources";
 
 const DASHBOARD_PREVIEW_LIMIT = 2;
 
@@ -58,6 +59,7 @@ function boardHeadline(
 
 export function Dashboard() {
   const { overview, loadError, polledAt, now, reload } = useOverview();
+  const resources = useResources(15_000);
   const [error, setError] = useState<string | null>(null);
   const [showRemoved, setShowRemoved] = useState(false);
   const [boardFilter, setBoardFilter] = useState<BoardFilter>("all");
@@ -284,6 +286,7 @@ export function Dashboard() {
                 onAdminAction={(item, action) => void adminAction(item, action)}
                 onShowLifecycle={(item) => setLifecycleId(item.id)}
                 onPickAuthor={pickAuthor}
+                resources={env.deploymentId ? resources?.previews?.[env.deploymentId] : undefined}
               />
             ))}
           </div>
