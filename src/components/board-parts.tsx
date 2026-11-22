@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { PreviewResources } from "@/lib/resources";
 import type { Environment, EnvironmentStatus, UsageDay, UsageMonth } from "@/lib/types";
 import { formatBytes, loadTone } from "@/lib/use-resources";
+import { isProblemLine, summarizeFailure } from "@/lib/build-log";
 import {
   formatAgoRounded,
   formatEventTime,
@@ -225,13 +226,16 @@ export function EnvironmentCard({
         {state === "sleeping" && measured ? (
           <p className="card-res-note">Asleep, so it uses no CPU or memory right now.</p>
         ) : null}
-        {showError && env.error ? <pre className="fail-box">{env.error}</pre> : null}
+        {state === "failed" && env.error ? <FailureSummary error={env.error} signedIn={signedIn} /> : null}
+        {showError && signedIn && env.error ? <BuildLog error={env.error} /> : null}
       </div>
       <footer className="card-foot env-card-foot">
         {state === "failed" ? (
-          <button type="button" className="open-preview secondary" onClick={() => setShowError((open) => !open)}>
-            {showError ? "Hide error" : "View error"}
-          </button>
+          signedIn ? (
+            <button type="button" className="open-preview secondary" onClick={() => setShowError((open) => !open)}>
+              {showError ? "Hide build log" : "View build log"}
+            </button>
+          ) : null
         ) : state === "sleeping" ? (
           canOpen ? (
             <a className="open-preview" href={href}>
@@ -318,6 +322,68 @@ export function EnvironmentCard({
 }
 
 /** Icons for the dashboard metric tiles (Live / Running / Sleeping / Building). */
+/** On a failed card, always visible: what failed, and the line most likely to say why. */
+function FailureSummary({ error, signedIn }: { error: string; signedIn: boolean }) {
+  const { headline, hint } = summarizeFailure(error);
+  return (
+    <div className="fail-summary">
+      <strong>{headline}</strong>
+      {hint ? <code>{hint}</code> : null}
+      {signedIn ? null : (
+        // Visitors only get the first line: build output can include internal paths or values.
+        <span className="fail-summary-note">
+          <a href="/admin/login">Sign in as admin</a> to see the build log.
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Behind "View build log": the last lines of the build, problem lines marked, with a copy button. */
+function BuildLog({ error }: { error: string }) {
+  const { headline, log } = summarizeFailure(error);
+  const [copied, setCopied] = useState(false);
+  const boxRef = useRef<HTMLPreElement>(null);
+
+  useEffect(() => {
+    // The useful part is at the end, so start there.
+    const box = boxRef.current;
+    if (box) box.scrollTop = box.scrollHeight;
+  }, [error]);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(error);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  if (log.length === 0) return <pre className="fail-box">{headline}</pre>;
+  return (
+    <div className="build-log">
+      <div className="build-log-head">
+        <span>
+          Last {log.length} {log.length === 1 ? "line" : "lines"} of the build
+        </span>
+        <button type="button" className="build-log-copy" onClick={() => void copy()}>
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+      <pre className="build-log-box" ref={boxRef} tabIndex={0} aria-label="Build log">
+        {log.map((line, index) => (
+          <span key={index} className={isProblemLine(line) ? "build-log-problem" : undefined}>
+            {line}
+            {"\n"}
+          </span>
+        ))}
+      </pre>
+    </div>
+  );
+}
+
 /**
  * On an awake preview's card: CPU and memory. In Docker both are shares of the container's limits; a plain-process
  * preview has no memory limit, so it shows the amount used and CPU as a share of one CPU.

@@ -4636,3 +4636,62 @@ html[data-onboarding="open"] body { overflow: hidden; }
   .res-bar span,
   .card-res-bar span { transition: none; }
 }
+
+/* ───── Failed previews: summary and build log ───── */
+.fail-summary {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.75rem 0 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  background: var(--failed-bg);
+  color: var(--failed);
+  font-size: 0.88rem;
+}
+.fail-summary code {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+.fail-summary-note { color: var(--muted); font-size: 0.82rem; }
+.fail-summary-note a { color: inherit; }
+.build-log { margin-top: 0.6rem; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.build-log-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.35rem 0.4rem 0.35rem 0.75rem;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.build-log-copy {
+  min-height: 32px;
+  padding: 0 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+}
+.build-log-box {
+  margin: 0;
+  max-height: 18rem;
+  overflow: auto;
+  padding: 0.6rem 0.75rem;
+  background: #0b1220;
+  color: #d5dee9;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.build-log-box:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+.build-log-problem { color: #ff9b8f; font-weight: 600; }
+@media (pointer: coarse) {
+  .build-log-copy { min-height: 40px; }
+}
