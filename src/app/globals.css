@@ -4631,6 +4631,7 @@ html[data-onboarding="open"] body { overflow: hidden; }
 .card-res-label { color: var(--muted); }
 .card-res-bar { height: 6px; margin: 0; }
 .card-res-value { font-variant-numeric: tabular-nums; color: var(--ink); }
+.card-res-note { margin: 0.6rem 0 0; color: var(--muted); font-size: 0.8rem; }
 @media (prefers-reduced-motion: reduce) {
   .res-bar span,
   .card-res-bar span { transition: none; }

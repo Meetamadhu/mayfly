@@ -155,10 +155,13 @@ export function EnvironmentCard({
   onShowLifecycle,
   onPickAuthor,
   resources,
+  measured = false,
 }: {
   env: Environment;
-  /** CPU and memory while it's awake; absent when unknown (asleep, or previews aren't in Docker). */
+  /** CPU and memory while it's awake; absent when asleep or not read yet. */
   resources?: PreviewResources;
+  /** True when this server can measure previews at all (false for simulated previews). */
+  measured?: boolean;
   now: number;
   demo: boolean;
   signedIn: boolean;
@@ -215,7 +218,13 @@ export function EnvironmentCard({
           {typeof env.buildMs === "number" && env.buildMs >= 0 ? `, built in ${formatDurationMs(env.buildMs)}` : ""}.
           {" "}Last visited {formatAgo(env.lastActiveAt, now)}.
         </p>
-        {resources && state !== "sleeping" ? <CardResources usage={resources} /> : null}
+        {state === "running" && resources ? <CardResources usage={resources} /> : null}
+        {state === "running" && !resources && measured ? (
+          <p className="card-res-note">Measuring CPU and memory…</p>
+        ) : null}
+        {state === "sleeping" && measured ? (
+          <p className="card-res-note">Asleep, so it uses no CPU or memory right now.</p>
+        ) : null}
         {showError && env.error ? <pre className="fail-box">{env.error}</pre> : null}
       </div>
       <footer className="card-foot env-card-foot">
