@@ -5530,3 +5530,34 @@ html[data-theme="dark"] .act-icon[data-tone="failed"] { background: #3b1518; col
   .lp-states p { grid-column: 1 / -1; margin-top: 0.6rem; }
 }
 @media (max-width: 960px) { .act-layout { align-items: stretch; } }
+
+/* Sidebar: the Admin group sits in its own panel under a divider, so it reads as a separate area from Workspace. */
+.board-side-group[data-group="admin"] {
+  position: relative;
+  margin-top: 0.4rem;
+  padding: 0.7rem 0.4rem 0.4rem;
+  border: 1px solid color-mix(in srgb, var(--sidebar-ink) 10%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--sidebar-ink) 4%, transparent);
+}
+.board-side-group[data-group="admin"]::before {
+  content: "";
+  position: absolute;
+  left: 0.3rem;
+  right: 0.3rem;
+  top: -0.95rem;
+  border-top: 1px solid color-mix(in srgb, var(--sidebar-ink) 12%, transparent);
+}
+.board-side-group[data-group="admin"] .board-side-heading { display: flex; align-items: center; gap: 0.4rem; margin-left: 0.35rem; }
+.board-side-group[data-group="admin"] a { font-size: 0.95em; }
+.board-side-tag {
+  margin-left: auto;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sidebar-ink) 10%, transparent);
+  color: var(--sidebar-muted);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
