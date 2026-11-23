@@ -12,5 +12,7 @@ until then the site simply has no icon. See `src/lib/app-icons.ts`.
 | `favicon.svg` | any | Browser tab (simplified mark) |
 | `favicon-32.png`, `favicon-16.png` | 32, 16 | Browser tab fallbacks |
 
-The current files are a **temporary icon** (a rounded "m" with a mint dot, in the direction of the 3rd logo
-option). Replace them with the designer's final files, keeping the same names.
+These are the **final logo** (design 8.3): an open window with an "m" and a trail of dots leaving through the gap.
+`icon-512.png` and `favicon.svg` are the rounded navy square; `maskable-512.png` and `apple-touch-icon.png` fill the
+square to the edges with the mark shrunk inside the safe area, because Android and iOS cut their own shape. The
+same drawing is `MayflyMark` in `src/components/admin-header.tsx`, used on the site itself.
