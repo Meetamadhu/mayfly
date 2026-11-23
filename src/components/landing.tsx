@@ -240,10 +240,8 @@ export function Landing() {
             : "Preview environments for pull requests"}
         </p>
         <h1 id="lp-title">
-          Every pull request gets a <span className="lp-live-word">live</span> preview.{" "}
-          <span className="lp-line2">
-            Then it goes to <span className="lp-sleep-word">sleep.</span>
-          </span>
+          Every pull request gets a <span className="lp-live-word">live</span> preview, then it goes to{" "}
+          <span className="lp-sleep-word">sleep.</span>
         </h1>
         <p className="lp-lede2">
           Reviewers open one link and see the change running. Idle previews sleep and wake on the next visit, so you

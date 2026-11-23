@@ -5595,3 +5595,21 @@ html[data-theme="dark"] .act-icon[data-tone="failed"] { background: #3b1518; col
   html:not([data-app="1"]) .board-welcome:has(.title-in-header) .lede { margin-top: 0; }
 }
 .lp-nav-actions { margin-left: auto; }
+/* Home: a bigger logo in the top bar (about twice the earlier size). */
+.lp-nav-inner { min-height: 84px; }
+.lp-brand { gap: 0.6rem; font-size: 2.7rem; }
+.lp-brand-mark { width: 4.2rem; height: 4.2rem; }
+@media (max-width: 560px) {
+  .lp-nav-inner { min-height: 68px; }
+  .lp-brand { font-size: 1.9rem; gap: 0.45rem; }
+  .lp-brand-mark { width: 3rem; height: 3rem; }
+
+}
+@media (max-width: 400px) {
+  .lp-nav-inner { gap: 0.5rem; }
+  .lp-brand { font-size: 1.6rem; gap: 0.35rem; }
+  .lp-brand-mark { width: 2.6rem; height: 2.6rem; }
+  .lp-nav-actions { gap: 0.5rem; }
+  .lp-nav-actions .lp-btn { padding: 0 0.7rem; }
+}
+.lp-signin { white-space: nowrap; }
