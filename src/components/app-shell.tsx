@@ -301,8 +301,19 @@ export function AppShell({
         </div>
         <nav id="board-side-nav" className="board-side-nav" aria-label="Pages">
           {(["workspace", "admin"] as const).map((group) => (
-            <div key={group} className="board-side-group">
-              <p className="board-side-heading">{group === "workspace" ? "Workspace" : "Admin"}</p>
+            <div key={group} className="board-side-group" data-group={group}>
+              {group === "workspace" ? (
+                <p className="board-side-heading">Workspace</p>
+              ) : (
+                <p className="board-side-heading">
+                  <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="5" y="11" width="14" height="9" rx="2" />
+                    <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+                  </svg>
+                  Admin
+                  {!signedIn ? <span className="board-side-tag">Admins only</span> : null}
+                </p>
+              )}
               {NAV.filter((item) => item.group === group).map((item) => (
                 <a key={item.id} href={item.href} aria-current={item.id === active ? "page" : undefined}>
                   <NavIcon page={item.id} />
