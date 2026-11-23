@@ -11,8 +11,6 @@ import { ThemeToggle } from "@/components/theme-toggle";
  * and the questions people ask first.
  */
 
-const DOCS_URL = "https://github.com/Meetamadhu/mayfly#readme";
-
 const STATES: { tone: string; glyph: string; title: string; text: string }[] = [
   { tone: "building", glyph: "building", title: "Opens", text: "A pull request opens. Mayfly builds it and posts one link on the PR." },
   { tone: "awake", glyph: "awake", title: "Awake", text: "Reviewers click the link and see the change running in seconds." },
@@ -216,13 +214,6 @@ export function Landing() {
             <MayflyMark className="lp-brand-mark" />
             <span>mayfly</span>
           </a>
-          <nav className="lp-links" aria-label="Pages">
-            <a href="#how">Product</a>
-            <a href="/board">Previews</a>
-            <a href="/activity">Activity</a>
-            <a href="/cost">Cost</a>
-            <a href={DOCS_URL}>Docs</a>
-          </nav>
           <div className="lp-nav-actions">
             <ThemeToggle theme={theme} onChange={chooseTheme} />
             {signedIn ? (
@@ -350,8 +341,6 @@ export function Landing() {
 
       <footer className="lp-foot">
         <span>© Mayfly</span>
-        <a href="#faq">Questions</a>
-        <a href={DOCS_URL}>Docs</a>
       </footer>
     </main>
   );
