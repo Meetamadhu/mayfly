@@ -5166,3 +5166,7 @@ button.board-avatar { min-height: 0; padding: 0; border: 0; cursor: pointer; fon
 .board-account-primary { font-weight: 650; color: var(--accent); }
 .board-side-foot:empty { display: none; }
 .pv-title { display: block; width: fit-content; max-width: 100%; }
+/* The logo is square now (window, m and trail). */
+.board-mark { width: 1.9rem; height: 1.9rem; }
+.landing-mark { width: 2rem; height: 2rem; }
+.onb-mark { width: 1.75rem; }

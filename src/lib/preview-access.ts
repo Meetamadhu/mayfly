@@ -163,7 +163,7 @@ export function passwordPage(options: { repository: string; pr: string; next: st
 <body>
 <main>
   <div class="brand">
-    <svg viewBox="26 26 64 58" aria-hidden="true"><path d="M33 76 V52 a10.5 10.5 0 0 1 21 0 V76 M54 52 a10.5 10.5 0 0 1 21 0 V76" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><circle cx="82" cy="36" r="5.6" fill="#3ddbb0"/></svg>
+    <svg viewBox="84 66 362 362" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M304 103 H210 A103 103 0 0 0 107 206 V305 A103 103 0 0 0 210 408 H309 A103 103 0 0 0 412 305 V207" stroke-width="34"/><path d="M178.5 216.5 V295.5 M178.5 256.5 A40 40 0 0 1 258.5 256.5 V295.5 M258.5 256.5 A40 40 0 0 1 338.5 256.5 V295.5" stroke-width="39"/></g><g fill="#3ddbb0"><circle cx="362.5" cy="145.5" r="25"/><circle cx="395.5" cy="113.5" r="11" opacity=".78"/><circle cx="415" cy="95" r="8.5" opacity=".55"/><circle cx="429.5" cy="80.5" r="6" opacity=".38"/></g></svg>
     Mayfly
   </div>
   <h1>This preview is private</h1>
