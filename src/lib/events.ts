@@ -1,3 +1,4 @@
+import { cleanTitle } from "./github";
 import type { PullRequestEvent } from "./types";
 
 const ACTIONS = new Set<PullRequestEvent["action"]>(["opened", "synchronize", "closed", "reopened"]);
@@ -57,6 +58,7 @@ export function parseSimulatorEvent(
       headRepository: typeof body.headRepository === "string" ? body.headRepository.trim().toLowerCase() : undefined,
       author:
         typeof body.author === "string" && /^[A-Za-z0-9-]{1,39}$/.test(body.author.trim()) ? body.author.trim() : undefined,
+      title: cleanTitle(body.title),
     },
   };
 }

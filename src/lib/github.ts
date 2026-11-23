@@ -32,6 +32,14 @@ export function readPayload(raw: string, contentType: string | null): unknown {
   return JSON.parse(payload);
 }
 
+
+/** A pull request title, shown on the board: control characters removed, spaces tidied, at most 200 characters. */
+export function cleanTitle(raw: unknown) {
+  if (typeof raw !== "string") return undefined;
+  const title = raw.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
+  return title ? title.slice(0, 200) : undefined;
+}
+
 export function parseGithubWebhook(
   eventName: string | null,
   payload: unknown,
@@ -49,6 +57,7 @@ export function parseGithubWebhook(
     pull_request?: {
       number?: unknown;
       merged?: unknown;
+      title?: unknown;
       labels?: unknown;
       user?: { login?: unknown } | null;
       head?: { sha?: unknown; ref?: unknown; repo?: { full_name?: unknown } | null };
@@ -87,6 +96,7 @@ export function parseGithubWebhook(
       labels,
       author:
         typeof body.pull_request?.user?.login === "string" ? body.pull_request.user.login.slice(0, 100) : undefined,
+      title: cleanTitle(body.pull_request?.title),
       // GitHub sends no head repo when the fork was deleted. An empty value counts as a fork.
       headRepository:
         typeof body.pull_request?.head?.repo?.full_name === "string" ? body.pull_request.head.repo.full_name : "",

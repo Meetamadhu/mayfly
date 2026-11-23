@@ -72,6 +72,8 @@ export interface Environment {
   labels?: string[];
   /** GitHub login of whoever opened the pull request. Absent for simulator previews. */
   author?: string;
+  /** The pull request's title, as of the last event Mayfly received. Absent for older previews. */
+  title?: string;
   /** Overview-only: the pull request carries the keep label, so this preview does not expire while it is open. */
   keptByLabel?: boolean;
   /** How many times this preview has been extended. */
@@ -107,6 +109,8 @@ export interface PullRequestEvent {
   labels?: string[];
   /** GitHub login of the pull request's author, when the event carried it. */
   author?: string;
+  /** The pull request's title, when the event carried it. */
+  title?: string;
   repository: string;
   prNumber: number;
   sha: string;
