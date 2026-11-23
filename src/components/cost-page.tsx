@@ -1,144 +1,279 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { LifecycleDrawer, cardState, estimatedCost, formatEstMoney, statePillLabel } from "@/components/board-parts";
+import { BarChart, ChartLegend, type ChartSeries } from "@/components/charts";
+import { StateGlyph, repoAvatar } from "@/components/previews-view";
 import {
-  CostUsageChart,
-  LifecycleDrawer,
-  cardState,
-  estimatedCost,
-  formatEstMoney,
-  formatSaved,
-  statePillLabel,
-} from "@/components/board-parts";
-import {
-  FLEET_WINDOW_DAYS,
-  REMOVAL_LABELS,
-  REMOVAL_ORDER,
-  fleetStats,
-  formatLifespan,
-} from "@/lib/fleet";
+  COST_PERIODS,
+  estimateMonthly,
+  formatHours,
+  formatMoneyShort,
+  periodSeconds,
+  periodStart,
+  previewsInPeriod,
+  removalsInPeriod,
+  spendBars,
+  type CostPeriod,
+} from "@/lib/cost-view";
+import { FLEET_WINDOW_DAYS, REMOVAL_LABELS, REMOVAL_ORDER, fleetStats, formatLifespan } from "@/lib/fleet";
 import type { Environment } from "@/lib/types";
 import { useOverview } from "@/lib/use-overview";
 
-/** "< 1 min", "24 min", "3.4 h", "2.1 d". */
-function formatSpan(seconds: number) {
-  if (!Number.isFinite(seconds) || seconds <= 0) return "0 min";
-  if (seconds < 60) return "< 1 min";
-  if (seconds < 3600) return `${Math.round(seconds / 60)} min`;
-  if (seconds < 48 * 3600) return `${(seconds / 3600).toFixed(1)} h`;
-  return `${(seconds / 86_400).toFixed(1)} d`;
-}
+const PERIOD_KEY = "mayfly-cost-period";
+const TOP_SAVINGS = 5;
+
+const SPEND_SERIES: ChartSeries[] = [
+  { key: "always", label: "Always on", tone: "always" },
+  { key: "mayfly", label: "With Mayfly", tone: "mayfly" },
+];
 
 function matchesSearch(env: Environment, query: string) {
-  const q = query.trim().toLowerCase().replace(/^#/, "");
+  const q = query.trim().toLowerCase().replace(/^[#@]/, "");
   if (!q) return true;
-  return env.repository.toLowerCase().includes(q) || env.branch.toLowerCase().includes(q) || String(env.prNumber) === q;
+  return (
+    env.repository.toLowerCase().includes(q) ||
+    env.branch.toLowerCase().includes(q) ||
+    String(env.prNumber) === q ||
+    (env.title ?? "").toLowerCase().includes(q) ||
+    (env.author ?? "").toLowerCase().includes(q)
+  );
 }
 
 export function CostPage() {
-  const { overview, loadError } = useOverview();
+  const { overview, loadError, now } = useOverview();
   const [query, setQuery] = useState("");
+  const [period, setPeriod] = useState<CostPeriod>("month");
+  const [showAll, setShowAll] = useState(false);
   const [lifecycleId, setLifecycleId] = useState<string | null>(null);
+  const [perWeek, setPerWeek] = useState(12);
+  const [hoursAwake, setHoursAwake] = useState(3);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(PERIOD_KEY);
+      if (saved === "week" || saved === "month") setPeriod(saved);
+    } catch {
+      // Storage can be blocked; the month is shown.
+    }
+  }, []);
+
+  function choosePeriod(next: CostPeriod) {
+    setPeriod(next);
+    try {
+      localStorage.setItem(PERIOD_KEY, next);
+    } catch {
+      // Not remembered, still applied.
+    }
+  }
 
   const config = overview?.config;
   const currency = overview?.currency ?? config?.currency ?? "$";
   const costPerHour = overview?.costPerHour ?? 0.05;
   const demoKey = config?.demo ?? null;
   const isDemo = (env: Environment) => `${env.repository}#${env.prNumber}` === demoKey;
-  const awake = overview?.usage?.awakeSeconds ?? 0;
-  const asleep = overview?.usage?.asleepSeconds ?? 0;
-  const total = awake + asleep;
-  const alwaysAwake = estimatedCost(total, costPerHour);
-  const withMayfly = estimatedCost(awake, costPerHour);
-  const asleepShare = total > 0 ? Math.round((asleep / total) * 1000) / 10 : 0;
-  const monthLabel = overview?.usage?.month
-    ? new Date(`${overview.usage.month}-01T00:00:00Z`).toLocaleDateString(undefined, {
-        month: "long",
-        year: "numeric",
-        timeZone: "UTC",
-      })
-    : "this month";
+  const envs = (overview?.environments ?? []).filter((env) => !isDemo(env));
 
-  const rows = (overview?.environments ?? [])
-    .filter((env) => !isDemo(env) && matchesSearch(env, query))
-    .map((env) => {
-      const usage = env.usage;
-      return {
-        env,
-        usage,
-        saved: usage ? estimatedCost(usage.asleepSeconds, costPerHour) : -1,
-      };
-    })
-    .sort((a, b) => b.saved - a.saved);
-  const fleet = overview
-    ? fleetStats(overview.environments, { now: Date.now(), costPerHour, isDemo })
-    : null;
+  const start = periodStart(period, now);
+  const seconds = periodSeconds(overview?.usage, period, now);
+  const saved = estimatedCost(seconds.asleep, costPerHour);
+  const total = seconds.awake + seconds.asleep;
+  const savedShare = total > 0 ? Math.round((seconds.asleep / total) * 100) : 0;
+  const previews = previewsInPeriod(envs, start, now);
+  const removals = removalsInPeriod(envs, start);
+  const periodWords = period === "week" ? "last 7 days" : "this month";
+  const bars = spendBars(overview?.usage, period, costPerHour, now);
+
+  const fleet = overview ? fleetStats(overview.environments, { now, costPerHour, isDemo }) : null;
+  const lifespanDays = fleet?.averageLifespanMs ? Math.max(0.25, fleet.averageLifespanMs / 86_400_000) : 2;
+  const estimate = estimateMonthly({ perWeek, hoursAwake, lifespanDays, costPerHour });
   const removalRows = fleet
-    ? REMOVAL_ORDER.filter((reason) => (fleet.reasons[reason] ?? 0) > 0).map((reason) => ({
-        reason,
-        count: fleet.reasons[reason] ?? 0,
-      }))
+    ? REMOVAL_ORDER.filter((reason) => (fleet.reasons[reason] ?? 0) > 0).map((reason) => ({ reason, count: fleet.reasons[reason] ?? 0 }))
     : [];
+
+  const savings = envs
+    .filter((env) => matchesSearch(env, query))
+    .map((env) => ({ env, saved: env.usage ? estimatedCost(env.usage.asleepSeconds, costPerHour) : -1 }))
+    .sort((a, b) => b.saved - a.saved);
+  const visible = showAll ? savings : savings.slice(0, TOP_SAVINGS);
+  const biggest = Math.max(0.0001, ...savings.map((row) => row.saved));
+  const owners = [...new Set(envs.map((env) => env.repository.split("/")[0]))];
   const lifecycleEnv = lifecycleId ? (overview?.environments.find((env) => env.id === lifecycleId) ?? null) : null;
 
   return (
     <AppShell
       active="cost"
       githubConnected={Boolean(config?.githubConnected)}
-      search={{ value: query, onChange: setQuery, placeholder: "Search PR, repo or branch" }}
+      crumb={owners.length === 1 ? owners[0] : undefined}
+      previewCount={overview ? (overview.environments.filter((env) => env.status !== "destroyed").length) : undefined}
+      search={{ value: query, onChange: setQuery, placeholder: "Search repo, branch or person" }}
     >
-      <section className="board-welcome">
-        <div>
-          <h1>Cost &amp; savings</h1>
-          <p className="lede">
-            A preview that&apos;s awake is counted at {formatEstMoney(costPerHour, currency)} an hour; a sleeping one costs
-            nothing. These are estimates to compare with, not a bill.
+      <header className="pv-head">
+        <div className="pv-head-text">
+          <h1>Cost</h1>
+          <p className="pv-lede">
+            Estimated from the hours each preview spent asleep. An awake preview counts as{" "}
+            {formatEstMoney(costPerHour, currency)} an hour; a sleeping one costs nothing.
           </p>
         </div>
-      </section>
-
-      <dl className="stats board-stats page-stats">
-        <div data-stat="savings">
-          <dt>Estimated saved</dt>
-          <dd>{overview ? formatSaved(overview.savedEstimate, currency) : "–"}</dd>
+        <div className="pv-seg cost-period" role="group" aria-label="Period">
+          {COST_PERIODS.map((item) => (
+            <button key={item.id} type="button" aria-pressed={period === item.id} onClick={() => choosePeriod(item.id)}>
+              {item.label}
+            </button>
+          ))}
         </div>
-        <div data-stat="live">
-          <dt>If always awake</dt>
-          <dd>{overview ? formatEstMoney(alwaysAwake, currency) : "–"}</dd>
-        </div>
-        <div data-stat="awake">
-          <dt>With Mayfly</dt>
-          <dd>{overview ? formatEstMoney(withMayfly, currency) : "–"}</dd>
-        </div>
-        <div data-stat="asleep">
-          <dt>Time asleep</dt>
-          <dd>{overview ? `${asleepShare}%` : "–"}</dd>
-        </div>
-      </dl>
-
-      <p className="board-settings">
-        {overview
-          ? `In ${monthLabel}, previews were awake for ${formatSpan(awake)} and asleep for ${formatSpan(asleep)} in total (the demo isn’t counted).`
-          : "Loading usage…"}
-      </p>
+      </header>
 
       {loadError ? <p className="error" role="alert">{loadError}</p> : null}
 
-      <section className="board-rail-card page-panel cost-chart-panel" aria-label="Estimated spend this month">
-        <div className="board-rail-head">
-          <h2 className="board-rail-title">Spend this month</h2>
-          <span className="board-rail-note">Estimated · always awake vs with Mayfly</span>
+      <section className="cost-cards" aria-label="Totals">
+        <div className="cost-hero">
+          <p className="cost-hero-label">Saved {periodWords}</p>
+          <strong className="cost-hero-value">{overview ? formatMoneyShort(saved, currency) : "…"}</strong>
+          {savedShare > 0 ? <span className="cost-hero-pill">↓ {savedShare}% vs always on</span> : null}
         </div>
-        {overview ? <CostUsageChart usage={overview.usage} costPerHour={costPerHour} currency={currency} /> : null}
+        <div className="cost-card" data-tone="awake">
+          <span className="act-icon" data-tone="awake" aria-hidden="true">
+            <StateGlyph tone="awake" />
+          </span>
+          <strong>{overview ? formatHours(seconds.awake) : "…"}</strong>
+          <span className="cost-card-label">Awake hours</span>
+          <span className="cost-card-sub">
+            across {previews} preview{previews === 1 ? "" : "s"}
+          </span>
+        </div>
+        <div className="cost-card" data-tone="asleep">
+          <span className="act-icon" data-tone="asleep" aria-hidden="true">
+            <StateGlyph tone="asleep" />
+          </span>
+          <strong>{overview ? formatHours(seconds.asleep) : "…"}</strong>
+          <span className="cost-card-label">Asleep hours</span>
+          <span className="cost-card-sub">no cost while asleep</span>
+        </div>
+        <div className="cost-card" data-tone="removed">
+          <span className="act-icon" data-tone="failed" aria-hidden="true">
+            <StateGlyph tone="failed" />
+          </span>
+          <strong>{overview ? removals.merged : "…"}</strong>
+          <span className="cost-card-label">Removed after merge</span>
+          <span className="cost-card-sub">
+            {periodWords}
+            {removals.total > removals.merged ? ` · ${removals.total} removed in all` : ""}
+          </span>
+        </div>
       </section>
 
-      <section className="board-rail-card page-panel fleet-panel" aria-labelledby="fleet-title">
-        <div className="board-rail-head">
-          <h2 className="board-rail-title" id="fleet-title">
+      <div className="cost-middle">
+        <section className="act-card" aria-labelledby="cost-spend-title">
+          <div className="act-card-head">
+            <div>
+              <h2 id="cost-spend-title">{period === "week" ? "Spend by day" : "Spend by week"}</h2>
+              <p>Always on vs with Mayfly</p>
+            </div>
+            <ChartLegend series={SPEND_SERIES} />
+          </div>
+          <BarChart
+            caption={`Estimated spend ${periodWords}: always on vs with Mayfly`}
+            series={SPEND_SERIES}
+            columns={bars.map((bar) => ({ label: bar.label, title: bar.title, values: { always: bar.always, mayfly: bar.mayfly } }))}
+            format={(value) => formatEstMoney(value, currency)}
+            minTop={1}
+            axisFormat={(value) => `${currency}${value > 0 && value < 10 && !Number.isInteger(value) ? value.toFixed(2) : Math.round(value)}`}
+          />
+        </section>
+
+        <section className="act-card cost-estimate" aria-labelledby="cost-estimate-title">
+          <div>
+            <h2 id="cost-estimate-title">Estimate your own</h2>
+            <p className="cost-muted">Move the sliders to match your team.</p>
+          </div>
+          <label className="cost-slider">
+            <span>
+              Previews opened per week <strong>{perWeek}</strong>
+            </span>
+            <input type="range" min={1} max={60} value={perWeek} onChange={(event) => setPerWeek(Number(event.target.value))} />
+          </label>
+          <label className="cost-slider">
+            <span>
+              Hours awake per day <strong>{hoursAwake}</strong>
+            </span>
+            <input type="range" min={1} max={24} value={hoursAwake} onChange={(event) => setHoursAwake(Number(event.target.value))} />
+          </label>
+          <div className="cost-compare" aria-live="polite">
+            <div>
+              <span>Always on</span>
+              <strong>{formatMoneyShort(estimate.always, currency)}</strong>
+            </div>
+            <div data-tone="mayfly">
+              <span>With Mayfly</span>
+              <strong>{formatMoneyShort(estimate.mayfly, currency)}</strong>
+            </div>
+          </div>
+          <p className="cost-muted cost-small">
+            A month, with each preview open about {formatLifespan(lifespanDays * 86_400_000)}
+            {fleet?.averageLifespanMs ? " (your average)" : ""}.
+          </p>
+        </section>
+      </div>
+
+      <section className="act-card cost-savings" aria-labelledby="cost-savings-title">
+        <div className="act-card-head">
+          <h2 id="cost-savings-title" className="act-card-title">
+            Biggest savings
+          </h2>
+          <span className="cost-muted cost-small">Since each preview opened</span>
+        </div>
+        {overview && savings.length === 0 ? (
+          <p className="act-empty">{query ? "No previews match the search." : "No previews yet."}</p>
+        ) : null}
+        <ol className="cost-list">
+          {visible.map(({ env, saved: amount }) => {
+            const avatar = repoAvatar(env.repository);
+            const state = env.status === "destroyed" ? null : cardState(env);
+            return (
+              <li key={env.id}>
+                <span className="pv-avatar" data-tone={avatar.tone} aria-hidden="true">
+                  {avatar.letter}
+                </span>
+                <button type="button" className="cost-list-name" onClick={() => setLifecycleId(env.id)}>
+                  {env.title ?? env.branch}
+                </button>
+                <span className="cost-list-num">#{env.prNumber}</span>
+                <span className="cost-list-state">
+                  {state ? (
+                    <span className="state-pill" data-state={state}>
+                      {statePillLabel(state)}
+                    </span>
+                  ) : (
+                    <span className="cost-muted">Removed</span>
+                  )}
+                </span>
+                <span className="cost-list-hours">
+                  {env.usage ? `${formatHours(env.usage.awakeSeconds)} awake · ${formatHours(env.usage.asleepSeconds)} asleep` : "Not tracked"}
+                </span>
+                <span className="cost-list-bar" aria-hidden="true">
+                  <span style={{ width: `${amount > 0 ? Math.max(2, (amount / biggest) * 100) : 0}%` }} />
+                </span>
+                <strong className="cost-list-amount">{env.usage ? formatEstMoney(amount, currency) : "—"}</strong>
+              </li>
+            );
+          })}
+        </ol>
+        {savings.length > TOP_SAVINGS ? (
+          <button type="button" className="pv-link cost-more" onClick={() => setShowAll((value) => !value)}>
+            {showAll ? "Show the top 5" : `Show all ${savings.length}`}
+          </button>
+        ) : null}
+      </section>
+
+      <section className="act-card fleet-card fleet-panel" aria-labelledby="fleet-title">
+        <div className="act-card-head">
+          <h2 className="act-card-title" id="fleet-title">
             All previews
           </h2>
-          <span className="board-rail-note">Last {FLEET_WINDOW_DAYS} days · the demo isn&apos;t counted</span>
+          <span className="cost-muted cost-small">Last {FLEET_WINDOW_DAYS} days · the demo isn&apos;t counted</span>
         </div>
         {fleet ? (
           <>
@@ -159,7 +294,7 @@ export function CostPage() {
                 <p className="fleet-sub">
                   {fleet.lifespanCount === 0
                     ? "No preview has been removed yet."
-                    : `On average. Half last under ${formatLifespan(fleet.medianLifespanMs ?? 0)}. Based on ${fleet.lifespanCount} removed preview${fleet.lifespanCount === 1 ? "" : "s"}.`}
+                    : `On average. Half last under ${formatLifespan(fleet.medianLifespanMs ?? 0)}.`}
                 </p>
               </div>
               <div>
@@ -186,12 +321,7 @@ export function CostPage() {
                 <p className="fleet-reasons-title">Why previews were removed</p>
                 <div className="fleet-bar" aria-hidden="true">
                   {removalRows.map((row) => (
-                    <span
-                      key={row.reason}
-                      data-reason={row.reason}
-                      style={{ flexGrow: row.count }}
-                      title={`${REMOVAL_LABELS[row.reason]}: ${row.count}`}
-                    />
+                    <span key={row.reason} data-reason={row.reason} style={{ flexGrow: row.count }} title={`${REMOVAL_LABELS[row.reason]}: ${row.count}`} />
                   ))}
                 </div>
                 <ul className="fleet-legend">
@@ -206,78 +336,16 @@ export function CostPage() {
             ) : null}
           </>
         ) : (
-          <p className="help">Loading…</p>
+          <p className="act-empty">Loading…</p>
         )}
       </section>
 
-      <section className="live-column page-panel" aria-label="Savings per preview">
-        <div className="ledger-head">
-          <div>
-            <h2>Per preview</h2>
-            <p className="help">How long each preview was awake and asleep, and how much sleeping saved. Biggest savings first.</p>
-          </div>
-        </div>
-        {overview && rows.length === 0 ? (
-          <p className="empty">{query ? "No previews match this filter." : "No previews yet."}</p>
-        ) : null}
-        {rows.length > 0 ? (
-          <div className="cost-table-wrap">
-            <table className="cost-table stack-on-phone">
-              <thead>
-                <tr>
-                  <th scope="col">Preview</th>
-                  <th scope="col">Now</th>
-                  <th scope="col" className="num">
-                    Awake
-                  </th>
-                  <th scope="col" className="num">
-                    Asleep
-                  </th>
-                  <th scope="col" className="num">
-                    Saved (est.)
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(({ env, usage, saved }) => {
-                  const state = env.status === "destroyed" ? null : cardState(env);
-                  return (
-                    <tr key={env.id}>
-                      <th scope="row">
-                        <button type="button" className="activity-subject" onClick={() => setLifecycleId(env.id)}>
-                          PR #{env.prNumber}
-                        </button>
-                        <span className="cost-table-sub mono">{env.branch}</span>
-                      </th>
-                      <td data-label="Now">
-                        {state ? (
-                          <span className="state-pill" data-state={state}>
-                            {statePillLabel(state)}
-                          </span>
-                        ) : (
-                          <span className="cost-table-removed">Removed</span>
-                        )}
-                      </td>
-                      <td className="num" data-label="Awake">{usage ? formatSpan(usage.awakeSeconds) : "—"}</td>
-                      <td className="num" data-label="Asleep">{usage ? formatSpan(usage.asleepSeconds) : "—"}</td>
-                      <td className="num" data-label="Saved (est.)">{usage ? formatEstMoney(saved, currency) : "—"}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : null}
-        <p className="help activity-note">
-          “—” means the preview was removed before Mayfly started keeping track of time.
-        </p>
-      </section>
+      <p className="cost-foot">
+        Assumes {formatEstMoney(costPerHour, currency)} an hour per running preview. These are estimates to compare
+        with, not a bill.
+      </p>
 
-      <LifecycleDrawer
-        env={lifecycleEnv}
-        demo={lifecycleEnv ? isDemo(lifecycleEnv) : false}
-        onClose={() => setLifecycleId(null)}
-      />
+      <LifecycleDrawer env={lifecycleEnv} demo={lifecycleEnv ? isDemo(lifecycleEnv) : false} onClose={() => setLifecycleId(null)} />
     </AppShell>
   );
 }
