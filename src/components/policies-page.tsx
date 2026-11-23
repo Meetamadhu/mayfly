@@ -276,11 +276,11 @@ export function PoliciesPage() {
   const envRules = defaults ? Object.entries(defaults.sleepRules) : [];
 
   return (
-    <AppShell active="policies" githubConnected={Boolean(view?.githubConnected)} onSignOut={signOut}>
+    <AppShell active="policies" githubConnected={Boolean(view?.githubConnected)} onSignOut={signOut} titleInHeader>
       <form className="policies" onSubmit={(event) => void save(event)} noValidate>
         <section className="board-welcome policies-head">
           <div>
-            <h1>Lifetime rules</h1>
+            <h1 className="title-in-header">Lifetime rules</h1>
             <p className="lede">
               How long previews stay up, when they fall asleep, and how someone can keep one around for longer. Leave a box empty to keep the
               server&apos;s default.
