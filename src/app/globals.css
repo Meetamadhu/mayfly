@@ -5568,3 +5568,22 @@ html[data-theme="dark"] .act-icon[data-tone="failed"] { background: #3b1518; col
   .board-sidebar-brand { margin-bottom: 0; }
   .board-app[data-nav="open"] .board-side-nav { margin-top: 0.75rem; }
 }
+
+/* Pages whose name lives in the top bar only: a larger title there, and the page's own h1 kept for screen
+   readers but not shown. Phones hide the top-bar title, so they still show the h1. */
+.board-crumb[data-large="1"] .board-crumb-page { font-size: 1.45rem; font-weight: 700; letter-spacing: -0.02em; }
+@media (min-width: 901px) {
+  html:not([data-app="1"]) h1.title-in-header {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+}
+@media (min-width: 901px) {
+  html:not([data-app="1"]) .policies-head:has(.title-in-header) { align-items: center; margin-top: 0.25rem; }
+  html:not([data-app="1"]) .policies-head:has(.title-in-header) .lede { margin-top: 0; }
+}
