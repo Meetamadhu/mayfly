@@ -5594,3 +5594,4 @@ html[data-theme="dark"] .act-icon[data-tone="failed"] { background: #3b1518; col
   html:not([data-app="1"]) .pv-head:has(.title-in-header) .pv-lede { margin-top: 0; }
   html:not([data-app="1"]) .board-welcome:has(.title-in-header) .lede { margin-top: 0; }
 }
+.lp-nav-actions { margin-left: auto; }
