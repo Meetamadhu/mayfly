@@ -93,6 +93,105 @@ function NavIcon({ page }: { page: AppPage }) {
   }
 }
 
+function PersonIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
+      <circle cx="12" cy="8.5" r="4" />
+      <path d="M4.5 20a7.5 7.5 0 0 1 15 0z" />
+    </svg>
+  );
+}
+
+/** Top bar, right: who you are, light/dark, the intro, and signing in or out, behind the avatar. */
+function AccountMenu({
+  signedIn,
+  theme,
+  onTheme,
+  onSignOut,
+}: {
+  signedIn: boolean;
+  theme: "light" | "dark";
+  onTheme: (next: "light" | "dark") => void;
+  onSignOut: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    function onDown(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="board-account" ref={ref}>
+      <button
+        type="button"
+        className="board-avatar"
+        data-signed-in={signedIn ? "true" : "false"}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-label={signedIn ? "Account: Admin, signed in" : "Account: visitor"}
+        onClick={() => setOpen((value) => !value)}
+      >
+        {signedIn ? "A" : <PersonIcon />}
+      </button>
+      {open ? (
+        <div className="board-account-panel" role="dialog" aria-label="Account">
+          <div className="board-account-who">
+            <span className="board-avatar" data-signed-in={signedIn ? "true" : "false"} aria-hidden="true">
+              {signedIn ? "A" : <PersonIcon />}
+            </span>
+            <span>
+              <strong>{signedIn ? "Admin" : "Visitor"}</strong>
+              <span>{signedIn ? "Signed in" : "Viewing only"}</span>
+            </span>
+          </div>
+          <div className="board-account-row">
+            <span>Appearance</span>
+            <ThemeToggle theme={theme} onChange={onTheme} />
+          </div>
+          <button
+            type="button"
+            className="board-account-item"
+            onClick={() => {
+              setOpen(false);
+              window.dispatchEvent(new Event(SHOW_INTRO_EVENT));
+            }}
+          >
+            Show the intro
+          </button>
+          {signedIn ? (
+            <button
+              type="button"
+              className="board-account-item"
+              onClick={() => {
+                setOpen(false);
+                onSignOut();
+              }}
+            >
+              Sign out
+            </button>
+          ) : (
+            <a className="board-account-item board-account-primary" href="/admin/login">
+              Admin sign-in
+            </a>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /**
  * The one sidebar + top bar every Mayfly screen shares (Dashboard, Activity, Cost & savings, Lifetime rules, PR comments, Admin).
  *
@@ -219,44 +318,6 @@ export function AppShell({
           ))}
 
           <div className="board-side-foot">
-            <div className="board-user">
-              <span className="board-user-avatar" data-signed-in={signedIn ? "true" : "false"} aria-hidden="true">
-                {signedIn ? (
-                  "A"
-                ) : (
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                    <circle cx="12" cy="8.5" r="4" />
-                    <path d="M4.5 20a7.5 7.5 0 0 1 15 0z" />
-                  </svg>
-                )}
-              </span>
-              <span className="board-user-text">
-                <strong>{signedIn ? "Admin" : "Visitor"}</strong>
-                <span>{signedIn ? "Signed in" : "Viewing only"}</span>
-              </span>
-              {signedIn ? (
-                <button type="button" className="board-user-action" onClick={() => void signOut()}>
-                  Sign out
-                </button>
-              ) : (
-                <a className="board-user-action" href="/admin/login">
-                  Sign in
-                </a>
-              )}
-            </div>
-            <div className="board-side-tools">
-              <ThemeToggle theme={theme} onChange={chooseTheme} />
-              <button
-                type="button"
-                className="board-side-intro"
-                onClick={() => {
-                  setNavOpen(false);
-                  window.dispatchEvent(new Event(SHOW_INTRO_EVENT));
-                }}
-              >
-                Intro
-              </button>
-            </div>
             {githubConnected ? (
               <p className="board-github-note" title="GitHub token is configured">
                 <span aria-hidden="true" /> GitHub connected
@@ -313,15 +374,12 @@ export function AppShell({
             >
               ?
             </button>
-            {signedIn ? (
-              <a className="board-avatar" href="/admin" title="Admin">
-                A
-              </a>
-            ) : (
-              <a className="board-avatar-signin" href="/admin/login">
-                Sign in
-              </a>
-            )}
+            <AccountMenu
+              signedIn={signedIn}
+              theme={theme}
+              onTheme={chooseTheme}
+              onSignOut={() => void signOut()}
+            />
           </div>
         </header>
 
