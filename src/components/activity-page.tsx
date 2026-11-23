@@ -2,102 +2,69 @@
 
 import { useState } from "react";
 import { AppShell } from "@/components/app-shell";
-import { LifecycleDrawer, StateIcon, activityIcon, formatAgo } from "@/components/board-parts";
+import { LifecycleDrawer } from "@/components/board-parts";
+import { BarChart, ChartLegend, type ChartSeries } from "@/components/charts";
+import { StateGlyph } from "@/components/previews-view";
+import {
+  ACTIVITY_TABS,
+  activityEvents,
+  activityKind,
+  activityTone,
+  dayHeading,
+  describeRow,
+  groupBursts,
+  hoursPerDay,
+  rowTime,
+  todayCounts,
+  type ActivityRow,
+  type ActivityTab,
+} from "@/lib/activity";
 import type { Environment } from "@/lib/types";
-import { timelineLabel, timelineNewestFirst } from "@/lib/timeline";
 import { useOverview } from "@/lib/use-overview";
 
-type ActivityFilter = "all" | "builds" | "sleep" | "lifetime" | "removed";
-
-const FILTERS: { id: ActivityFilter; label: string; types: Set<string> | null }[] = [
-  { id: "all", label: "All", types: null },
-  { id: "builds", label: "Builds & new commits", types: new Set(["opened", "build_started", "built", "ready", "updated", "failed"]) },
-  { id: "sleep", label: "Sleep & wake", types: new Set(["slept", "woke"]) },
-  { id: "lifetime", label: "Time extended", types: new Set(["extended", "keep_awake", "keep_awake_off"]) },
-  { id: "removed", label: "Removed", types: new Set(["destroyed"]) },
-];
-
-const BURST_MS = 2 * 60 * 1000;
-
-type Row = {
-  at: string;
-  type: string;
-  label: string;
-  envs: Environment[];
-};
-
-function dayHeading(iso: string, now: number) {
-  const day = new Date(iso);
-  const today = new Date(now);
-  const yesterday = new Date(now - 86_400_000);
-  const same = (a: Date, b: Date) => a.toDateString() === b.toDateString();
-  if (same(day, today)) return "Today";
-  if (same(day, yesterday)) return "Yesterday";
-  return day.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
-}
-
-function clock(iso: string) {
-  return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-}
-
 function matchesSearch(env: Environment, query: string) {
-  const q = query.trim().toLowerCase().replace(/^#/, "");
+  const q = query.trim().toLowerCase().replace(/^[#@]/, "");
   if (!q) return true;
   return (
     env.repository.toLowerCase().includes(q) ||
     env.branch.toLowerCase().includes(q) ||
     String(env.prNumber) === q ||
-    env.sha.toLowerCase().startsWith(q)
+    env.sha.toLowerCase().startsWith(q) ||
+    (env.title ?? "").toLowerCase().includes(q) ||
+    (env.author ?? "").toLowerCase().includes(q)
   );
 }
 
-/** "PR #4 built in 6 s", "PR #1 woken by a visit (1 s)", "PR #9 removed (PR closed)". */
-function verb(row: Row) {
-  if (row.type === "opened") return "opened";
-  if (row.type === "ready") return "ready";
-  if (row.type === "slept") return "slept";
-  return row.label.charAt(0).toLowerCase() + row.label.slice(1);
+/** Rows shown at first; "Show older" adds this many more. */
+const PAGE_ROWS = 25;
+
+const HOURS_SERIES: ChartSeries[] = [
+  { key: "awake", label: "Awake", tone: "awake" },
+  { key: "asleep", label: "Asleep", tone: "asleep" },
+];
+
+function formatHoursValue(value: number) {
+  if (value <= 0) return "0 h";
+  if (value < 1) return `${Math.max(1, Math.round(value * 60))} min`;
+  return `${value < 10 ? value.toFixed(1) : Math.round(value)} h`;
 }
 
 export function ActivityPage() {
   const { overview, loadError, now } = useOverview();
-  const [filter, setFilter] = useState<ActivityFilter>("all");
+  const [tab, setTab] = useState<ActivityTab>("all");
   const [query, setQuery] = useState("");
   const [lifecycleId, setLifecycleId] = useState<string | null>(null);
+  const [limit, setLimit] = useState(PAGE_ROWS);
 
   const config = overview?.config;
   const demoKey = config?.demo ?? null;
   const isDemo = (env: Environment) => `${env.repository}#${env.prNumber}` === demoKey;
-  const repos = new Set((overview?.environments ?? []).filter((env) => !isDemo(env)).map((env) => env.repository));
-  const showRepo = repos.size > 1;
-  const types = FILTERS.find((item) => item.id === filter)?.types ?? null;
+  const all = overview ? activityEvents(overview.environments) : [];
+  const shown = all.filter((event) => matchesSearch(event.env, query) && (tab === "all" || activityKind(event.type) === tab));
+  const allRows = groupBursts(shown);
+  const rows = allRows.slice(0, limit);
 
-  const raw: { at: string; type: string; label: string; env: Environment }[] = [];
-  for (const env of overview?.environments ?? []) {
-    if (!matchesSearch(env, query)) continue;
-    // Newest first per preview, so events recorded at the same moment (built, then ready) keep their order.
-    for (const event of timelineNewestFirst(env.events)) {
-      if (types && !types.has(event.type)) continue;
-      raw.push({ at: event.at, type: event.type, label: timelineLabel(event), env });
-    }
-  }
-  raw.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
-
-  // Several previews sleeping or waking together (e.g. after a restart) read as one line.
-  const rows: Row[] = [];
-  for (let i = 0; i < raw.length; ) {
-    const first = raw[i];
-    let j = i + 1;
-    if (first.type === "slept" || first.type === "woke") {
-      while (j < raw.length && raw[j].type === first.type && Date.parse(first.at) - Date.parse(raw[j].at) <= BURST_MS) {
-        j += 1;
-      }
-    }
-    rows.push({ at: first.at, type: first.type, label: first.label, envs: raw.slice(i, j).map((item) => item.env) });
-    i = j;
-  }
-
-  const groups: { heading: string; rows: Row[] }[] = [];
+  const groups: { heading: string; rows: ActivityRow[] }[] = [];
   for (const row of rows) {
     const heading = dayHeading(row.at, now);
     const last = groups[groups.length - 1];
@@ -105,107 +72,172 @@ export function ActivityPage() {
     else groups.push({ heading, rows: [row] });
   }
 
-  const todayCount = rows.filter((row) => dayHeading(row.at, now) === "Today").length;
-  const builds = raw.filter((item) => item.type === "built").length;
-  const wakes = raw.filter((item) => item.type === "woke").length;
-  const lifecycleEnv = lifecycleId ? (overview?.environments.find((env) => env.id === lifecycleId) ?? null) : null;
-
-  function subject(env: Environment) {
-    return isDemo(env) ? "Demo" : `PR #${env.prNumber}`;
+  const counts = todayCounts(all, now);
+  const tabCounts: Partial<Record<ActivityTab, number>> = {};
+  for (const event of all) {
+    if (!matchesSearch(event.env, query)) continue;
+    const kind = activityKind(event.type);
+    tabCounts[kind] = (tabCounts[kind] ?? 0) + 1;
   }
+  const days = hoursPerDay(overview?.usage?.days, now, 7);
+  const owners = [...new Set((overview?.environments ?? []).filter((env) => !isDemo(env)).map((env) => env.repository.split("/")[0]))];
+  const livePreviews = (overview?.environments ?? []).filter((env) => env.status !== "destroyed").length;
+  const lifecycleEnv = lifecycleId ? (overview?.environments.find((env) => env.id === lifecycleId) ?? null) : null;
+  const describeOptions = { demoKey, fallbackSleepSeconds: config?.sleepSeconds ?? 1800 };
+
+  const today: { id: string; tone: string; label: string; value: number }[] = [
+    { id: "build", tone: "building", label: "Builds", value: counts.build },
+    { id: "wake", tone: "awake", label: "Wakes", value: counts.wake },
+    { id: "nap", tone: "asleep", label: "Naps", value: counts.nap },
+    { id: "removed", tone: "failed", label: "Removed", value: counts.removed },
+  ];
 
   return (
     <AppShell
       active="activity"
       githubConnected={Boolean(config?.githubConnected)}
-      search={{ value: query, onChange: setQuery, placeholder: "Search PR, repo, branch or commit" }}
+      crumb={owners.length === 1 ? owners[0] : undefined}
+      previewCount={overview ? livePreviews : undefined}
+      search={{ value: query, onChange: setQuery, placeholder: "Search repo, branch or person" }}
     >
-      <section className="board-welcome">
-        <div>
+      <header className="pv-head">
+        <div className="pv-head-text">
           <h1>Activity</h1>
-          <p className="lede">Everything that happened to your previews: builds, naps, wake-ups and clean-ups.</p>
+          <p className="pv-lede">Builds, wake-ups, naps and clean-ups across your repos.</p>
         </div>
-      </section>
+      </header>
 
-      <dl className="stats board-stats page-stats">
-        <div data-stat="live">
-          <dt>Things that happened today</dt>
-          <dd>{overview ? todayCount : "–"}</dd>
-        </div>
-        <div data-stat="building">
-          <dt>Builds today</dt>
-          <dd>{overview ? builds : "–"}</dd>
-        </div>
-        <div data-stat="awake">
-          <dt>Wake-ups today</dt>
-          <dd>{overview ? wakes : "–"}</dd>
-        </div>
-      </dl>
-
-      <section className="live-column page-panel" aria-label="Activity log">
-        <div className="board-filters">
-          <div className="board-filter-pills" role="group" aria-label="Filter activity">
-            {FILTERS.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className="board-filter-pill"
-                aria-pressed={filter === item.id}
-                onClick={() => setFilter(item.id)}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {loadError ? <p className="error" role="alert">{loadError}</p> : null}
-        {!overview && !loadError ? <p className="empty">Loading activity…</p> : null}
-        {overview && rows.length === 0 ? (
-          <p className="empty">{query || filter !== "all" ? "No activity matches this filter." : "No activity yet."}</p>
-        ) : null}
-
-        {groups.map((group) => (
-          <section key={group.heading} className="activity-day" aria-label={group.heading}>
-            <h2 className="activity-day-title">{group.heading}</h2>
-            <ol className="board-activity-list activity-log">
-              {group.rows.map((row, index) => {
-                const single = row.envs.length === 1 ? row.envs[0] : null;
-                return (
-                  <li key={`${row.at}-${row.type}-${index}`} data-tone={activityIcon(row.type)}>
-                    <span className="board-activity-icon" aria-hidden="true">
-                      <StateIcon name={activityIcon(row.type)} />
-                    </span>
-                    <span className="board-activity-text">
-                      {single ? (
-                        <button type="button" className="activity-subject" onClick={() => setLifecycleId(single.id)}>
-                          {subject(single)}
-                        </button>
-                      ) : (
-                        <strong>{row.envs.length} previews</strong>
-                      )}{" "}
-                      {single ? verb(row) : row.type === "slept" ? "slept" : "woke"}
-                      <span className="board-activity-repo">
-                        {single
-                          ? ` · ${showRepo && !isDemo(single) ? `${single.repository} · ` : ""}${isDemo(single) ? "demo" : single.branch}`
-                          : ` · ${row.envs.map(subject).join(", ")}`}
-                      </span>
-                    </span>
-                    <time dateTime={row.at} title={new Date(row.at).toLocaleString()}>
-                      {clock(row.at)} · {formatAgo(row.at, now)}
-                    </time>
-                  </li>
-                );
-              })}
-            </ol>
-          </section>
+      <div className="pv-tabs" role="tablist" aria-label="Show activity">
+        {ACTIVITY_TABS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === item.id}
+            className="pv-tab"
+            onClick={() => {
+              setTab(item.id);
+              setLimit(PAGE_ROWS);
+            }}
+          >
+            {item.label}
+            {item.id !== "all" && tabCounts[item.id] ? <span className="pv-tab-count">{tabCounts[item.id]}</span> : null}
+          </button>
         ))}
+      </div>
 
-        <p className="help activity-note">
-          Mayfly remembers the last 50 things that happened to each preview, even after it&apos;s removed. Click a pull
-          request to see its whole history.
-        </p>
-      </section>
+      <div className="act-layout">
+        <section className="act-feed" aria-label="Activity log">
+          {loadError ? <p className="error" role="alert">{loadError}</p> : null}
+          {!overview && !loadError ? <p className="act-empty">Loading activity…</p> : null}
+          {overview && rows.length === 0 ? (
+            <p className="act-empty">
+              {query || tab !== "all" ? "Nothing here matches. Try another tab or clear the search." : "Nothing has happened yet. Open a pull request to get a preview."}
+            </p>
+          ) : null}
+
+          {groups.map((group) => (
+            <section key={group.heading} className="act-day" aria-label={group.heading}>
+              <h2 className="act-day-title">{group.heading}</h2>
+              <ol className="act-list">
+                {group.rows.map((row, index) => {
+                  const single = row.envs.length === 1 ? row.envs[0] : null;
+                  const text = describeRow(row, describeOptions);
+                  return (
+                    <li key={`${row.at}-${row.type}-${index}`} className="act-row">
+                      <span className="act-icon" data-tone={activityTone(row.type)} aria-hidden="true">
+                        <StateGlyph tone={activityTone(row.type)} />
+                      </span>
+                      <span className="act-text">
+                        <span className="act-title">
+                          {text.before}
+                          {single ? (
+                            <button
+                              type="button"
+                              className="act-subject"
+                              onClick={() => setLifecycleId(single.id)}
+                              aria-label={`${text.subject}: show its history`}
+                            >
+                              {text.subject}
+                            </button>
+                          ) : (
+                            text.subject
+                          )}
+                          {text.after}
+                        </span>
+                        <span className="act-sub">{text.sub}</span>
+                      </span>
+                      <time dateTime={row.at} title={new Date(row.at).toLocaleString()}>
+                        {rowTime(row.at, now)}
+                      </time>
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
+          ))}
+
+          {allRows.length > rows.length ? (
+            <button type="button" className="pv-btn act-more" onClick={() => setLimit((value) => value + PAGE_ROWS)}>
+              Show older ({allRows.length - rows.length} more)
+            </button>
+          ) : null}
+
+          {overview && rows.length > 0 ? (
+            <p className="act-note">
+              Mayfly keeps the last 50 events for each preview, even after it&apos;s removed. Click a PR number to see
+              its whole history.
+            </p>
+          ) : null}
+        </section>
+
+        <aside className="act-side" aria-label="Summary">
+          <section className="act-card" aria-labelledby="act-hours-title">
+            <div className="act-card-head">
+              <div>
+                <h2 id="act-hours-title">Preview hours per day</h2>
+                <p>Awake vs asleep, last 7 days</p>
+              </div>
+              <ChartLegend series={HOURS_SERIES} />
+            </div>
+            <BarChart
+              stacked
+              minTop={4}
+              caption="Preview hours per day, awake and asleep, last 7 days"
+              series={HOURS_SERIES}
+              columns={days.map((day) => ({
+                label: day.label,
+                title: new Date(`${day.key}T00:00:00Z`).toLocaleDateString(undefined, {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "short",
+                  timeZone: "UTC",
+                }),
+                values: { awake: day.awake, asleep: day.asleep },
+              }))}
+              format={formatHoursValue}
+              axisFormat={(value) => String(Math.round(value * 10) / 10)}
+            />
+          </section>
+
+          <section className="act-card" aria-labelledby="act-today-title">
+            <h2 id="act-today-title" className="act-card-title">
+              Today so far
+            </h2>
+            <ul className="act-today">
+              {today.map((item) => (
+                <li key={item.id}>
+                  <span className="act-icon" data-tone={item.tone} aria-hidden="true">
+                    <StateGlyph tone={item.tone} />
+                  </span>
+                  <span>{item.label}</span>
+                  <strong>{overview ? item.value : "…"}</strong>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </aside>
+      </div>
 
       <LifecycleDrawer
         env={lifecycleEnv}

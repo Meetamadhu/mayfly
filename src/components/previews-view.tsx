@@ -139,7 +139,14 @@ export function StateGlyph({ tone }: { tone: string }) {
         <path d="M12 5v13M6.5 12.5 12 18l5.5-5.5" />
       </svg>
     );
-  if (tone === "failed")
+  if (tone === "time")
+    return (
+      <svg {...common} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="8" />
+        <path d="M12 7.5V12l3 2" />
+      </svg>
+    );
+  if (tone === "failed" || tone === "removed")
     return (
       <svg {...common} fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
         <path d="M7 7l10 10M17 7 7 17" />

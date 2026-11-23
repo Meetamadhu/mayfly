@@ -11,9 +11,9 @@ const NAV: { id: AppPage; href: string; label: string; group: "workspace" | "adm
   { id: "dashboard", href: "/board", label: "Previews", group: "workspace" },
   { id: "activity", href: "/activity", label: "Activity", group: "workspace" },
   { id: "cost", href: "/cost", label: "Cost", group: "workspace" },
+  { id: "admin", href: "/admin", label: "Admin", group: "admin" },
   { id: "policies", href: "/policies", label: "Lifetime rules", group: "admin" },
   { id: "comments", href: "/pr-comments", label: "PR comments", group: "admin" },
-  { id: "admin", href: "/admin", label: "Admin", group: "admin" },
 ];
 
 /** The app's bottom tabs. Everything else sits in the More sheet. */
@@ -22,7 +22,7 @@ const TABS: { id: AppPage; href: string; label: string }[] = [
   { id: "activity", href: "/activity", label: "Activity" },
   { id: "cost", href: "/cost", label: "Cost" },
 ];
-const MORE: AppPage[] = ["policies", "comments", "admin"];
+const MORE: AppPage[] = ["admin", "policies", "comments"];
 
 const TITLES: Record<AppPage, string> = {
   dashboard: "Previews",
