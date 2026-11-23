@@ -5561,3 +5561,10 @@ html[data-theme="dark"] .act-icon[data-tone="failed"] { background: #3b1518; col
   letter-spacing: 0;
   text-transform: none;
 }
+
+/* Room between the logo and the first menu heading. */
+.board-sidebar-brand { margin-bottom: 1.25rem; }
+@media (max-width: 900px) {
+  .board-sidebar-brand { margin-bottom: 0; }
+  .board-app[data-nav="open"] .board-side-nav { margin-top: 0.75rem; }
+}
