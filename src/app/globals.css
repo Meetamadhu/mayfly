@@ -5587,3 +5587,10 @@ html[data-theme="dark"] .act-icon[data-tone="failed"] { background: #3b1518; col
   html:not([data-app="1"]) .policies-head:has(.title-in-header) { align-items: center; margin-top: 0.25rem; }
   html:not([data-app="1"]) .policies-head:has(.title-in-header) .lede { margin-top: 0; }
 }
+/* Every page: the name sits in the top bar only on wide screens, so the description starts the page. */
+.board-crumb[data-large="1"] .board-crumb-owner, .board-crumb[data-large="1"] .board-crumb-sep { font-size: 1.05rem; }
+@media (min-width: 901px) {
+  html:not([data-app="1"]) .pv-head:has(.title-in-header) { align-items: center; margin-top: 0; }
+  html:not([data-app="1"]) .pv-head:has(.title-in-header) .pv-lede { margin-top: 0; }
+  html:not([data-app="1"]) .board-welcome:has(.title-in-header) .lede { margin-top: 0; }
+}

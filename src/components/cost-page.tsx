@@ -111,7 +111,7 @@ export function CostPage() {
     >
       <header className="pv-head">
         <div className="pv-head-text">
-          <h1>Cost</h1>
+          <h1 className="title-in-header">Cost</h1>
           <p className="pv-lede">
             Estimated from the hours each preview spent asleep. An awake preview counts as{" "}
             {formatEstMoney(costPerHour, currency)} an hour; a sleeping one costs nothing.

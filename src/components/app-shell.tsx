@@ -206,15 +206,12 @@ export function AppShell({
   onSignOut,
   crumb,
   previewCount,
-  titleInHeader = false,
 }: {
   active: AppPage;
   children: ReactNode;
   githubConnected?: boolean;
   /** Shown before the page name in the top bar, e.g. the GitHub owner of the repositories. */
   crumb?: string;
-  /** The page's name shows only in the top bar, in a larger size; the page's own h1 is hidden on wide screens. */
-  titleInHeader?: boolean;
   /** The number on the Previews item in the sidebar. */
   previewCount?: number;
   search?: { value: string; onChange: (value: string) => void; placeholder: string };
@@ -348,7 +345,7 @@ export function AppShell({
             <MayflyMark className="app-title-mark" />
             <span className="app-title-text" aria-hidden="true">{TITLES[active]}</span>
           </div>
-          <p className="board-crumb" data-large={titleInHeader ? "1" : undefined}>
+          <p className="board-crumb" data-large="1">
             {crumb ? (
               <>
                 <span className="board-crumb-owner">{crumb}</span>

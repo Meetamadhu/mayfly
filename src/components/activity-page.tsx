@@ -102,7 +102,7 @@ export function ActivityPage() {
     >
       <header className="pv-head">
         <div className="pv-head-text">
-          <h1>Activity</h1>
+          <h1 className="title-in-header">Activity</h1>
           <p className="pv-lede">Builds, wake-ups, naps and clean-ups across your repos.</p>
         </div>
       </header>

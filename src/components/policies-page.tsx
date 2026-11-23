@@ -276,7 +276,7 @@ export function PoliciesPage() {
   const envRules = defaults ? Object.entries(defaults.sleepRules) : [];
 
   return (
-    <AppShell active="policies" githubConnected={Boolean(view?.githubConnected)} onSignOut={signOut} titleInHeader>
+    <AppShell active="policies" githubConnected={Boolean(view?.githubConnected)} onSignOut={signOut}>
       <form className="policies" onSubmit={(event) => void save(event)} noValidate>
         <section className="board-welcome policies-head">
           <div>

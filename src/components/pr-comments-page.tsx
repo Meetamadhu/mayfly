@@ -139,7 +139,7 @@ export function PrCommentsPage() {
     <AppShell active="comments" githubConnected={Boolean(config?.githubConnected)} onSignOut={signOut}>
       <section className="board-welcome">
         <div>
-          <h1>PR comments</h1>
+          <h1 className="title-in-header">PR comments</h1>
           <p className="lede">
             The comment and check Mayfly keeps on each pull request. It edits one comment in place as the preview
             changes, so the PR doesn&apos;t fill up with bot messages.

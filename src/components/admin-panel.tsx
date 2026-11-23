@@ -394,7 +394,7 @@ export function AdminPanel() {
       <div className="admin-panel admin-in-shell">
       <section className="board-welcome page-head-inline">
         <div>
-          <h1>Admin</h1>
+          <h1 className="title-in-header">Admin</h1>
           <p className="lede">Look after every preview by hand, and try out pull requests without going to GitHub.</p>
         </div>
       </section>
