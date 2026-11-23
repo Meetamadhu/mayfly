@@ -147,7 +147,7 @@ export function passwordPage(options: { repository: string; pr: string; next: st
   body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   main { width: min(420px, 100%); background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 28px 24px; }
   .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; margin-bottom: 20px; }
-  .brand svg { width: 26px; height: auto; }
+  .brand svg { width: 38px; height: auto; }
   h1 { font-size: 1.45rem; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.01em; }
   p { margin: 0 0 20px; color: var(--muted); }
   code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; color: var(--ink); }
