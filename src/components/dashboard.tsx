@@ -193,7 +193,7 @@ export function Dashboard() {
 
       <header className="pv-head">
         <div className="pv-head-text">
-          <h1>Previews</h1>
+          <h1 className="title-in-header">Previews</h1>
           <p className="pv-lede" aria-live="polite">
             {overview ? `${countLine(current)} ` : "Loading previews… "}
             {config
