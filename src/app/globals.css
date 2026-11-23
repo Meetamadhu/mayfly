@@ -5182,3 +5182,10 @@ html[data-app="1"] .app-title-mark { width: 2.3rem; }
   .board-mark { width: 2.3rem; height: 2.3rem; }
   .board-wordmark { font-size: 1.45rem; }
 }
+/* A little larger again on desktop: 48px mark, 28px wordmark. */
+.board-mark { width: 3rem; height: 3rem; }
+.board-wordmark { font-size: 1.75rem; }
+@media (max-width: 900px) {
+  .board-mark { width: 2.5rem; height: 2.5rem; }
+  .board-wordmark { font-size: 1.5rem; }
+}
