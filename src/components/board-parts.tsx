@@ -321,9 +321,8 @@ export function EnvironmentCard({
   );
 }
 
-/** Icons for the dashboard metric tiles (Live / Running / Sleeping / Building). */
 /** On a failed card, always visible: what failed, and the line most likely to say why. */
-function FailureSummary({ error, signedIn }: { error: string; signedIn: boolean }) {
+export function FailureSummary({ error, signedIn }: { error: string; signedIn: boolean }) {
   const { headline, hint } = summarizeFailure(error);
   return (
     <div className="fail-summary">
@@ -340,7 +339,7 @@ function FailureSummary({ error, signedIn }: { error: string; signedIn: boolean 
 }
 
 /** Behind "View build log": the last lines of the build, problem lines marked, with a copy button. */
-function BuildLog({ error }: { error: string }) {
+export function BuildLog({ error }: { error: string }) {
   const { headline, log } = summarizeFailure(error);
   const [copied, setCopied] = useState(false);
   const boxRef = useRef<HTMLPreElement>(null);
@@ -388,7 +387,7 @@ function BuildLog({ error }: { error: string }) {
  * On an awake preview's card: CPU and memory. In Docker both are shares of the container's limits; a plain-process
  * preview has no memory limit, so it shows the amount used and CPU as a share of one CPU.
  */
-function CardResources({ usage }: { usage: PreviewResources }) {
+export function CardResources({ usage }: { usage: PreviewResources }) {
   const limited = usage.memLimitBytes !== null && usage.memPercent !== null;
   return (
     <div className="card-res" aria-label="Resource use">
@@ -418,6 +417,7 @@ function CardResources({ usage }: { usage: PreviewResources }) {
   );
 }
 
+/** Icons for the dashboard metric tiles (Live / Running / Sleeping / Building). */
 export function StatIcon({ name }: { name: StatIconName }) {
   const props = {
     width: 18,
@@ -847,7 +847,7 @@ export function formatDurationMs(ms: number) {
   return secs ? `${mins} min ${secs} s` : `${mins} min`;
 }
 
-export type BoardFilter = "all" | "awake" | "asleep" | "expiring";
+export type BoardFilter = "all" | "awake" | "asleep" | "building" | "expiring";
 
 export const EXPIRING_SOON_MS = 2 * 60 * 60 * 1000;
 
@@ -855,6 +855,7 @@ export function matchesBoardFilter(env: Environment, filter: BoardFilter, now: n
   if (filter === "all") return true;
   if (filter === "awake") return env.sleep === "awake" || env.sleep === "waking";
   if (filter === "asleep") return env.sleep === "asleep";
+  if (filter === "building") return env.status === "provisioning" || env.status === "updating";
   if (filter === "expiring") {
     if (demoKey && demoKey === `${env.repository}#${env.prNumber}`) return false;
     if (env.keptByLabel || !env.expiresAt) return false;

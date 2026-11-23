@@ -5,56 +5,55 @@ import { AppShell } from "@/components/app-shell";
 import {
   EnvironmentCard,
   LifecycleDrawer,
-  StateIcon,
-  boardRecentActivity,
-  estimatedCost,
-  formatAgo,
-  formatEstMoney,
   formatLifetime,
-  formatSaved,
   formatSleep,
   authorOf,
   matchesBoardAuthor,
   matchesBoardFilter,
   matchesBoardSearch,
   previewPath,
-  readStoredView,
-  writeStoredView,
   type BoardFilter,
 } from "@/components/board-parts";
+import {
+  Popover,
+  PreviewStats,
+  PreviewsTable,
+  PreviewTabs,
+  SORT_LABELS,
+  TABS,
+  sortPreviews,
+  type PreviewSort,
+} from "@/components/previews-view";
 import type { Environment } from "@/lib/types";
 import { useOverview } from "@/lib/use-overview";
 import { useResources } from "@/lib/use-resources";
 
-const DASHBOARD_PREVIEW_LIMIT = 2;
+const VIEW_KEY = "mayfly-previews-view";
+const SORT_KEY = "mayfly-previews-sort";
 
-const NUMBER_WORDS = ["No", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve"];
-
-function countWord(n: number, capital = true) {
-  const word = NUMBER_WORDS[n] ?? String(n);
-  return capital ? word : word.toLowerCase();
+function readPref<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key) as T | null;
+    if (raw && allowed.includes(raw)) return raw;
+  } catch {
+    // Storage can be blocked.
+  }
+  return fallback;
 }
 
-/** The dashboard's headline: what is up right now, said the way a person would say it. */
-function boardHeadline(
-  counts: { live: number; awake: number; asleep: number; building: number; capacity: number } | null,
-) {
-  if (!counts) return "Checking on your previews…";
-  const { live, awake, asleep, building, capacity } = counts;
-  if (live === 0) return "No previews are up right now.";
-  const first = `${countWord(live)} preview${live === 1 ? " is" : "s are"} up${live >= capacity && capacity > 0 ? ", the most Mayfly allows" : ""}.`;
-  if (live > 1 && (awake === live || asleep === live || building === live)) {
-    const all = awake === live ? "awake" : asleep === live ? "asleep" : "building";
-    return `${first.slice(0, -1)}, ${live === 2 ? "both" : "all of them"} ${all}.`;
+function writePref(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Storage can be blocked; the choice still applies on this page.
   }
-  const parts = [
-    awake ? `${countWord(awake, false)} awake` : "",
-    asleep ? `${countWord(asleep, false)} asleep` : "",
-    building ? `${countWord(building, false)} building` : "",
-  ].filter(Boolean);
-  if (parts.length === 0) return first;
-  const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
-  return `${first} ${list.charAt(0).toUpperCase()}${list.slice(1)}.`;
+}
+
+/** "6 pull requests across 2 repos" */
+function countLine(list: Environment[]) {
+  const repos = new Set(list.map((env) => env.repository)).size;
+  if (list.length === 0) return "No pull requests have a preview right now.";
+  return `${list.length} pull request${list.length === 1 ? "" : "s"} across ${repos} repo${repos === 1 ? "" : "s"}.`;
 }
 
 export function Dashboard() {
@@ -66,13 +65,14 @@ export function Dashboard() {
   const [boardQuery, setBoardQuery] = useState("");
   const [boardAuthor, setBoardAuthor] = useState<string | null>(null);
   const [signedIn, setSignedIn] = useState(false);
-  const [cardView, setCardView] = useState<"grid" | "list">("grid");
+  const [view, setView] = useState<"table" | "cards">("table");
+  const [sort, setSort] = useState<PreviewSort>("visit");
   const [busy, setBusy] = useState(false);
   const [lifecycleId, setLifecycleId] = useState<string | null>(null);
-  const [showAllCards, setShowAllCards] = useState(false);
 
   useEffect(() => {
-    setCardView(readStoredView());
+    setView(readPref(VIEW_KEY, ["table", "cards"] as const, "table"));
+    setSort(readPref(SORT_KEY, ["visit", "newest", "expiring"] as const, "visit"));
     // Searches started from another page arrive as /board?q=…
     const params = new URLSearchParams(window.location.search);
     const q = params.get("q");
@@ -109,9 +109,14 @@ export function Dashboard() {
     };
   }, []);
 
-  function chooseCardView(next: "grid" | "list") {
-    setCardView(next);
-    writeStoredView(next);
+  function chooseView(next: "table" | "cards") {
+    setView(next);
+    writePref(VIEW_KEY, next);
+  }
+
+  function chooseSort(next: PreviewSort) {
+    setSort(next);
+    writePref(SORT_KEY, next);
   }
 
   async function adminAction(env: Environment, action: "sleep" | "extend" | "destroy") {
@@ -140,15 +145,18 @@ export function Dashboard() {
 
   const config = overview?.config;
   const currency = overview?.currency ?? config?.currency ?? "$";
+  const costPerHour = overview?.costPerHour ?? 0.05;
   const current = overview?.environments.filter((env) => env.status !== "destroyed") ?? [];
   const demoKey = config?.demo ?? null;
-  const visible = current.filter(
-    (env) =>
-      matchesBoardFilter(env, boardFilter, now, demoKey) &&
-      matchesBoardSearch(env, boardQuery) &&
-      matchesBoardAuthor(env, boardAuthor),
+  const matching = current.filter((env) => matchesBoardSearch(env, boardQuery) && matchesBoardAuthor(env, boardAuthor));
+  const visible = sortPreviews(
+    matching.filter((env) => matchesBoardFilter(env, boardFilter, now, demoKey)),
+    sort,
   );
-  // Everyone who has a preview up, with how many, for the "Opened by" menu.
+  const tabCounts = Object.fromEntries(
+    TABS.map(([id]) => [id, matching.filter((env) => matchesBoardFilter(env, id, now, demoKey)).length]),
+  ) as Partial<Record<BoardFilter, number>>;
+  // Everyone who has a preview up, with how many, for the "Opened by" filter.
   const authorCounts = new Map<string, number>();
   for (const env of current) {
     const login = authorOf(env);
@@ -157,30 +165,19 @@ export function Dashboard() {
   const authors = [...authorCounts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   // Keep a person picked from a link in the menu even when they have nothing up right now.
   if (boardAuthor && !authorCounts.has(boardAuthor)) authors.unshift([boardAuthor, 0]);
-  // The Dashboard shows two previews; the rest sit behind "Show all". Searching or filtering shows every match.
-  const narrowing = boardFilter !== "all" || boardQuery.trim() !== "" || boardAuthor !== null;
-  const shown = showAllCards || narrowing ? visible : visible.slice(0, DASHBOARD_PREVIEW_LIMIT);
-  const hiddenCount = visible.length - shown.length;
-  // "Show all" gives the previews the whole width: the Cost & Usage and Recent activity cards step aside.
-  const expanded = showAllCards && !narrowing && visible.length > DASHBOARD_PREVIEW_LIMIT;
   const removed = overview?.environments.filter((env) => env.status === "destroyed") ?? [];
   const dockerRuntime = config?.allowedRepositories != null;
-  const liveCount = overview?.summary.live ?? 0;
-  const capacity = config?.maxConcurrent ?? 0;
-  const buildingCount = current.filter((env) => env.status === "provisioning" || env.status === "updating").length;
-  const activity = overview ? boardRecentActivity(overview.environments, demoKey).slice(0, 6) : [];
   const lifecycleEnv = lifecycleId ? (overview?.environments.find((env) => env.id === lifecycleId) ?? null) : null;
-  const costPerHour = overview?.costPerHour ?? 0.05;
-  const alwaysAwakeEstimate = overview
-    ? estimatedCost((overview.usage?.awakeSeconds ?? 0) + (overview.usage?.asleepSeconds ?? 0), costPerHour)
-    : 0;
-  const withMayflyEstimate = overview ? estimatedCost(overview.usage?.awakeSeconds ?? 0, costPerHour) : 0;
+  const owners = [...new Set(current.map((env) => env.repository.split("/")[0]))];
+  const filtersOn = (boardAuthor ? 1 : 0) + (view === "cards" ? 1 : 0);
 
   return (
     <AppShell
       active="dashboard"
       githubConnected={Boolean(config?.githubConnected)}
-      search={{ value: boardQuery, onChange: setBoardQuery, placeholder: "Search repo, branch or @person" }}
+      crumb={owners.length === 1 ? owners[0] : undefined}
+      previewCount={overview ? current.length : undefined}
+      search={{ value: boardQuery, onChange: setBoardQuery, placeholder: "Search repo, branch or person" }}
     >
       {config?.deployer === "fake" ? (
         <p className="notice" role="status">
@@ -194,241 +191,219 @@ export function Dashboard() {
         </p>
       ) : null}
 
-      <section className="board-hero" aria-live="polite">
-        <h1 className="board-headline">{boardHeadline(overview ? { live: liveCount, awake: overview.summary.awake, asleep: overview.summary.asleep, building: buildingCount, capacity } : null)}</h1>
-        <p className="board-subline">
-          {overview && overview.savedEstimate >= 0.01
-            ? `Sleeping has saved about ${formatSaved(overview.savedEstimate, currency).replace("≈ ", "")} this month. `
-            : ""}
-          {config
-            ? `Previews fall asleep after ${formatSleep(config.sleepSeconds)} without visitors and last up to ${formatLifetime(config.ttlHours)}.`
-            : ""}
-          {config?.privatePreviews ? " Preview links ask for the team password." : ""}
-        </p>
-        {signedIn ? (
-          <a className="btn secondary board-hero-action" href="/admin#simulator">
-            Try a pull request
-          </a>
-        ) : null}
-      </section>
-
-      <div className="board-workspace" data-expanded={expanded ? "true" : "false"}>
-        <section className="live-column">
-          <div className="ledger-head board-env-head">
-            <h2>Previews</h2>
-            <div className="board-filter-pills" role="group" aria-label="Filter previews">
-              {(
-                [
-                  ["all", "All"],
-                  ["awake", "Awake"],
-                  ["asleep", "Asleep"],
-                  ["expiring", "Expiring soon"],
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  key={id}
-                  type="button"
-                  className="board-filter-pill"
-                  aria-pressed={boardFilter === id}
-                  aria-label={label}
-                  onClick={() => setBoardFilter(id)}
-                >
-                  {id === "expiring" ? (
-                    <>
-                      Expiring<span className="pill-long">{"\u00a0"}soon</span>
-                    </>
-                  ) : (
-                    label
-                  )}
-                </button>
-              ))}
-            </div>
-            {authors.length > 0 ? (
-              <label className="board-author-filter">
-                <span>Opened by</span>
-                <select value={boardAuthor ?? ""} onChange={(event) => pickAuthor(event.target.value || null)}>
-                  <option value="">Everyone</option>
-                  {authors.map(([login, count]) => (
-                    <option key={login} value={login}>
-                      @{login} ({count})
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-            <div className="board-view-toggle" role="group" aria-label="Card layout">
-              <button type="button" aria-pressed={cardView === "grid"} onClick={() => chooseCardView("grid")}>
-                Grid
-              </button>
-              <button type="button" aria-pressed={cardView === "list"} onClick={() => chooseCardView("list")}>
-                List
-              </button>
-            </div>
-          </div>
-
-          {loadError ? <p className="error" role="alert">{loadError}</p> : null}
-          {!overview && !loadError ? <p className="empty">Loading previews…</p> : null}
-
-          <div className="stack env-card-stack" data-view={cardView}>
-            {overview && current.length === 0 ? (
-              <p className="empty">No previews yet. Open a pull request on GitHub and its preview will appear here.</p>
-            ) : null}
-            {overview && current.length > 0 && visible.length === 0 ? (
-              <p className="empty">Nothing matches. Try another filter or search.</p>
-            ) : null}
-            {shown.map((env) => (
-              <EnvironmentCard
-                key={env.id}
-                env={env}
-                now={now}
-                demo={demoKey === `${env.repository}#${env.prNumber}`}
-                signedIn={signedIn}
-                busy={busy}
-                onAdminAction={(item, action) => void adminAction(item, action)}
-                onShowLifecycle={(item) => setLifecycleId(item.id)}
-                onPickAuthor={pickAuthor}
-                resources={env.deploymentId ? resources?.previews?.[env.deploymentId] : undefined}
-                measured={Boolean(resources?.previews)}
-              />
-            ))}
-          </div>
-
-          {hiddenCount > 0 || (showAllCards && !narrowing && visible.length > DASHBOARD_PREVIEW_LIMIT) ? (
-            <button
-              type="button"
-              className="secondary board-show-all"
-              aria-expanded={showAllCards}
-              onClick={() => setShowAllCards((open) => !open)}
-            >
-              {showAllCards ? "Show fewer" : `Show all ${visible.length} previews`}
-              <span aria-hidden="true">{showAllCards ? "↑" : "↓"}</span>
-            </button>
+      <header className="pv-head">
+        <div className="pv-head-text">
+          <h1>Previews</h1>
+          <p className="pv-lede" aria-live="polite">
+            {overview ? `${countLine(current)} ` : "Loading previews… "}
+            {config
+              ? `Idle previews fall asleep after ${formatSleep(config.sleepSeconds)} and cost nothing; each lasts up to ${formatLifetime(config.ttlHours)}.`
+              : ""}
+            {config?.privatePreviews ? " Preview links ask for the team password." : ""}
+          </p>
+        </div>
+        <div className="pv-head-actions">
+          {signedIn ? (
+            <a className="pv-btn" href="/admin#simulator">
+              Try a pull request
+            </a>
           ) : null}
-
-          <div className="board-toolbar">
-            <div className="board-toolbar-main">
-              <details className="advanced">
-                <summary>
-                  Behind the scenes
-                  {overview && overview.deployments.length > 0 ? (
-                    <span className="advanced-count">{overview.deployments.length}</span>
-                  ) : null}
-                </summary>
-                <p className="advanced-help">
-                  {dockerRuntime
-                    ? "The containers running on the server right now, one per preview."
-                    : "The programs running on the server right now, one per preview."}
-                </p>
-                <div className="stack advanced-list">
-                  {overview && overview.deployments.length === 0 ? (
-                    <p className="empty">Nothing is running. Closed and expired previews have been cleaned up.</p>
-                  ) : null}
-                  {overview?.deployments.map((deployment) => (
-                    <article className="deployment" key={deployment.deploymentId}>
-                      <div className="deployment-main">
-                        <strong>
-                          {deployment.repository}
-                          <span> #{deployment.prNumber}</span>
-                        </strong>
-                        <p className="meta">
-                          <span className="chip mono">{deployment.sha.slice(0, 8)}</span>
-                          {deployment.port ? <span className="chip port-chip">port {deployment.port}</span> : null}
-                        </p>
-                      </div>
-                      {config?.deployer === "fake" ? null : (
-                        <a className="open-preview secondary" href={previewPath(deployment.url)}>
-                          Open
-                        </a>
-                      )}
-                    </article>
-                  ))}
-                </div>
-              </details>
-              {polledAt != null ? (
-                <p className="updated">Updated {Math.max(0, Math.floor((now - polledAt) / 1000))} s ago</p>
-              ) : null}
-            </div>
-
-            {overview && removed.length > 0 ? (
-              <button
-                type="button"
-                className="history-toggle secondary"
-                aria-expanded={showRemoved}
-                onClick={() => setShowRemoved((open) => !open)}
-              >
-                {showRemoved ? "Hide removed" : "Show removed"}
-                <span>{removed.length}</span>
-              </button>
-            ) : null}
-          </div>
-
-          {showRemoved && removed.length > 0 ? (
-            <div className="stack env-card-stack" data-view="list">
-              {removed.map((env) => (
-                <EnvironmentCard
-                  key={env.id}
-                  env={env}
-                  now={now}
-                  demo={config?.demo === `${env.repository}#${env.prNumber}`}
-                  signedIn={signedIn}
-                  busy={busy}
-                  onAdminAction={(item, action) => void adminAction(item, action)}
-                  onShowLifecycle={(item) => setLifecycleId(item.id)}
-                />
-              ))}
-            </div>
-          ) : null}
-          {error ? <p className="error" role="alert">{error}</p> : null}
-        </section>
-
-        {expanded ? null : (
-        <aside className="board-rail">
-          <section className="board-rail-card" aria-label="Estimated cost and usage">
-            <div className="board-rail-head">
-              <h2 className="board-rail-title">Cost this month</h2>
-              <a className="board-rail-link" href="/cost">
-                Details
-              </a>
-            </div>
-            <p className="savings-sub">
-              {overview
-                ? alwaysAwakeEstimate < 0.01
-                  ? "Less than a cent so far this month."
-                  : `About ${formatEstMoney(withMayflyEstimate, currency)} with Mayfly, instead of ${formatEstMoney(alwaysAwakeEstimate, currency)} if every preview stayed on.`
-                : "The first numbers appear about a minute after start-up."}
-            </p>
-          </section>
-
-          <section className="board-rail-card board-activity" aria-label="Recent activity">
-            <div className="board-rail-head">
-              <h2 className="board-rail-title">Recent activity</h2>
-              <a className="board-rail-link" href="/activity">
-                View all
-              </a>
-            </div>
-            {activity.length === 0 ? (
-              <p className="empty">No activity yet.</p>
-            ) : (
-              <ol className="board-activity-list">
-                {activity.map((item, index) => (
-                  <li key={`${item.at}-${item.subject}-${item.type}-${index}`} data-tone={item.icon}>
-                    <span className="board-activity-icon" aria-hidden="true">
-                      <StateIcon name={item.icon} />
-                    </span>
-                    <span className="board-activity-text">
-                      <strong>{item.subject}</strong>
-                      {item.repository ? <span className="board-activity-repo"> in {item.repository}</span> : null}{" "}
-                      {item.label}
-                    </span>
-                    <time dateTime={item.at}>{formatAgo(item.at, now)}</time>
-                  </li>
-                ))}
-              </ol>
+          <Popover
+            label={
+              <>
+                Filters{filtersOn > 0 ? <span className="pv-badge">{filtersOn}</span> : null}
+              </>
+            }
+          >
+            {() => (
+              <div className="pv-filters">
+                <label className="pv-field">
+                  <span>Opened by</span>
+                  <select value={boardAuthor ?? ""} onChange={(event) => pickAuthor(event.target.value || null)}>
+                    <option value="">Everyone</option>
+                    {authors.map(([login, count]) => (
+                      <option key={login} value={login}>
+                        @{login} ({count})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <fieldset className="pv-field">
+                  <legend>Show as</legend>
+                  <div className="pv-seg" role="group">
+                    <button type="button" aria-pressed={view === "table"} onClick={() => chooseView("table")}>
+                      Table
+                    </button>
+                    <button type="button" aria-pressed={view === "cards"} onClick={() => chooseView("cards")}>
+                      Cards
+                    </button>
+                  </div>
+                </fieldset>
+                {filtersOn > 0 ? (
+                  <button
+                    type="button"
+                    className="pv-link"
+                    onClick={() => {
+                      pickAuthor(null);
+                      chooseView("table");
+                    }}
+                  >
+                    Reset
+                  </button>
+                ) : null}
+              </div>
             )}
-          </section>
-        </aside>
-        )}
+          </Popover>
+          <Popover label={<>Sort: {SORT_LABELS[sort]}</>}>
+            {(close) => (
+              <div className="pv-sort" role="menu">
+                {(Object.keys(SORT_LABELS) as PreviewSort[]).map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={sort === id}
+                    onClick={() => {
+                      chooseSort(id);
+                      close();
+                    }}
+                  >
+                    {SORT_LABELS[id]}
+                  </button>
+                ))}
+              </div>
+            )}
+          </Popover>
+        </div>
+      </header>
+
+      <PreviewStats overview={overview ?? null} current={current} now={now} />
+
+      <PreviewTabs value={boardFilter} counts={tabCounts} onChange={setBoardFilter} />
+      {boardAuthor ? (
+        <p className="pv-filter-note">
+          Showing @{boardAuthor}&apos;s previews.{" "}
+          <button type="button" className="pv-link" onClick={() => pickAuthor(null)}>
+            Show everyone&apos;s
+          </button>
+        </p>
+      ) : null}
+
+      {loadError ? <p className="error" role="alert">{loadError}</p> : null}
+      {error ? <p className="error" role="alert">{error}</p> : null}
+
+      {overview && current.length === 0 ? (
+        <p className="pv-empty">No previews yet. Open a pull request on GitHub and its preview will appear here.</p>
+      ) : overview && visible.length === 0 ? (
+        <p className="pv-empty">Nothing matches. Try another tab, filter or search.</p>
+      ) : view === "table" && visible.length > 0 ? (
+        <PreviewsTable
+          previews={visible}
+          demoKey={demoKey}
+          now={now}
+          signedIn={signedIn}
+          busy={busy}
+          currency={currency}
+          costPerHour={costPerHour}
+          measured={Boolean(resources?.previews)}
+          resourcesFor={(env) => (env.deploymentId ? resources?.previews?.[env.deploymentId] : undefined)}
+          onAdminAction={(item, action) => void adminAction(item, action)}
+          onShowHistory={(item) => setLifecycleId(item.id)}
+          onPickAuthor={pickAuthor}
+        />
+      ) : (
+        <div className="stack env-card-stack" data-view="grid">
+          {visible.map((env) => (
+            <EnvironmentCard
+              key={env.id}
+              env={env}
+              now={now}
+              demo={demoKey === `${env.repository}#${env.prNumber}`}
+              signedIn={signedIn}
+              busy={busy}
+              onAdminAction={(item, action) => void adminAction(item, action)}
+              onShowLifecycle={(item) => setLifecycleId(item.id)}
+              onPickAuthor={pickAuthor}
+              resources={env.deploymentId ? resources?.previews?.[env.deploymentId] : undefined}
+              measured={Boolean(resources?.previews)}
+            />
+          ))}
+        </div>
+      )}
+
+      <div className="board-toolbar pv-toolbar">
+        <div className="board-toolbar-main">
+          <details className="advanced">
+            <summary>
+              Behind the scenes
+              {overview && overview.deployments.length > 0 ? (
+                <span className="advanced-count">{overview.deployments.length}</span>
+              ) : null}
+            </summary>
+            <p className="advanced-help">
+              {dockerRuntime
+                ? "The containers running on the server right now, one per preview."
+                : "The programs running on the server right now, one per preview."}
+            </p>
+            <div className="stack advanced-list">
+              {overview && overview.deployments.length === 0 ? (
+                <p className="empty">Nothing is running. Closed and expired previews have been cleaned up.</p>
+              ) : null}
+              {overview?.deployments.map((deployment) => (
+                <article className="deployment" key={deployment.deploymentId}>
+                  <div className="deployment-main">
+                    <strong>
+                      {deployment.repository}
+                      <span> #{deployment.prNumber}</span>
+                    </strong>
+                    <p className="meta">
+                      <span className="chip mono">{deployment.sha.slice(0, 8)}</span>
+                      {deployment.port ? <span className="chip port-chip">port {deployment.port}</span> : null}
+                    </p>
+                  </div>
+                  {config?.deployer === "fake" ? null : (
+                    <a className="open-preview secondary" href={previewPath(deployment.url)}>
+                      Open
+                    </a>
+                  )}
+                </article>
+              ))}
+            </div>
+          </details>
+          {polledAt != null ? (
+            <p className="updated">Updated {Math.max(0, Math.floor((now - polledAt) / 1000))} s ago</p>
+          ) : null}
+        </div>
+
+        {overview && removed.length > 0 ? (
+          <button
+            type="button"
+            className="history-toggle secondary"
+            aria-expanded={showRemoved}
+            onClick={() => setShowRemoved((open) => !open)}
+          >
+            {showRemoved ? "Hide removed" : "Show removed"}
+            <span>{removed.length}</span>
+          </button>
+        ) : null}
       </div>
+
+      {showRemoved && removed.length > 0 ? (
+        <div className="stack env-card-stack" data-view="list">
+          {removed.map((env) => (
+            <EnvironmentCard
+              key={env.id}
+              env={env}
+              now={now}
+              demo={config?.demo === `${env.repository}#${env.prNumber}`}
+              signedIn={signedIn}
+              busy={busy}
+              onAdminAction={(item, action) => void adminAction(item, action)}
+              onShowLifecycle={(item) => setLifecycleId(item.id)}
+            />
+          ))}
+        </div>
+      ) : null}
 
       {config?.deployer === "fake" ? (
         <p className="footer">

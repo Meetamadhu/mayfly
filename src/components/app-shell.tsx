@@ -7,27 +7,27 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 export type AppPage = "dashboard" | "activity" | "cost" | "policies" | "comments" | "admin";
 
-const NAV: { id: AppPage; href: string; label: string }[] = [
-  { id: "dashboard", href: "/board", label: "Dashboard" },
-  { id: "activity", href: "/activity", label: "Activity" },
-  { id: "cost", href: "/cost", label: "Cost & savings" },
-  { id: "policies", href: "/policies", label: "Lifetime rules" },
-  { id: "comments", href: "/pr-comments", label: "PR comments" },
-  { id: "admin", href: "/admin", label: "Admin" },
+const NAV: { id: AppPage; href: string; label: string; group: "workspace" | "admin" }[] = [
+  { id: "dashboard", href: "/board", label: "Previews", group: "workspace" },
+  { id: "activity", href: "/activity", label: "Activity", group: "workspace" },
+  { id: "cost", href: "/cost", label: "Cost", group: "workspace" },
+  { id: "policies", href: "/policies", label: "Lifetime rules", group: "admin" },
+  { id: "comments", href: "/pr-comments", label: "PR comments", group: "admin" },
+  { id: "admin", href: "/admin", label: "Admin", group: "admin" },
 ];
 
 /** The app's bottom tabs. Everything else sits in the More sheet. */
 const TABS: { id: AppPage; href: string; label: string }[] = [
-  { id: "dashboard", href: "/board", label: "Board" },
+  { id: "dashboard", href: "/board", label: "Previews" },
   { id: "activity", href: "/activity", label: "Activity" },
-  { id: "cost", href: "/cost", label: "Savings" },
+  { id: "cost", href: "/cost", label: "Cost" },
 ];
 const MORE: AppPage[] = ["policies", "comments", "admin"];
 
 const TITLES: Record<AppPage, string> = {
   dashboard: "Previews",
   activity: "Activity",
-  cost: "Savings",
+  cost: "Cost",
   policies: "Lifetime rules",
   comments: "PR comments",
   admin: "Admin",
@@ -105,10 +105,16 @@ export function AppShell({
   githubConnected = false,
   search,
   onSignOut,
+  crumb,
+  previewCount,
 }: {
   active: AppPage;
   children: ReactNode;
   githubConnected?: boolean;
+  /** Shown before the page name in the top bar, e.g. the GitHub owner of the repositories. */
+  crumb?: string;
+  /** The number on the Previews item in the sidebar. */
+  previewCount?: number;
   search?: { value: string; onChange: (value: string) => void; placeholder: string };
   onSignOut?: () => void | Promise<void>;
 }) {
@@ -180,12 +186,9 @@ export function AppShell({
     <div className="board-app" data-nav={navOpen ? "open" : "closed"}>
       <aside className="board-sidebar" aria-label="Mayfly">
         <div className="board-sidebar-brand">
-          <a className="board-brand" href="/">
+          <a className="board-brand" href="/" aria-label="Mayfly home">
             <MayflyMark className="board-mark" />
-            <span>
-              <span className="board-wordmark">Mayfly</span>
-              <span className="board-tagline">Previews for every pull request</span>
-            </span>
+            <span className="board-wordmark">mayfly</span>
           </a>
           <button
             type="button"
@@ -198,22 +201,68 @@ export function AppShell({
           </button>
         </div>
         <nav id="board-side-nav" className="board-side-nav" aria-label="Pages">
-          {NAV.map((item) => (
-            <a key={item.id} href={item.href} aria-current={item.id === active ? "page" : undefined}>
-              <NavIcon page={item.id} />
-              <span>{item.label}</span>
-            </a>
+          {(["workspace", "admin"] as const).map((group) => (
+            <div key={group} className="board-side-group">
+              <p className="board-side-heading">{group === "workspace" ? "Workspace" : "Admin"}</p>
+              {NAV.filter((item) => item.group === group).map((item) => (
+                <a key={item.id} href={item.href} aria-current={item.id === active ? "page" : undefined}>
+                  <NavIcon page={item.id} />
+                  <span>{item.label}</span>
+                  {item.id === "dashboard" && typeof previewCount === "number" ? (
+                    <span className="board-side-count" aria-label={`${previewCount} previews`}>
+                      {previewCount}
+                    </span>
+                  ) : null}
+                </a>
+              ))}
+            </div>
           ))}
-          <button
-            type="button"
-            className="board-side-intro"
-            onClick={() => {
-              setNavOpen(false);
-              window.dispatchEvent(new Event(SHOW_INTRO_EVENT));
-            }}
-          >
-            Show the intro
-          </button>
+
+          <div className="board-side-foot">
+            <div className="board-user">
+              <span className="board-user-avatar" data-signed-in={signedIn ? "true" : "false"} aria-hidden="true">
+                {signedIn ? (
+                  "A"
+                ) : (
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                    <circle cx="12" cy="8.5" r="4" />
+                    <path d="M4.5 20a7.5 7.5 0 0 1 15 0z" />
+                  </svg>
+                )}
+              </span>
+              <span className="board-user-text">
+                <strong>{signedIn ? "Admin" : "Visitor"}</strong>
+                <span>{signedIn ? "Signed in" : "Viewing only"}</span>
+              </span>
+              {signedIn ? (
+                <button type="button" className="board-user-action" onClick={() => void signOut()}>
+                  Sign out
+                </button>
+              ) : (
+                <a className="board-user-action" href="/admin/login">
+                  Sign in
+                </a>
+              )}
+            </div>
+            <div className="board-side-tools">
+              <ThemeToggle theme={theme} onChange={chooseTheme} />
+              <button
+                type="button"
+                className="board-side-intro"
+                onClick={() => {
+                  setNavOpen(false);
+                  window.dispatchEvent(new Event(SHOW_INTRO_EVENT));
+                }}
+              >
+                Intro
+              </button>
+            </div>
+            {githubConnected ? (
+              <p className="board-github-note" title="GitHub token is configured">
+                <span aria-hidden="true" /> GitHub connected
+              </p>
+            ) : null}
+          </div>
         </nav>
       </aside>
 
@@ -224,6 +273,15 @@ export function AppShell({
             <MayflyMark className="app-title-mark" />
             <span className="app-title-text" aria-hidden="true">{TITLES[active]}</span>
           </div>
+          <p className="board-crumb">
+            {crumb ? (
+              <>
+                <span className="board-crumb-owner">{crumb}</span>
+                <span className="board-crumb-sep" aria-hidden="true">/</span>
+              </>
+            ) : null}
+            <span className="board-crumb-page">{TITLES[active]}</span>
+          </p>
           {search ? (
             <label className="board-search board-search-top">
               <span className="visually-hidden">{search.placeholder}</span>
@@ -241,24 +299,27 @@ export function AppShell({
               <label className="visually-hidden" htmlFor="shell-search">
                 Search previews by repo, branch or person
               </label>
-              <input id="shell-search" ref={searchRef} type="search" name="q" placeholder="Search repo, branch or @person" />
+              <input id="shell-search" ref={searchRef} type="search" name="q" placeholder="Search repo, branch or person" />
               <kbd className="board-search-kbd">Ctrl K</kbd>
             </form>
           )}
           <div className="board-topbar-actions">
-            {githubConnected ? (
-              <span className="board-github-pill" title="GitHub token is configured">
-                GitHub connected
-              </span>
-            ) : null}
-            <ThemeToggle theme={theme} onChange={chooseTheme} />
+            <button
+              type="button"
+              className="board-help"
+              aria-label="How Mayfly works"
+              title="How Mayfly works"
+              onClick={() => window.dispatchEvent(new Event(SHOW_INTRO_EVENT))}
+            >
+              ?
+            </button>
             {signedIn ? (
-              <button type="button" className="secondary board-auth-btn" onClick={() => void signOut()}>
-                Sign out
-              </button>
+              <a className="board-avatar" href="/admin" title="Admin">
+                A
+              </a>
             ) : (
-              <a className="btn secondary board-auth-btn" href="/admin/login">
-                Admin sign-in
+              <a className="board-avatar-signin" href="/admin/login">
+                Sign in
               </a>
             )}
           </div>

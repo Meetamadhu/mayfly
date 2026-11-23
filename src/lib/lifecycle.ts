@@ -638,6 +638,8 @@ async function reserve(event: PullRequestEvent): Promise<LifecycleResult> {
       existing.branch = normalized.branch;
       // Previews opened before authors were recorded pick it up from their next commit.
       if (!existing.author && normalized.author) existing.author = normalized.author;
+      // Titles change; keep the newest one GitHub sent.
+      if (normalized.title) existing.title = normalized.title;
       existing.updatedAt = now;
       existing.lastActiveAt = now;
       // Keep the later of the current expiry and a fresh TTL so an extended preview is not shortened.
@@ -707,6 +709,7 @@ async function reserve(event: PullRequestEvent): Promise<LifecycleResult> {
       labels: eventLabels(normalized) ?? [],
       extensions: 0,
       ...(normalized.author ? { author: normalized.author } : {}),
+      ...(normalized.title ? { title: normalized.title } : {}),
     };
     if (hasKeepLabel(created.labels)) {
       pushEnvironmentEvent(created, { at: now, type: "kept", detail: currentPolicy().keepLabel });
