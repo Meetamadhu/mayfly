@@ -5613,3 +5613,8 @@ html[data-theme="dark"] .act-icon[data-tone="failed"] { background: #3b1518; col
   .lp-nav-actions .lp-btn { padding: 0 0.7rem; }
 }
 .lp-signin { white-space: nowrap; }
+/* Home: the headline on a single line on wide screens; it wraps on phones. */
+@media (min-width: 900px) {
+  .lp-hero2 { width: min(1240px, calc(100% - 2rem)); }
+  .lp-hero2 h1 { font-size: clamp(1.9rem, 2.75vw, 2.9rem); white-space: nowrap; letter-spacing: -0.03em; }
+}
