@@ -5916,3 +5916,26 @@ html[data-theme="dark"] .ra-label[data-kind="update"] { color: #7dd3fc; }
   .pv-cell-status { display: flex !important; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem; text-align: left; }
   .pv-usage { text-align: left; }
 }
+
+/* Home: the Android app section */
+.lp-app-lede { max-width: 44rem; margin: -0.75rem 0 1.75rem; color: var(--muted); font-size: 1.05rem; line-height: 1.6; }
+.lp-app { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(16rem, 1fr); gap: 1.5rem; align-items: start; }
+.lp-app-people { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; list-style: none; margin: 0; padding: 0; }
+.lp-app-people li { padding: 1.1rem 1.2rem; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+.lp-app-people h3 { margin: 0 0 0.35rem; font-size: 1.02rem; }
+.lp-app-people p { margin: 0; color: var(--muted); line-height: 1.55; }
+.lp-app-get { display: grid; gap: 0.85rem; justify-items: start; padding: 1.5rem; border-radius: 14px; background: #0b1322; color: #e6efea; }
+.lp-app-get h3 { margin: 0; font-size: 1.25rem; }
+.lp-app-get p { margin: 0; color: #a9b6cb; line-height: 1.55; }
+.lp-app-get .lp-btn { background: #3ddbb0; color: #04221a; }
+.lp-app-get .lp-btn:hover { background: #63e6c3; }
+.lp-app-get .lp-app-small { font-size: 0.85rem; }
+@media (max-width: 900px) {
+  .lp-app { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .lp-app-people { grid-template-columns: minmax(0, 1fr); gap: 0.75rem; }
+  .lp-app-get .lp-btn { width: 100%; }
+}
+.lp-app-people li:last-child:nth-child(odd) { grid-column: 1 / -1; }
+@media (max-width: 900px) { .lp-app-get { order: -1; } }

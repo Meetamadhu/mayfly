@@ -45,6 +45,15 @@ const SAMPLE: { repo: "W" | "A"; tone: string; title: string; pr: number; who: s
 ];
 
 const ACTION = { awake: "Open", asleep: "Wake", building: "Logs" } as const;
+
+/** Who the Android app is for. Everything also works in a browser. */
+const APP_PEOPLE: { title: string; text: string }[] = [
+  { title: "Reviewers, product managers and clients", text: "Open a pull request’s preview on your phone and see the change running, no laptop needed." },
+  { title: "Designers", text: "Check how a change really looks on a phone screen, mobile layouts included." },
+  { title: "QA and testers", text: "Try previews on a real device and see which are awake, asleep or failed." },
+  { title: "Team leads and admins", text: "Keep a preview awake for a demo, remove old ones and catch up on recent activity." },
+  { title: "Managers", text: "See on the Cost page how much sleeping previews are saving." },
+];
 const PILL = { awake: "Awake", asleep: "Asleep", building: "Building" } as const;
 
 function PreviewsPicture() {
@@ -302,6 +311,36 @@ export function Landing() {
             <span data-life="awake" /> awake <span data-life="asleep" /> asleep <span data-life="build" /> building
           </p>
         </figure>
+      </section>
+
+      <section className="lp-section" id="app" aria-labelledby="lp-app-title">
+        <p className="lp-kicker">Android app</p>
+        <h2 id="lp-app-title">Mayfly on your phone.</h2>
+        <p className="lp-app-lede">
+          For people who check or approve work on the go. Developers can keep using the website, which does everything
+          the app does.
+        </p>
+        <div className="lp-app">
+          <ul className="lp-app-people">
+            {APP_PEOPLE.map((person) => (
+              <li key={person.title}>
+                <h3>{person.title}</h3>
+                <p>{person.text}</p>
+              </li>
+            ))}
+          </ul>
+          <aside className="lp-app-get" aria-labelledby="lp-app-get-title">
+            <h3 id="lp-app-get-title">Get the Android app</h3>
+            <p>Opens full screen, like any other app, and keeps itself up to date: every improvement to Mayfly shows up the next time you open it.</p>
+            <a className="lp-btn lp-btn-lg" href="/downloads/mayfly.apk" download="Mayfly.apk">
+              Download for Android
+            </a>
+            <p className="lp-app-small">
+              APK, about 1 MB. Android asks once to allow installs from your browser. Not on Android? Add this page to
+              your home screen instead.
+            </p>
+          </aside>
+        </div>
       </section>
 
       <section className="lp-section lp-faq" id="faq" aria-labelledby="lp-faq-title">
