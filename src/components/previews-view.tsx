@@ -437,10 +437,37 @@ export const TABS: [BoardFilter, string][] = [
 ];
 
 export function PreviewTabs({ value, counts, onChange }: { value: BoardFilter; counts: Partial<Record<BoardFilter, number>>; onChange: (next: BoardFilter) => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [atEnd, setAtEnd] = useState(true);
+
+  // On a narrow screen the tabs scroll sideways: fade the right edge while more are hidden there.
+  useEffect(() => {
+    const list = ref.current;
+    if (!list) return;
+    const update = () => setAtEnd(list.scrollLeft + list.clientWidth >= list.scrollWidth - 4);
+    update();
+    list.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    return () => {
+      list.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+
   return (
-    <div className="pv-tabs" role="tablist" aria-label="Show previews">
+    <div className="pv-tabs" role="tablist" aria-label="Show previews" ref={ref} data-at-end={atEnd ? "1" : undefined}>
       {TABS.map(([id, label]) => (
-        <button key={id} type="button" role="tab" aria-selected={value === id} className="pv-tab" onClick={() => onChange(id)}>
+        <button
+          key={id}
+          type="button"
+          role="tab"
+          aria-selected={value === id}
+          className="pv-tab"
+          onClick={(event) => {
+            onChange(id);
+            event.currentTarget.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+          }}
+        >
           {label}
           {counts[id] ? <span className="pv-tab-count">{counts[id]}</span> : null}
         </button>
