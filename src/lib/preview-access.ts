@@ -163,7 +163,7 @@ export function passwordPage(options: { repository: string; pr: string; next: st
 <body>
 <main>
   <div class="brand">
-    <svg viewBox="84 66 362 362" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M304 103 H210 A103 103 0 0 0 107 206 V305 A103 103 0 0 0 210 408 H309 A103 103 0 0 0 412 305 V207" stroke-width="34"/><path d="M178.5 216.5 V295.5 M178.5 256.5 A40 40 0 0 1 258.5 256.5 V295.5 M258.5 256.5 A40 40 0 0 1 338.5 256.5 V295.5" stroke-width="39"/></g><g fill="#3ddbb0"><circle cx="362.5" cy="145.5" r="25"/><circle cx="395.5" cy="113.5" r="11" opacity=".78"/><circle cx="415" cy="95" r="8.5" opacity=".55"/><circle cx="429.5" cy="80.5" r="6" opacity=".38"/></g></svg>
+    <svg viewBox="84 64 364 364" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M305 103 H207 A100 100 0 0 0 107 203 V310 A100 100 0 0 0 207 410 H313 A100 100 0 0 0 413 310 V205" stroke-width="34"/><path d="M178 218 V296 M178 257 A40 40 0 0 1 258 257 V296 M258 257 A40 40 0 0 1 338 257 V296" stroke-width="40"/></g><g fill="#3ddbb0"><circle cx="347.5" cy="164" r="25"/><circle cx="385" cy="130" r="14.5"/><circle cx="414" cy="104.5" r="11"/><circle cx="437.5" cy="85" r="7.5"/></g></svg>
     Mayfly
   </div>
   <h1>This preview is private</h1>
