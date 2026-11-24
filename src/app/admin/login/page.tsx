@@ -6,14 +6,14 @@ import { AppShell } from "@/components/app-shell";
 export default function AdminLoginPage() {
   const [token, setToken] = useState("");
   const [show, setShow] = useState(false);
-  const [wrong, setWrong] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!token.trim()) return;
     setBusy(true);
-    setWrong(false);
+    setProblem(null);
     try {
       const response = await fetch("/api/admin/session", {
         method: "POST",
@@ -26,9 +26,13 @@ export default function AdminLoginPage() {
         window.location.assign(next === "/policies" || next === "/pr-comments" ? next : "/admin");
         return;
       }
-      setWrong(true);
+      setProblem(
+        response.status === 401
+          ? "That token didn't work. Check you're on the right Mayfly (the demo and the test server have different tokens) and that the whole token was copied."
+          : "Mayfly couldn't check the token just now. Try again in a moment.",
+      );
     } catch {
-      setWrong(true);
+      setProblem("Couldn't reach Mayfly. Check your connection and try again.");
     } finally {
       setBusy(false);
     }
@@ -66,7 +70,7 @@ export default function AdminLoginPage() {
             {busy ? "Signing in…" : "Sign in"}
           </button>
         </form>
-        {wrong ? <p className="error" role="alert">That token didn&apos;t work. Check it and try again.</p> : null}
+        {problem ? <p className="error" role="alert">{problem}</p> : null}
       </section>
       <p className="login-back">
         <a href="/board">Back to dashboard</a>

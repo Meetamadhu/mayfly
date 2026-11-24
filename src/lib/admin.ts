@@ -116,8 +116,18 @@ export async function delayWrongSignIn() {
   await new Promise((resolve) => setTimeout(resolve, 500));
 }
 
-export function signIn(token: string) {
+/**
+ * A token as typed or pasted: spaces, line breaks and invisible characters that chat apps add around (or inside)
+ * a copied token are dropped, since a real token never contains them.
+ */
+export function cleanToken(raw: string) {
+  return raw.replace(/[\s\u200B-\u200D\u2060\uFEFF]+/g, "");
+}
+
+export function signIn(raw: string) {
   const expected = configuredToken();
-  if (!expected || !token || !sameToken(token, expected)) return null;
+  if (!expected || !cleanToken(raw)) return null;
+  // Exact match first; then the same with spaces and invisible characters ignored on both sides.
+  if (!sameToken(raw.trim(), expected) && !sameToken(cleanToken(raw), cleanToken(expected))) return null;
   return issueSessionValue(expected);
 }

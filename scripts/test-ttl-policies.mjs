@@ -224,6 +224,20 @@ try {
   const same = await api("GET", "/api/admin/policy", undefined, { cookie });
   check(same.status === 200, "signed-in cookie can read");
 
+  // A token pasted with spaces, a line break or an invisible character (as chat apps add) still signs in.
+  const pasted = await fetch(`${BASE}/api/admin/session`, {
+    method: "POST",
+    headers: { "content-type": "application/json", origin: BASE },
+    body: JSON.stringify({ token: ` ${ADMIN}\u200B\n` }),
+  });
+  check(pasted.status === 200, "a pasted token with spaces still signs in", pasted.status);
+  const cut = await fetch(`${BASE}/api/admin/session`, {
+    method: "POST",
+    headers: { "content-type": "application/json", origin: BASE },
+    body: JSON.stringify({ token: ADMIN.slice(0, -1) }),
+  });
+  check(cut.status === 401, "a cut-off token is still refused", cut.status);
+
   // --- save ---
   const policy = {
     ttlHours: 24,
