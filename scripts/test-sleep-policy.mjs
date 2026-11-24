@@ -177,6 +177,14 @@ try {
   ov = await overview();
   assert(ov.environments.find((e) => e.id === rules.id)?.sleep === "awake", "keep-awake should prevent idle sleep");
 
+  // Visits are noted at most once per 30 minutes, and never on top of a wake.
+  const history = ov.environments.find((e) => e.id === rules.id)?.events ?? [];
+  assert(history.some((e) => e.type === "visited"), `timeline missing the visit: ${JSON.stringify(history)}`);
+  const wakes = history.filter((e) => e.type === "woke").map((e) => Date.parse(e.at));
+  const doubled = history.filter((e) => e.type === "visited" && wakes.some((w) => Math.abs(Date.parse(e.at) - w) <= 120000));
+  assert(doubled.length === 0, `a wake was also recorded as a visit: ${JSON.stringify(doubled)}`);
+  assert(history.filter((e) => e.type === "visited").length <= 1, "visits should be noted at most once per 30 minutes");
+
   // Public proxy must 404 the private control.
   const proxyRes = await fetch(`http://127.0.0.1:${PORT}/p/acme/rules/2/__preview_keepawake`, {
     method: "POST",

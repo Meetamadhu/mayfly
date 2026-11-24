@@ -61,6 +61,8 @@ export function timelineLabel(event: EnvironmentEvent): string {
       return "Fell asleep (no visitors)";
     case "woke":
       return event.detail ? `Woke up for a visitor (took ${event.detail} s)` : "Woke up for a visitor";
+    case "visited":
+      return "Visited";
     case "extended":
       return event.detail ? `Extended to ${formatDay(event.detail)}` : "Extended";
     case "keep_awake":
@@ -100,6 +102,7 @@ export function timelineTone(type: string): TimelineTone {
     case "slept":
       return "sleep";
     case "woke":
+    case "visited":
       return "wake";
     case "extended":
     case "keep_awake":
@@ -155,4 +158,9 @@ export function formatAgoRounded(iso: string, now: number) {
   const hours = Math.round(abs / 3_600_000);
   if (hours < 48) return `${hours} h ago`;
   return `${Math.round(abs / 86_400_000)} d ago`;
+}
+
+/** Drop a "visited" noted within 2 minutes of a wake: the visit that woke a preview is recorded as the wake. */
+export function withoutVisitNearWake(events: EnvironmentEvent[], wokeMs: number) {
+  return events.filter((event) => !(event.type === "visited" && Math.abs(Date.parse(event.at) - wokeMs) <= 2 * 60 * 1000));
 }
