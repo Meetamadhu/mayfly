@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
-import { LifecycleDrawer, cardState, estimatedCost, formatEstMoney, statePillLabel } from "@/components/board-parts";
+import { cardState, estimatedCost, formatEstMoney, statePillLabel } from "@/components/board-parts";
 import { BarChart, ChartLegend, type ChartSeries } from "@/components/charts";
 import { StateGlyph, repoAvatar } from "@/components/previews-view";
 import {
@@ -18,7 +18,10 @@ import {
   type CostPeriod,
 } from "@/lib/cost-view";
 import { FLEET_WINDOW_DAYS, REMOVAL_LABELS, REMOVAL_ORDER, fleetStats, formatLifespan } from "@/lib/fleet";
+import { PreviewDetails } from "@/components/preview-details";
+import { usualBuildMs } from "@/lib/preview-details";
 import type { Environment } from "@/lib/types";
+import { usePreviewActions, usePreviewPanel } from "@/lib/use-preview-actions";
 import { useOverview } from "@/lib/use-overview";
 
 const PERIOD_KEY = "mayfly-cost-period";
@@ -42,11 +45,12 @@ function matchesSearch(env: Environment, query: string) {
 }
 
 export function CostPage() {
-  const { overview, loadError, now } = useOverview();
+  const { overview, loadError, now, reload } = useOverview();
+  const { signedIn, busy, error, run } = usePreviewActions(reload);
+  const panel = usePreviewPanel();
   const [query, setQuery] = useState("");
   const [period, setPeriod] = useState<CostPeriod>("month");
   const [showAll, setShowAll] = useState(false);
-  const [lifecycleId, setLifecycleId] = useState<string | null>(null);
   const [perWeek, setPerWeek] = useState(12);
   const [hoursAwake, setHoursAwake] = useState(3);
 
@@ -99,7 +103,7 @@ export function CostPage() {
   const visible = showAll ? savings : savings.slice(0, TOP_SAVINGS);
   const biggest = Math.max(0.0001, ...savings.map((row) => row.saved));
   const owners = [...new Set(envs.map((env) => env.repository.split("/")[0]))];
-  const lifecycleEnv = lifecycleId ? (overview?.environments.find((env) => env.id === lifecycleId) ?? null) : null;
+  const panelEnv = panel.openId ? (overview?.environments.find((env) => env.id === panel.openId) ?? null) : null;
 
   return (
     <AppShell
@@ -237,7 +241,7 @@ export function CostPage() {
                 <span className="pv-avatar" data-tone={avatar.tone} aria-hidden="true">
                   {avatar.letter}
                 </span>
-                <button type="button" className="cost-list-name" onClick={() => setLifecycleId(env.id)}>
+                <button type="button" className="cost-list-name" onClick={() => panel.open(env.id)}>
                   {env.title ?? env.branch}
                 </button>
                 <span className="cost-list-num">#{env.prNumber}</span>
@@ -345,7 +349,21 @@ export function CostPage() {
         with, not a bill.
       </p>
 
-      <LifecycleDrawer env={lifecycleEnv} demo={lifecycleEnv ? isDemo(lifecycleEnv) : false} onClose={() => setLifecycleId(null)} />
+      <PreviewDetails
+        env={panelEnv}
+        demo={panelEnv ? isDemo(panelEnv) : false}
+        now={now}
+        signedIn={signedIn}
+        busy={busy}
+        error={error}
+        currency={overview?.currency ?? overview?.config.currency ?? "$"}
+        costPerHour={overview?.costPerHour ?? 0.05}
+        fallbackSleepSeconds={overview?.config.sleepSeconds ?? 1800}
+        usualBuildMs={usualBuildMs(overview?.environments ?? [])}
+        backLabel="Cost"
+        onAction={run}
+        onClose={panel.close}
+      />
     </AppShell>
   );
 }

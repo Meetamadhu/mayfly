@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import {
   EnvironmentCard,
-  LifecycleDrawer,
   formatLifetime,
   formatSleep,
   authorOf,
@@ -24,7 +23,10 @@ import {
   sortPreviews,
   type PreviewSort,
 } from "@/components/previews-view";
+import { PreviewDetails } from "@/components/preview-details";
+import { usualBuildMs } from "@/lib/preview-details";
 import type { Environment } from "@/lib/types";
+import { usePreviewActions, usePreviewPanel } from "@/lib/use-preview-actions";
 import { useOverview } from "@/lib/use-overview";
 import { useResources } from "@/lib/use-resources";
 
@@ -59,16 +61,14 @@ function countLine(list: Environment[]) {
 export function Dashboard() {
   const { overview, loadError, polledAt, now, reload } = useOverview();
   const resources = useResources(15_000);
-  const [error, setError] = useState<string | null>(null);
   const [showRemoved, setShowRemoved] = useState(false);
   const [boardFilter, setBoardFilter] = useState<BoardFilter>("all");
   const [boardQuery, setBoardQuery] = useState("");
   const [boardAuthor, setBoardAuthor] = useState<string | null>(null);
-  const [signedIn, setSignedIn] = useState(false);
   const [view, setView] = useState<"table" | "cards">("table");
   const [sort, setSort] = useState<PreviewSort>("visit");
-  const [busy, setBusy] = useState(false);
-  const [lifecycleId, setLifecycleId] = useState<string | null>(null);
+  const { signedIn, busy, error, run } = usePreviewActions(reload);
+  const panel = usePreviewPanel();
 
   useEffect(() => {
     setView(readPref(VIEW_KEY, ["table", "cards"] as const, "table"));
@@ -94,20 +94,6 @@ export function Dashboard() {
     }
   }
 
-  useEffect(() => {
-    let cancelled = false;
-    void fetch("/api/admin/session", { credentials: "include", cache: "no-store" })
-      .then((res) => res.json())
-      .then((body: { signedIn?: boolean }) => {
-        if (!cancelled) setSignedIn(Boolean(body.signedIn));
-      })
-      .catch(() => {
-        if (!cancelled) setSignedIn(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   function chooseView(next: "table" | "cards") {
     setView(next);
@@ -119,28 +105,8 @@ export function Dashboard() {
     writePref(SORT_KEY, next);
   }
 
-  async function adminAction(env: Environment, action: "sleep" | "extend" | "destroy") {
-    if (action === "destroy" && !window.confirm(`Remove the preview for ${env.repository} #${env.prNumber}? Its link will stop working.`)) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const path =
-        action === "destroy"
-          ? `/api/environments/${env.id}?action=destroy&wait=1`
-          : action === "sleep"
-            ? `/api/environments/${env.id}?action=sleep`
-            : `/api/environments/${env.id}?action=extend&hours=4`;
-      const response = await fetch(path, { method: "POST", credentials: "include" });
-      const body = (await response.json()) as { ok?: boolean; error?: string };
-      if (!response.ok || body.ok === false) {
-        throw new Error(body.error || `${action} failed.`);
-      }
-      await reload();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Something went wrong. Please try again.");
-    } finally {
-      setBusy(false);
-    }
+  function adminAction(env: Environment, action: "sleep" | "extend" | "destroy") {
+    void run(env, action, action === "extend" ? 4 : undefined);
   }
 
   const config = overview?.config;
@@ -167,7 +133,7 @@ export function Dashboard() {
   if (boardAuthor && !authorCounts.has(boardAuthor)) authors.unshift([boardAuthor, 0]);
   const removed = overview?.environments.filter((env) => env.status === "destroyed") ?? [];
   const dockerRuntime = config?.allowedRepositories != null;
-  const lifecycleEnv = lifecycleId ? (overview?.environments.find((env) => env.id === lifecycleId) ?? null) : null;
+  const panelEnv = panel.openId ? (overview?.environments.find((env) => env.id === panel.openId) ?? null) : null;
   const owners = [...new Set(current.map((env) => env.repository.split("/")[0]))];
   const filtersOn = (boardAuthor ? 1 : 0) + (view === "cards" ? 1 : 0);
 
@@ -308,7 +274,7 @@ export function Dashboard() {
           measured={Boolean(resources?.previews)}
           resourcesFor={(env) => (env.deploymentId ? resources?.previews?.[env.deploymentId] : undefined)}
           onAdminAction={(item, action) => void adminAction(item, action)}
-          onShowHistory={(item) => setLifecycleId(item.id)}
+          onShowHistory={(item) => panel.open(item.id)}
           onPickAuthor={pickAuthor}
         />
       ) : (
@@ -322,7 +288,7 @@ export function Dashboard() {
               signedIn={signedIn}
               busy={busy}
               onAdminAction={(item, action) => void adminAction(item, action)}
-              onShowLifecycle={(item) => setLifecycleId(item.id)}
+              onShowLifecycle={(item) => panel.open(item.id)}
               onPickAuthor={pickAuthor}
               resources={env.deploymentId ? resources?.previews?.[env.deploymentId] : undefined}
               measured={Boolean(resources?.previews)}
@@ -399,7 +365,7 @@ export function Dashboard() {
               signedIn={signedIn}
               busy={busy}
               onAdminAction={(item, action) => void adminAction(item, action)}
-              onShowLifecycle={(item) => setLifecycleId(item.id)}
+              onShowLifecycle={(item) => panel.open(item.id)}
             />
           ))}
         </div>
@@ -411,10 +377,20 @@ export function Dashboard() {
         </p>
       ) : null}
 
-      <LifecycleDrawer
-        env={lifecycleEnv}
-        demo={lifecycleEnv ? demoKey === `${lifecycleEnv.repository}#${lifecycleEnv.prNumber}` : false}
-        onClose={() => setLifecycleId(null)}
+      <PreviewDetails
+        env={panelEnv}
+        demo={panelEnv ? demoKey === `${panelEnv.repository}#${panelEnv.prNumber}` : false}
+        now={now}
+        signedIn={signedIn}
+        busy={busy}
+        error={error}
+        currency={currency}
+        costPerHour={costPerHour}
+        fallbackSleepSeconds={config?.sleepSeconds ?? 1800}
+        usualBuildMs={usualBuildMs(current)}
+        backLabel="Previews"
+        onAction={run}
+        onClose={panel.close}
       />
     </AppShell>
   );

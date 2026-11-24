@@ -115,7 +115,7 @@ environmentsRouter.post(
     if (action === "keep_awake") {
       const hoursRaw = typeof req.query.hours === "string" ? req.query.hours : "";
       if (!/^\d+$/.test(hoursRaw)) {
-        sendJson(res, { ok: false, code: "invalid", error: "hours must be 1, 4, or 8." }, 400);
+        sendJson(res, { ok: false, code: "invalid", error: "hours must be 1, 2, 4, or 8." }, 400);
         return;
       }
       const hours = Number(hoursRaw);
