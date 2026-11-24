@@ -1126,12 +1126,12 @@ async function syncGateIdle(
   return { updated, failed };
 }
 
-const KEEP_AWAKE_HOURS = new Set([1, 4, 8]);
+const KEEP_AWAKE_HOURS = new Set([1, 2, 4, 8]);
 
-/** Hold a live preview awake for 1, 4, or 8 hours (no idle sleep). */
+/** Hold a live preview awake for 1, 2, 4, or 8 hours (no idle sleep). */
 export async function keepAwakeEnvironment(id: string, hours: number): Promise<LifecycleResult> {
   if (!KEEP_AWAKE_HOURS.has(hours)) {
-    return { ok: false, code: "invalid", error: "hours must be 1, 4, or 8." };
+    return { ok: false, code: "invalid", error: "hours must be 1, 2, 4, or 8." };
   }
 
   const reserved = await exclusive(async () => {

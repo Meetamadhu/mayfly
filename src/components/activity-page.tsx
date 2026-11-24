@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { AppShell } from "@/components/app-shell";
-import { LifecycleDrawer } from "@/components/board-parts";
 import { BarChart, ChartLegend, type ChartSeries } from "@/components/charts";
 import { StateGlyph } from "@/components/previews-view";
 import {
@@ -19,7 +18,10 @@ import {
   type ActivityRow,
   type ActivityTab,
 } from "@/lib/activity";
+import { PreviewDetails } from "@/components/preview-details";
+import { usualBuildMs } from "@/lib/preview-details";
 import type { Environment } from "@/lib/types";
+import { usePreviewActions, usePreviewPanel } from "@/lib/use-preview-actions";
 import { useOverview } from "@/lib/use-overview";
 
 function matchesSearch(env: Environment, query: string) {
@@ -50,10 +52,11 @@ function formatHoursValue(value: number) {
 }
 
 export function ActivityPage() {
-  const { overview, loadError, now } = useOverview();
+  const { overview, loadError, now, reload } = useOverview();
+  const { signedIn, busy, error, run } = usePreviewActions(reload);
+  const panel = usePreviewPanel();
   const [tab, setTab] = useState<ActivityTab>("all");
   const [query, setQuery] = useState("");
-  const [lifecycleId, setLifecycleId] = useState<string | null>(null);
   const [limit, setLimit] = useState(PAGE_ROWS);
 
   const config = overview?.config;
@@ -82,7 +85,7 @@ export function ActivityPage() {
   const days = hoursPerDay(overview?.usage?.days, now, 7);
   const owners = [...new Set((overview?.environments ?? []).filter((env) => !isDemo(env)).map((env) => env.repository.split("/")[0]))];
   const livePreviews = (overview?.environments ?? []).filter((env) => env.status !== "destroyed").length;
-  const lifecycleEnv = lifecycleId ? (overview?.environments.find((env) => env.id === lifecycleId) ?? null) : null;
+  const panelEnv = panel.openId ? (overview?.environments.find((env) => env.id === panel.openId) ?? null) : null;
   const describeOptions = { demoKey, fallbackSleepSeconds: config?.sleepSeconds ?? 1800 };
 
   const today: { id: string; tone: string; label: string; value: number }[] = [
@@ -155,7 +158,7 @@ export function ActivityPage() {
                             <button
                               type="button"
                               className="act-subject"
-                              onClick={() => setLifecycleId(single.id)}
+                              onClick={() => panel.open(single.id)}
                               aria-label={`${text.subject}: show its history`}
                             >
                               {text.subject}
@@ -186,7 +189,7 @@ export function ActivityPage() {
           {overview && rows.length > 0 ? (
             <p className="act-note">
               Mayfly keeps the last 50 events for each preview, even after it&apos;s removed. Click a PR number to see
-              its whole history.
+              its details and whole history.
             </p>
           ) : null}
         </section>
@@ -239,10 +242,20 @@ export function ActivityPage() {
         </aside>
       </div>
 
-      <LifecycleDrawer
-        env={lifecycleEnv}
-        demo={lifecycleEnv ? isDemo(lifecycleEnv) : false}
-        onClose={() => setLifecycleId(null)}
+      <PreviewDetails
+        env={panelEnv}
+        demo={panelEnv ? isDemo(panelEnv) : false}
+        now={now}
+        signedIn={signedIn}
+        busy={busy}
+        error={error}
+        currency={overview?.currency ?? overview?.config.currency ?? "$"}
+        costPerHour={overview?.costPerHour ?? 0.05}
+        fallbackSleepSeconds={overview?.config.sleepSeconds ?? 1800}
+        usualBuildMs={usualBuildMs(overview?.environments ?? [])}
+        backLabel="Activity"
+        onAction={run}
+        onClose={panel.close}
       />
     </AppShell>
   );

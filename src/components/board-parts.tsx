@@ -5,13 +5,7 @@ import type { PreviewResources } from "@/lib/resources";
 import type { Environment, EnvironmentStatus, UsageDay, UsageMonth } from "@/lib/types";
 import { formatBytes, loadTone } from "@/lib/use-resources";
 import { isProblemLine, summarizeFailure } from "@/lib/build-log";
-import {
-  formatAgoRounded,
-  formatEventTime,
-  timelineLabel,
-  timelineOldestFirst,
-  timelineTone,
-} from "@/lib/timeline";
+import { formatAgoRounded, timelineOldestFirst } from "@/lib/timeline";
 
 /** Building blocks shared by the Dashboard, Activity, Cost & savings and Admin pages. */
 
@@ -1035,85 +1029,6 @@ export function boardRecentActivity(environments: Environment[], demoKey: string
     i = j;
   }
   return items;
-}
-
-export function LifecycleDrawer({
-  env,
-  demo,
-  onClose,
-}: {
-  env: Environment | null;
-  demo: boolean;
-  onClose: () => void;
-}) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    if (env && !dialog.open) dialog.showModal();
-    if (!env && dialog.open) dialog.close();
-  }, [env]);
-
-  const events = env ? timelineOldestFirst(env.events) : [];
-  const state = env ? cardState(env) : "running";
-
-  return (
-    <dialog
-      ref={dialogRef}
-      className="lifecycle-drawer"
-      aria-labelledby="lifecycle-title"
-      onClose={onClose}
-      onCancel={(event) => {
-        event.preventDefault();
-        onClose();
-      }}
-      onClick={(event) => {
-        if (event.target === dialogRef.current) onClose();
-      }}
-    >
-      {env ? (
-        <div className="lifecycle-inner">
-          <header className="lifecycle-head">
-            <div>
-              <h2 id="lifecycle-title">
-                {demo ? "Demo" : `PR #${env.prNumber}`} — History
-              </h2>
-              <p className="lifecycle-sub">
-                <span className="mono">{demo ? "demo" : env.branch}</span> · {env.repository}
-              </p>
-            </div>
-            <button type="button" className="secondary lifecycle-close" onClick={onClose}>
-              Close
-            </button>
-          </header>
-          <p className="lifecycle-state">
-            <span className="state-pill" data-state={state}>
-              {statePillIcon(state) ? <StatIcon name={statePillIcon(state)!} /> : null}
-              {statePillLabel(state)}
-            </span>
-            <span className="mono">{env.sha.slice(0, 8)}</span>
-          </p>
-          {events.length === 0 ? (
-            <p className="empty">Nothing has happened to this preview yet.</p>
-          ) : (
-            <ol className="lifecycle-list">
-              {events.map((event, index) => (
-                <li key={`${event.at}-${event.type}-${index}`} data-tone={timelineTone(event.type)}>
-                  <span className="lifecycle-dot" aria-hidden="true" />
-                  <div>
-                    <strong>{timelineLabel(event)}</strong>
-                    <time dateTime={event.at}>{formatEventTime(event.at)}</time>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          )}
-          <p className="lifecycle-foot">Mayfly remembers the last 50 things that happened to each preview.</p>
-        </div>
-      ) : null}
-    </dialog>
-  );
 }
 
 export const VIEW_STORAGE_KEY = "mayfly-board-view";
