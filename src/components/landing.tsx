@@ -376,8 +376,43 @@ export function Landing() {
         </details>
       </section>
 
-      <footer className="lp-foot">
-        <span>© Mayfly</span>
+      <footer className="lp-footer">
+        <div className="lp-footer-inner">
+          <div className="lp-footer-brand">
+            <a className="lp-brand" href="/" aria-label="Mayfly home">
+              <MayflyMark className="lp-footer-mark" />
+              <span>mayfly</span>
+            </a>
+            <p>
+              A live preview for every pull request. Idle previews sleep, wake on the next visit, and are removed after
+              the merge.
+            </p>
+          </div>
+          <nav className="lp-footer-cols" aria-label="Footer">
+            <div>
+              <h2>Product</h2>
+              <a href="#how">How it works</a>
+              <a href="#app">Android app</a>
+              <a href="#faq">Questions</a>
+            </div>
+            <div>
+              <h2>Dashboard</h2>
+              <a href="/board">Previews</a>
+              <a href="/activity">Activity</a>
+              <a href="/cost">Cost</a>
+            </div>
+            <div>
+              <h2>Admins</h2>
+              <a href={signedIn ? "/admin" : "/admin/login"}>{signedIn ? "Admin" : "Sign in"}</a>
+              <a href="/policies">Lifetime rules</a>
+              <a href="/pr-comments">PR comments</a>
+            </div>
+          </nav>
+        </div>
+        <div className="lp-footer-bottom">
+          <span>© {new Date().getFullYear()} Mayfly</span>
+          <span>Preview environments for pull requests</span>
+        </div>
       </footer>
     </main>
   );
