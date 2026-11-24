@@ -14,7 +14,7 @@ import {
   sleepSecondsForRepo,
   ttlHoursForRepo,
 } from "./config";
-import { removedBecause } from "./timeline";
+import { removedBecause, withoutVisitNearWake } from "./timeline";
 import { getDeployer, previewUrl, publicPreviewUrl, type Deployment } from "./deployer";
 import { pruneEnvironments } from "./prune";
 import { sendAlert } from "./alerts";
@@ -1256,6 +1256,9 @@ async function ensureDemo() {
   }
 }
 
+/** How often a visit is written into a preview's history. */
+export const VISIT_EVENT_GAP_MS = 30 * 60 * 1000;
+
 export async function recordActivity(id: string): Promise<LifecycleResult> {
   return exclusive(async () => {
     const state = await loadState();
@@ -1272,6 +1275,10 @@ export async function recordActivity(id: string): Promise<LifecycleResult> {
     const now = iso();
     env.lastActiveAt = now;
     env.updatedAt = now;
+    // Note a visit in the history at most once every 30 minutes (a wake counts as one), so a busy preview's
+    // visits don't push its older history out of the 50 kept events.
+    const lastVisit = Math.max(lastEventAt(env, "visited"), lastEventAt(env, "woke"));
+    if (Date.parse(now) - lastVisit >= VISIT_EVENT_GAP_MS) pushEnvironmentEvent(env, { at: now, type: "visited" });
     await saveState(state);
     return { ok: true, action: "activity", environment: clone(env) };
   });
@@ -1553,6 +1560,14 @@ export async function reap(): Promise<ReapResult> {
       const gate = gateById.get(env.id);
       if (!gate) continue;
       const pending: EnvironmentEvent[] = [];
+      // The visit that woke a sleeping preview is recorded as the wake itself, so drop a "visited" noted
+      // around the same moment (it can land just before the gate's wake time and would hide the wake).
+      if (gate.wokeAt) {
+        const wokeMs = Date.parse(gate.wokeAt);
+        if (Number.isFinite(wokeMs) && wokeMs > lastEventAt(env, "woke") && env.events?.length) {
+          env.events = withoutVisitNearWake(env.events, wokeMs);
+        }
+      }
       if (gate.sleptAt) {
         const sleptMs = Date.parse(gate.sleptAt);
         if (Number.isFinite(sleptMs) && sleptMs > lastEventAt(env, "slept")) {

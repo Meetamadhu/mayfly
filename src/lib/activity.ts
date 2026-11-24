@@ -22,6 +22,7 @@ export const ACTIVITY_TABS: { id: ActivityTab; label: string }[] = [
 export function activityKind(type: string): ActivityKind {
   switch (type) {
     case "woke":
+    case "visited":
       return "wake";
     case "slept":
       return "nap";
@@ -41,7 +42,7 @@ export function activityKind(type: string): ActivityKind {
 
 /** The icon tone for a row: the same four state colours as the Previews page, plus red for failures. */
 export function activityTone(type: string): "building" | "awake" | "asleep" | "failed" | "time" {
-  if (type === "woke" || type === "ready") return "awake";
+  if (type === "woke" || type === "visited" || type === "ready") return "awake";
   if (type === "slept") return "asleep";
   if (type === "failed" || type === "destroyed") return "failed";
   if (activityKind(type) === "time") return "time";
@@ -165,6 +166,8 @@ export function describeRow(row: ActivityRow, options: { demoKey: string | null;
         after: demo ? " woke for a visitor" : " woke for a reviewer",
         sub: join(detail ? `Ready in ${detail} s` : "", by) || repo,
       };
+    case "visited":
+      return { subject, before: "", after: " was visited", sub: join(repo, by) };
     case "slept":
       return {
         subject,

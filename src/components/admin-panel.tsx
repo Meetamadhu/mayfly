@@ -5,8 +5,11 @@ import { AppShell } from "@/components/app-shell";
 import { BackupsPanel } from "@/components/backups-panel";
 import { ResourcesPanel } from "@/components/resources-panel";
 import { Lifespan, OpenedBy, cardState, statePillLabel } from "@/components/board-parts";
+import { StateGlyph, repoAvatar } from "@/components/previews-view";
+import { RecentActivitySheet } from "@/components/recent-activity-sheet";
+import { READ_KEY, isUnread, readSince, recentItems } from "@/lib/recent-activity";
 import type { Environment, EnvironmentStatus, Overview } from "@/lib/types";
-import { removedLabel, timelineLabel, timelineNewestFirst } from "@/lib/timeline";
+import { timelineLabel, timelineNewestFirst } from "@/lib/timeline";
 
 const TRANSITIONAL = new Set<EnvironmentStatus>(["provisioning", "updating", "destroying"]);
 const LIVE = new Set<EnvironmentStatus>(["provisioning", "ready", "updating", "destroying"]);
@@ -28,23 +31,6 @@ function previewPath(url: string) {
   } catch {
     return url;
   }
-}
-
-function formatDelta(iso: string, now = Date.now()) {
-  const delta = Date.parse(iso) - now;
-  if (Number.isNaN(delta)) return iso;
-  const abs = Math.abs(delta);
-  const minutes = Math.round(abs / 60000);
-  if (minutes < 1) return delta >= 0 ? "now" : "just now";
-  const hours = Math.floor(abs / 3600000);
-  const rest = minutes % 60;
-  const text =
-    hours >= 48
-      ? `${Math.floor(hours / 24)} d ${hours % 24} h`
-      : hours > 0
-        ? `${hours}h ${rest}m`
-        : `${minutes}m`;
-  return delta >= 0 ? `in ${text}` : `${text} ago`;
 }
 
 function formatLifetime(hours: number) {
@@ -108,56 +94,21 @@ function isLocalPreviewBase(url: string) {
   }
 }
 
-type Activity = { at: string; repository: string; prNumber: number; text: string };
+type ListTab = "all" | "awake" | "asleep" | "failed";
 
-function describeActivity(text: string) {
-  const lower = text.toLowerCase();
-  if (lower === "created") return { tone: "ready", label: "Created", detail: null };
-  if (lower === "updated") return { tone: "work", label: "Updated", detail: null };
-  if (lower === "last visit") return { tone: "asleep", label: "Visit", detail: null };
-  if (lower.startsWith("removed")) {
-    const reason = text.replace(/^Removed\s*/i, "").replace(/^\((.*)\)$/, "$1").trim();
-    return { tone: "failed", label: "Removed", detail: reason || null };
-  }
-  if (lower.startsWith("preview ready:") || lower.startsWith("preview updated:")) {
-    const raw = text.slice(text.indexOf(":") + 1).trim();
-    let detail = raw;
-    try {
-      detail = new URL(raw).pathname;
-    } catch {
-      detail = raw;
-    }
-    return { tone: lower.startsWith("preview ready:") ? "ready" : "work", label: lower.startsWith("preview ready:") ? "Ready" : "Updated", detail };
-  }
-  const destroyed = /^Preview destroyed \(([^)]+)\)/i.exec(text);
-  if (destroyed) return { tone: "failed", label: "Removed", detail: destroyed[1] };
-  return { tone: "note", label: "Note", detail: text };
-}
+const LIST_TABS: { id: ListTab; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "awake", label: "Awake" },
+  { id: "asleep", label: "Asleep" },
+  { id: "failed", label: "Failed" },
+];
 
-function recentActivity(environments: Environment[]) {
-  const events: Activity[] = [];
-  for (const env of environments) {
-    events.push({ at: env.createdAt, repository: env.repository, prNumber: env.prNumber, text: "Created" });
-    if (env.lastActiveAt && env.lastActiveAt !== env.createdAt) {
-      events.push({ at: env.lastActiveAt, repository: env.repository, prNumber: env.prNumber, text: "Last visit" });
-    }
-    if (env.updatedAt && env.updatedAt !== env.createdAt && env.updatedAt !== env.lastActiveAt) {
-      events.push({ at: env.updatedAt, repository: env.repository, prNumber: env.prNumber, text: "Updated" });
-    }
-    if (env.destroyedAt) {
-      const reason = removedLabel(env.destroyReason);
-      events.push({ at: env.destroyedAt, repository: env.repository, prNumber: env.prNumber, text: reason });
-    }
-    for (const comment of env.comments) {
-      events.push({
-        at: comment.at,
-        repository: env.repository,
-        prNumber: env.prNumber,
-        text: comment.body.split("\n")[0],
-      });
-    }
-  }
-  return events.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 20);
+function inListTab(env: Environment, tab: ListTab) {
+  const state = cardState(env);
+  if (tab === "awake") return state === "running";
+  if (tab === "asleep") return state === "sleeping";
+  if (tab === "failed") return state === "failed";
+  return true;
 }
 
 export function AdminPanel() {
@@ -173,7 +124,11 @@ export function AdminPanel() {
   const repositoryEdited = useRef(false);
   const [ttlMinutes, setTtlMinutes] = useState("");
   const [extendHours, setExtendHours] = useState("4");
-  const [keepAwakeHours, setKeepAwakeHours] = useState<1 | 4 | 8>(1);
+  const [keepAwakeHours, setKeepAwakeHours] = useState<1 | 2 | 4 | 8>(1);
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [readMs, setReadMs] = useState(() => Date.now());
+  const [listTab, setListTab] = useState<ListTab>("all");
+  const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const defaultTtlLabel = overview ? formatLifetime(overview.config.ttlHours) : "server default";
 
@@ -213,6 +168,38 @@ export function AdminPanel() {
     const tick = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(tick);
   }, []);
+
+  // When this device last marked the activity read (kept in this browser only).
+  useEffect(() => {
+    let stored: string | null = null;
+    try {
+      stored = localStorage.getItem(READ_KEY);
+    } catch {
+      // Storage can be blocked; everything from the last day counts as new.
+    }
+    setReadMs(readSince(stored, Date.now()));
+  }, []);
+
+  function markAllRead() {
+    const at = new Date().toISOString();
+    try {
+      localStorage.setItem(READ_KEY, at);
+    } catch {
+      // Not remembered after a reload, but cleared for now.
+    }
+    setReadMs(Date.parse(at));
+  }
+
+  async function refresh() {
+    setRefreshing(true);
+    try {
+      await reload();
+    } catch (caught) {
+      setLoadError(caught instanceof Error ? caught.message : "Could not load environments.");
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   async function readBody(response: Response) {
     const body = (await response.json()) as { error?: string };
@@ -294,7 +281,7 @@ export function AdminPanel() {
     }
   }
 
-  async function keepAwake(env: Environment, hours: 1 | 4 | 8) {
+  async function keepAwake(env: Environment, hours: 1 | 2 | 4 | 8) {
     setBusy(true);
     setError(null);
     setNotice(null);
@@ -387,7 +374,17 @@ export function AdminPanel() {
 
   const demoKey = config?.demo ?? "";
   const rows = overview?.environments.filter((env) => env.status !== "destroyed") ?? [];
-  const activity = overview ? recentActivity(overview.environments) : [];
+  const activity = overview ? recentItems(overview.environments, demoKey || null) : [];
+  const unread = activity.filter((item) => isUnread(item, readMs)).length;
+  const listed = rows.filter((env) => inListTab(env, listTab));
+  const setupIssues = config
+    ? (config.webhookVerification === "signed" ? 0 : 1) + (isLocalPreviewBase(config.previewBaseUrl) ? 1 : 0)
+    : 0;
+  const envFile = config?.onRender ? "Render → Environment" : ".env.local";
+  const envLines = [
+    config && config.webhookVerification !== "signed" ? "GITHUB_WEBHOOK_SECRET=…" : null,
+    config && isLocalPreviewBase(config.previewBaseUrl) ? "PREVIEW_BASE_URL=https://…" : null,
+  ].filter(Boolean) as string[];
 
   return (
     <AppShell active="admin" githubConnected={Boolean(config?.githubConnected)} onSignOut={signOut}>
@@ -399,19 +396,69 @@ export function AdminPanel() {
         </div>
       </section>
 
+      <div className="adm-toolbar">
+        <button type="button" className="adm-tool" onClick={() => setActivityOpen(true)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" />
+            <path d="M10 20.5a2.2 2.2 0 0 0 4 0" />
+          </svg>
+          Recent activity
+          {unread > 0 ? (
+            <span className="adm-badge">
+              {unread > 99 ? "99+" : unread}
+              <span className="visually-hidden"> new</span>
+            </span>
+          ) : null}
+        </button>
+        <button type="button" className="adm-tool" disabled={refreshing} onClick={() => void refresh()}>
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" data-spin={refreshing ? "1" : undefined}>
+            <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+            <path d="M20 4v5h-5" />
+          </svg>
+          {refreshing ? "Refreshing…" : "Refresh"}
+        </button>
+      </div>
+
+      {setupIssues > 0 ? (
+        <a className="adm-banner" href="#setup-check">
+          <span className="adm-banner-icon" aria-hidden="true">
+            !
+          </span>
+          <span className="adm-banner-text">
+            <strong>Setup needs attention</strong>
+            <span>
+              {setupIssues} setting{setupIssues === 1 ? "" : "s"} to fix
+            </span>
+          </span>
+          <span className="adm-banner-go">Review ›</span>
+        </a>
+      ) : null}
+
       <section className="panel" aria-label="Previews">
         <div className="ledger-head">
           <div>
-            <h2>Previews</h2>
+            <h2>
+              Previews {overview ? <span className="adm-count">{rows.length}</span> : null}
+            </h2>
             <p className="help">Everything running now, plus any that failed to build. You&apos;ll always be asked before a preview is removed.</p>
           </div>
         </div>
+        {rows.length > 0 ? (
+          <div className="adm-tabs" role="tablist" aria-label="Show previews">
+            {LIST_TABS.map((item) => (
+              <button key={item.id} type="button" role="tab" aria-selected={listTab === item.id} onClick={() => setListTab(item.id)}>
+                {item.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {rows.length > 0 && listed.length === 0 ? <p className="empty">No previews here right now.</p> : null}
         {loadError ? <p className="error" role="alert">{loadError}</p> : null}
         {!overview && !loadError ? <p className="empty">Loading previews…</p> : null}
         {overview && rows.length === 0 ? <p className="empty">Nothing is running right now.</p> : null}
-        {rows.length > 0 ? (
+        {listed.length > 0 ? (
           <ul className="preview-list">
-            {rows.map((env) => {
+            {listed.map((env) => {
               const demo = demoKey === `${env.repository}#${env.prNumber}`;
               const canSleep = env.status === "ready" && env.sleep === "awake";
               const canKeepAwake = env.status === "ready" || env.status === "updating";
@@ -419,37 +466,100 @@ export function AdminPanel() {
                 env.keepAwakeUntil && Date.parse(env.keepAwakeUntil) > now ? env.keepAwakeUntil : null;
               const pillState = cardState(env);
               const timeline = timelineNewestFirst(env.events);
+              const avatar = repoAvatar(env.repository);
               return (
-                <li key={env.id} className={env.status === "ready" ? "env featured" : "env"} data-state={pillState}>
-                  <div className="card-body">
-                    <header className="admin-card-head">
-                      <h3>
-                        {demo ? "Demo preview" : `PR #${env.prNumber}`}
-                        <span className="card-repo">{env.repository}</span>
-                      </h3>
-                      <span className="state-pill" data-state={pillState}>
-                        {statePillLabel(pillState)}
-                      </span>
-                    </header>
-                    {demo ? null : <p className="env-card-branch mono">{env.branch}</p>}
-                    <p className="admin-card-note">
-                      {stateNote(env)}
-                      {awakeUntil ? ` Kept awake until ${formatAwakeUntil(awakeUntil)}.` : ""}
-                    </p>
-                    <Lifespan env={env} now={now} demo={demo} />
-                    <p className="env-card-facts">
+                <li key={env.id} className="env adm-card" data-state={pillState}>
+                  <header className="adm-card-head">
+                    <span className="pv-avatar" data-tone={avatar.tone} aria-hidden="true">
+                      {avatar.letter}
+                    </span>
+                    <div className="adm-card-title">
+                      <h3>{demo ? "Demo preview" : `PR #${env.prNumber}`}</h3>
+                      <span className="card-repo">{env.repository}</span>
+                    </div>
+                    <span className="state-pill" data-state={pillState}>
+                      {statePillLabel(pillState)}
+                    </span>
+                  </header>
+                  {demo ? null : <p className="adm-branch mono">{env.branch}</p>}
+                  <p className="adm-note">
+                    {stateNote(env)}
+                    {awakeUntil ? ` Kept awake until ${formatAwakeUntil(awakeUntil)}.` : ""}
+                  </p>
+                  <Lifespan env={env} now={now} demo={demo} />
+                  <p className="adm-facts">
+                    <span>
                       <OpenedBy env={env} />
                       {demo ? null : (
                         <>
-                          Commit <span className="mono">{env.sha.slice(0, 7)}</span>.{" "}
+                          Commit <span className="mono">{env.sha.slice(0, 7)}</span>
                         </>
                       )}
-                      Last visited {formatAgo(env.lastActiveAt, now)}.
-                      {typeof env.sleepSeconds === "number"
-                        ? ` Falls asleep after ${env.sleepSeconds} s without visitors.`
-                        : ""}
-                    </p>
-                    <details className="env-timeline">
+                    </span>
+                    <span>Last visited {formatAgo(env.lastActiveAt, now)}</span>
+                  </p>
+                  <div className="adm-actions">
+                    {env.url ? (
+                      <a className="adm-btn adm-btn-main" href={previewPath(env.url)} target="_blank" rel="noopener noreferrer">
+                        Open preview <span aria-hidden="true">↗</span>
+                        <span className="visually-hidden"> (opens in a new tab)</span>
+                      </a>
+                    ) : (
+                      <button type="button" className="adm-btn adm-btn-main" disabled>
+                        Open preview
+                      </button>
+                    )}
+                    {canSleep ? (
+                      <button type="button" className="adm-btn" disabled={busy} onClick={() => void sleepNow(env.id)}>
+                        Put to sleep
+                      </button>
+                    ) : null}
+                    {awakeUntil ? (
+                      <button type="button" className="adm-btn" disabled={busy} onClick={() => void keepAwakeOff(env)}>
+                        Stop keeping awake
+                      </button>
+                    ) : (
+                      <span className="adm-split">
+                        <button
+                          type="button"
+                          className="adm-btn"
+                          disabled={busy || !canKeepAwake}
+                          onClick={() => void keepAwake(env, keepAwakeHours)}
+                        >
+                          Keep awake
+                        </button>
+                        <select
+                          aria-label="Keep awake for"
+                          value={keepAwakeHours}
+                          disabled={busy || !canKeepAwake}
+                          onChange={(event) => setKeepAwakeHours(Number(event.target.value) as 1 | 2 | 4 | 8)}
+                        >
+                          <option value={1}>1h</option>
+                          <option value={2}>2h</option>
+                          <option value={4}>4h</option>
+                          <option value={8}>8h</option>
+                        </select>
+                      </span>
+                    )}
+                    <span className="adm-split">
+                      <button type="button" className="adm-btn" disabled={busy || demo} onClick={() => void extend(env)}>
+                        Extend
+                      </button>
+                      <select
+                        aria-label="Extend by"
+                        value={extendHours}
+                        disabled={busy || demo}
+                        onChange={(event) => setExtendHours(event.target.value)}
+                      >
+                        <option value="2">2h</option>
+                        <option value="4">4h</option>
+                        <option value="12">12h</option>
+                        <option value="24">24h</option>
+                      </select>
+                    </span>
+                  </div>
+                  <footer className="adm-card-foot">
+                    <details className="adm-history">
                       <summary>History</summary>
                       {timeline.length === 0 ? (
                         <p className="env-timeline-empty">Nothing has happened yet</p>
@@ -464,62 +574,9 @@ export function AdminPanel() {
                         </ol>
                       )}
                     </details>
-                  </div>
-                  <footer className="card-foot card-foot-admin">
-                    {env.url ? (
-                      <a className="open-preview" href={previewPath(env.url)}>
-                        Open preview
-                      </a>
-                    ) : (
-                      <button type="button" className="open-preview" disabled>
-                        Open preview
-                      </button>
-                    )}
-                    <div className="admin-actions">
-                      <button type="button" className="secondary" disabled={busy || !canSleep} onClick={() => void sleepNow(env.id)}>
-                        Put to sleep
-                      </button>
-                      <select
-                        aria-label="Keep awake for"
-                        value={keepAwakeHours}
-                        disabled={busy || !canKeepAwake}
-                        onChange={(event) => setKeepAwakeHours(Number(event.target.value) as 1 | 4 | 8)}
-                      >
-                        <option value={1}>1h</option>
-                        <option value={4}>4h</option>
-                        <option value={8}>8h</option>
-                      </select>
-                      <button
-                        type="button"
-                        className="secondary"
-                        disabled={busy || !canKeepAwake}
-                        onClick={() => void keepAwake(env, keepAwakeHours)}
-                      >
-                        Keep awake
-                      </button>
-                      {awakeUntil ? (
-                        <button type="button" className="secondary" disabled={busy} onClick={() => void keepAwakeOff(env)}>
-                          Stop keeping awake
-                        </button>
-                      ) : null}
-                      <select
-                        aria-label="Extend by"
-                        value={extendHours}
-                        disabled={busy || demo}
-                        onChange={(event) => setExtendHours(event.target.value)}
-                      >
-                        <option value="2">2h</option>
-                        <option value="4">4h</option>
-                        <option value="12">12h</option>
-                        <option value="24">24h</option>
-                      </select>
-                      <button type="button" className="secondary" disabled={busy || demo} onClick={() => void extend(env)}>
-                        Extend
-                      </button>
-                      <button type="button" className="destroy" disabled={busy || env.status === "destroying"} onClick={() => void destroy(env)}>
-                        Remove
-                      </button>
-                    </div>
+                    <button type="button" className="adm-remove" disabled={busy || env.status === "destroying"} onClick={() => void destroy(env)}>
+                      Remove
+                    </button>
                   </footer>
                 </li>
               );
@@ -532,7 +589,9 @@ export function AdminPanel() {
 
       <div className="workspace">
         <details id="simulator" className="panel simulator" open>
-          <summary>Try a pull request</summary>
+          <summary>
+            Try a pull request <span className="adm-chip" data-tone="ok">Practice mode</span>
+          </summary>
           <p className="help">
             Pretend to be GitHub: open, update, close or merge a pull request and watch what Mayfly does. Real pull requests arrive at <span className="mono">/api/webhooks/github</span>.
           </p>
@@ -633,25 +692,25 @@ export function AdminPanel() {
                     placeholder={`default: ${defaultTtlLabel}`}
                   />
                 </label>
-                <p className="help">Leave empty for the usual lifetime. Enter 0 to make it run out straight away, then press Clean up now to see it removed.</p>
+                <p className="help">Leave empty for the usual lifetime. Enter 0 to make it run out straight away, then press Clean up to see it removed.</p>
                 <div className="actions">
-                  <button type="submit" disabled={busy}>Open the pull request</button>
+                  <button type="submit" disabled={busy}>Open PR</button>
                   <button
                     type="button"
                     className="secondary"
                     disabled={busy}
                     onClick={() => void send("synchronize", { sha: "" })}
                   >
-                    Push a new commit
+                    Push commit
                   </button>
                   <button type="button" className="secondary" disabled={busy} onClick={() => void send("closed")}>
-                    Close it
+                    Close
                   </button>
                   <button type="button" className="secondary" disabled={busy} onClick={() => void send("closed", { merged: true })}>
-                    Merge it
+                    Merge
                   </button>
-                  <button type="button" className="secondary" disabled={busy} onClick={() => void runReaper()}>
-                    Clean up now
+                  <button type="button" className="secondary sim-cleanup" disabled={busy} onClick={() => void runReaper()}>
+                    Clean up
                   </button>
                 </div>
               </form>
@@ -659,55 +718,66 @@ export function AdminPanel() {
           </article>
         </details>
 
-        <section className="panel config-check" aria-label="Configuration check">
-          <h2>Setup check</h2>
-          <p className="help">
-            Two settings worth checking: whether Mayfly can tell real GitHub messages from fake ones, and the address
-            people use to open previews.
-          </p>
-          <dl className="settings config-check-list">
-            <div>
-              <dt>Messages from GitHub</dt>
-              <dd>
-                {config ? (
-                  config.webhookVerification === "signed" ? (
-                    <span className="config-status" data-tone="ok">
-                      Verified
-                    </span>
-                  ) : (
-                    <span className="config-status" data-tone="bad">
-                      Not verified — anyone could pretend to be GitHub
-                    </span>
-                  )
-                ) : (
-                  "–"
-                )}
-              </dd>
-            </div>
-            <div>
-              <dt>Public address</dt>
-              <dd>
-                {config ? (
-                  <>
-                    <span className="mono config-base-url">{config.previewBaseUrl}</span>
-                    {isLocalPreviewBase(config.previewBaseUrl) ? (
-                      <span className="config-status" data-tone="warn">
-                        This is a local address, so links in PR comments won&apos;t work for anyone else
-                      </span>
-                    ) : null}
-                  </>
-                ) : (
-                  "–"
-                )}
-              </dd>
-            </div>
-          </dl>
+        <section className="panel config-check adm-setup" id="setup-check" aria-label="Setup check">
+          <div className="adm-setup-head">
+            <h2>Setup check</h2>
+            {config ? (
+              <span className="adm-chip" data-tone={setupIssues > 0 ? "warn" : "ok"}>
+                {setupIssues > 0 ? `${setupIssues} to fix` : "All good"}
+              </span>
+            ) : null}
+          </div>
+          <p className="help">Two settings worth checking before real pull requests arrive.</p>
           {config ? (
-            <p className="help">
-              {config.onRender
-                ? "To change these, set GITHUB_WEBHOOK_SECRET and PREVIEW_BASE_URL in Render → Environment."
-                : "To change these, set GITHUB_WEBHOOK_SECRET and PREVIEW_BASE_URL in .env.local, then restart Mayfly."}
-            </p>
+            <ul className="adm-checks">
+              <li data-tone={config.webhookVerification === "signed" ? "ok" : "bad"}>
+                <span className="adm-check-icon" aria-hidden="true">
+                  <StateGlyph tone={config.webhookVerification === "signed" ? "awake" : "failed"} />
+                </span>
+                <div>
+                  <strong>Messages from GitHub</strong>
+                  <span className="adm-chip" data-tone={config.webhookVerification === "signed" ? "ok" : "bad"}>
+                    {config.webhookVerification === "signed" ? "Verified" : "Not verified"}
+                  </span>
+                  <p>
+                    {config.webhookVerification === "signed"
+                      ? "Mayfly checks that each message really comes from GitHub."
+                      : "Anyone could pretend to be GitHub. Set GITHUB_WEBHOOK_SECRET to the webhook's secret."}
+                  </p>
+                </div>
+              </li>
+              <li data-tone={isLocalPreviewBase(config.previewBaseUrl) ? "warn" : "ok"}>
+                <span className="adm-check-icon" aria-hidden="true">
+                  {isLocalPreviewBase(config.previewBaseUrl) ? "!" : <StateGlyph tone="awake" />}
+                </span>
+                <div>
+                  <strong>Public address</strong>
+                  <span className="adm-url mono">{config.previewBaseUrl}</span>
+                  <p>
+                    {isLocalPreviewBase(config.previewBaseUrl)
+                      ? "Local address, so links in PR comments won't work for anyone else."
+                      : "Links in PR comments use this address."}
+                  </p>
+                </div>
+              </li>
+            </ul>
+          ) : (
+            <p className="help">Checking…</p>
+          )}
+          {config && envLines.length > 0 ? (
+            <div className="adm-code">
+              <div className="adm-code-head">
+                <span># {envFile}</span>
+                <button
+                  type="button"
+                  onClick={() => void navigator.clipboard?.writeText(envLines.join("\n")).catch(() => undefined)}
+                >
+                  Copy
+                </button>
+              </div>
+              <pre>{envLines.join("\n")}</pre>
+              <p>{config.onRender ? "then save, and Render restarts Mayfly" : "then restart Mayfly"}</p>
+            </div>
           ) : null}
         </section>
 
@@ -716,31 +786,14 @@ export function AdminPanel() {
         <BackupsPanel />
       </div>
 
-      <section className="panel" aria-label="Recent activity">
-        <h2>Recent activity</h2>
-        {activity.length === 0 ? <p className="empty">No activity yet.</p> : null}
-        <ol className="activity">
-          {activity.map((item, index) => {
-            const described = describeActivity(item.text);
-            return (
-              <li key={`${item.at}:${item.repository}:${item.prNumber}:${index}`} data-tone={described.tone}>
-                <div className="activity-top">
-                  <span className="activity-kind" data-tone={described.tone}>
-                    {described.label}
-                  </span>
-                  <span className="activity-repo">
-                    {item.repository} <span className="activity-pr">#{item.prNumber}</span>
-                  </span>
-                  <time className="activity-when" dateTime={item.at}>
-                    {formatDelta(item.at, now)}
-                  </time>
-                </div>
-                {described.detail ? <p className="activity-detail">{described.detail}</p> : null}
-              </li>
-            );
-          })}
-        </ol>
-      </section>
+      <RecentActivitySheet
+        open={activityOpen}
+        items={activity}
+        now={now}
+        readMs={readMs}
+        onMarkRead={markAllRead}
+        onClose={() => setActivityOpen(false)}
+      />
       </div>
     </AppShell>
   );
