@@ -120,6 +120,8 @@ function removedLine(env: Environment) {
       return `when its time ran out${day}`;
     case "manual":
       return `by an admin${day}`;
+    case "budget":
+      return `when it reached its budget${day}`;
     default:
       return day ? day.trim() : "this preview no longer runs";
   }

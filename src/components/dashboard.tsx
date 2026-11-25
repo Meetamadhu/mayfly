@@ -23,6 +23,7 @@ import {
   sortPreviews,
   type PreviewSort,
 } from "@/components/previews-view";
+import { NewPreviewDialog } from "@/components/new-preview-dialog";
 import { PreviewDetails } from "@/components/preview-details";
 import { usualBuildMs } from "@/lib/preview-details";
 import type { Environment } from "@/lib/types";
@@ -69,6 +70,7 @@ export function Dashboard() {
   const [sort, setSort] = useState<PreviewSort>("visit");
   const { signedIn, busy, error, run } = usePreviewActions(reload);
   const panel = usePreviewPanel();
+  const [newOpen, setNewOpen] = useState(false);
 
   useEffect(() => {
     setView(readPref(VIEW_KEY, ["table", "cards"] as const, "table"));
@@ -170,9 +172,9 @@ export function Dashboard() {
         </div>
         <div className="pv-head-actions">
           {signedIn ? (
-            <a className="pv-btn" href="/admin#simulator">
-              Try a pull request
-            </a>
+            <button type="button" className="pv-btn pv-btn-primary" onClick={() => setNewOpen(true)}>
+              <span aria-hidden="true">+</span> New preview
+            </button>
           ) : null}
           <Popover
             label={
@@ -377,6 +379,23 @@ export function Dashboard() {
         </p>
       ) : null}
 
+      <NewPreviewDialog
+        open={newOpen}
+        repositories={
+          config?.allowedRepositories?.length
+            ? config.allowedRepositories
+            : [...new Set((overview?.environments ?? []).filter((env) => `${env.repository}#${env.prNumber}` !== demoKey).map((env) => env.repository))]
+        }
+        costPerHour={costPerHour}
+        currency={currency}
+        usualTtlHours={config?.ttlHours ?? 168}
+        onClose={() => setNewOpen(false)}
+        onStarted={(env) => {
+          setNewOpen(false);
+          void reload();
+          panel.open(env.id);
+        }}
+      />
       <PreviewDetails
         env={panelEnv}
         demo={panelEnv ? demoKey === `${panelEnv.repository}#${panelEnv.prNumber}` : false}

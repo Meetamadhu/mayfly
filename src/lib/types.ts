@@ -6,7 +6,7 @@ export type EnvironmentStatus =
   | "destroyed"
   | "failed";
 
-export type DestroyReason = "closed" | "merged" | "idle" | "expired" | "manual" | "stuck" | "failed";
+export type DestroyReason = "closed" | "merged" | "idle" | "expired" | "manual" | "stuck" | "failed" | "budget";
 
 export type LifecycleAction =
   | "created"
@@ -64,6 +64,10 @@ export interface Environment {
   events?: EnvironmentEvent[];
   /** Estimated awake/asleep time for this preview (demo excluded). Absent on older previews. */
   usage?: PreviewUsage;
+  /** Size chosen when an admin started the preview by hand. Absent means Standard. */
+  size?: import("./sizes").PreviewSize;
+  /** Remove the preview once its awake time has cost this much (in the configured currency). */
+  budget?: number | null;
   /** When set and in the future, the gate will not idle-sleep this preview. */
   keepAwakeUntil?: string | null;
   /** Effective idle seconds for this repo (overview-only; from the TTL policies / env defaults). */
@@ -117,6 +121,9 @@ export interface PullRequestEvent {
   branch: string;
   merged?: boolean;
   ttlMinutes?: number;
+  /** Only for previews an admin starts by hand: their size and budget. */
+  size?: import("./sizes").PreviewSize;
+  budget?: number;
   /** Repository the pull request's head lives in. A value that differs from `repository` is a fork. */
   headRepository?: string;
 }
@@ -157,6 +164,9 @@ export interface OrchestratorConfigView {
 export interface UsageDay {
   awakeSeconds: number;
   asleepSeconds: number;
+  /** The same time weighted by each preview's size, for money. Absent on totals saved before sizes existed. */
+  awakeWeighted?: number;
+  asleepWeighted?: number;
 }
 
 /** Accumulators for preview awake/asleep time in the current calendar month (UTC). */
@@ -164,6 +174,9 @@ export interface UsageMonth {
   month: string;
   asleepSeconds: number;
   awakeSeconds: number;
+  /** Weighted by size, for money (see UsageDay). */
+  awakeWeighted?: number;
+  asleepWeighted?: number;
   lastSampleAt: string;
   /** Daily totals keyed by UTC YYYY-MM-DD; keep the last 31 days. */
   days?: Record<string, UsageDay>;

@@ -1,3 +1,4 @@
+import { moneySeconds } from "./sizes";
 import type { Environment, UsageMonth } from "./types";
 
 /**
@@ -25,17 +26,28 @@ export function periodStart(period: CostPeriod, now: number) {
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1);
 }
 
-/** The period's awake and asleep seconds. The month uses Mayfly's monthly totals; the week adds up the last 7 days. */
+/**
+ * The period's awake and asleep seconds, and the same weighted by each preview's size (for money). The month uses
+ * Mayfly's monthly totals; the week adds up the last 7 days.
+ */
 export function periodSeconds(usage: UsageMonth | undefined, period: CostPeriod, now: number) {
-  if (period === "month") return { awake: usage?.awakeSeconds ?? 0, asleep: usage?.asleepSeconds ?? 0 };
+  if (period === "month") {
+    const money = moneySeconds(usage);
+    return { awake: usage?.awakeSeconds ?? 0, asleep: usage?.asleepSeconds ?? 0, awakeMoney: money.awake, asleepMoney: money.asleep };
+  }
   let awake = 0;
   let asleep = 0;
+  let awakeMoney = 0;
+  let asleepMoney = 0;
   for (let back = 0; back < 7; back += 1) {
     const day = usage?.days?.[dayKey(now - back * DAY_MS)];
+    const money = moneySeconds(day);
     awake += day?.awakeSeconds ?? 0;
     asleep += day?.asleepSeconds ?? 0;
+    awakeMoney += money.awake;
+    asleepMoney += money.asleep;
   }
-  return { awake, asleep };
+  return { awake, asleep, awakeMoney, asleepMoney };
 }
 
 export type SpendBar = { label: string; title: string; always: number; mayfly: number };
@@ -51,9 +63,9 @@ export function spendBars(usage: UsageMonth | undefined, period: CostPeriod, cos
     const bars: SpendBar[] = [];
     for (let back = 6; back >= 0; back -= 1) {
       const ms = now - back * DAY_MS;
-      const totals = day(ms);
-      const awake = totals?.awakeSeconds ?? 0;
-      const asleep = totals?.asleepSeconds ?? 0;
+      const totals = moneySeconds(day(ms));
+      const awake = totals.awake;
+      const asleep = totals.asleep;
       const date = new Date(ms);
       bars.push({
         label: date.toLocaleDateString(undefined, { weekday: "short", timeZone: "UTC" }),
@@ -74,9 +86,9 @@ export function spendBars(usage: UsageMonth | undefined, period: CostPeriod, cos
     let awake = 0;
     let asleep = 0;
     for (let d = first; d <= Math.min(last, today); d += 1) {
-      const totals = day(start + (d - 1) * DAY_MS);
-      awake += totals?.awakeSeconds ?? 0;
-      asleep += totals?.asleepSeconds ?? 0;
+      const totals = moneySeconds(day(start + (d - 1) * DAY_MS));
+      awake += totals.awake;
+      asleep += totals.asleep;
     }
     bars.push({ label: `Wk ${week}`, title: `${first}–${last} ${monthName}`, always: cost(awake + asleep), mayfly: cost(awake) });
   }

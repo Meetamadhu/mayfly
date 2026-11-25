@@ -1,3 +1,4 @@
+import { hourlyRate } from "./sizes";
 import { isLiveStatus, type DestroyReason, type Environment } from "./types";
 
 /**
@@ -9,7 +10,7 @@ import { isLiveStatus, type DestroyReason, type Environment } from "./types";
 export const FLEET_WINDOW_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export const REMOVAL_ORDER: DestroyReason[] = ["merged", "closed", "expired", "manual", "idle", "failed", "stuck"];
+export const REMOVAL_ORDER: DestroyReason[] = ["merged", "closed", "expired", "budget", "manual", "idle", "failed", "stuck"];
 
 export interface FleetStats {
   /** Live previews awake (or waking) right now, and asleep. */
@@ -99,7 +100,9 @@ export function fleetStats(
   return {
     awakeNow,
     asleepNow,
-    burnPerHour: awakeNow * costPerHour,
+    burnPerHour: live
+      .filter((env) => env.sleep === "awake" || env.sleep === "waking")
+      .reduce((sum, env) => sum + hourlyRate(env, costPerHour), 0),
     created,
     peak,
     peakAt: peakAt === null ? null : new Date(peakAt).toISOString(),
@@ -129,4 +132,5 @@ export const REMOVAL_LABELS: Record<DestroyReason, string> = {
   idle: "Not used",
   failed: "Build failed",
   stuck: "Build got stuck",
+  budget: "Budget reached",
 };

@@ -145,8 +145,8 @@ async function main() {
   };
 
   check("period totals: the month uses the monthly total, the week the last 7 days", () => {
-    assert.deepEqual(cost.periodSeconds(usage, "month", now), { awake: 360000, asleep: 1080000 });
-    assert.deepEqual(cost.periodSeconds(usage, "week", now), { awake: 7200, asleep: 10800 });
+    assert.deepEqual(cost.periodSeconds(usage, "month", now), { awake: 360000, asleep: 1080000, awakeMoney: 360000, asleepMoney: 1080000 });
+    assert.deepEqual(cost.periodSeconds(usage, "week", now), { awake: 7200, asleep: 10800, awakeMoney: 7200, asleepMoney: 10800 });
   });
 
   check("spend bars: 7 days for a week, weeks of the month for a month", () => {

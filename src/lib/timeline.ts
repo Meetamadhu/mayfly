@@ -22,6 +22,7 @@ const REMOVAL_REASONS: Record<string, string> = {
   idle: "not used",
   stuck: "build got stuck",
   failed: "build failed",
+  budget: "budget reached",
 };
 
 const REMOVED_BECAUSE: Record<string, string> = {
@@ -32,6 +33,7 @@ const REMOVED_BECAUSE: Record<string, string> = {
   idle: "nobody was using it",
   failed: "its build failed",
   stuck: "its build got stuck",
+  budget: "it reached its budget",
 };
 
 /** "the pull request was merged", for sentences like "This preview was removed because …". */
