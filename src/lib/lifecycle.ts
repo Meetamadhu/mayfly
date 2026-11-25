@@ -38,8 +38,10 @@ import {
   type PullRequestEvent,
   type ReapResult,
   type SleepState,
+  type UsageDay,
   type UsageMonth,
 } from "./types";
+import { hourlyRate, moneySeconds, sizeWeight } from "./sizes";
 
 const MAX_ENVIRONMENT_EVENTS = 50;
 
@@ -134,23 +136,29 @@ function lifetimeLine(env: Environment) {
   return `Expires ${formatUtc(env.expiresAt)}.${keep}`;
 }
 
+/** A table cell's text: pipes and line breaks would break the Markdown table. */
+function cell(text: string) {
+  return text.replace(/\|/g, "\\|").replace(/\s*\n\s*/g, " ");
+}
+
 function readyComment(env: Environment, refreshed: boolean) {
   const verb = refreshed ? "updated" : "ready";
   const build =
-    typeof env.buildMs === "number" && env.buildMs >= 0 ? ` Built in ${formatDurationMs(env.buildMs)}.` : "";
+    typeof env.buildMs === "number" && env.buildMs >= 0 ? ` · built in ${formatDurationMs(env.buildMs)}` : "";
   const at = iso();
   return [
-    `**Mayfly preview ${verb}**`,
+    `### Mayfly preview ${verb}`,
     "",
-    env.url ? `[Open preview](${env.url})` : "Preview URL is not available yet.",
+    env.url ? `**[Open preview](${env.url})**` : "Preview URL is not available yet.",
     "",
-    `Commit \`${env.sha.slice(0, 8)}\` on \`${env.branch}\`.${build}`,
+    "| | |",
+    "| --- | --- |",
+    env.url ? `| **Preview** | ${env.url} |` : "| **Preview** | The link is not available yet. |",
+    `| **Commit** | \`${env.sha.slice(0, 8)}\` on \`${cell(env.branch)}\`${build} |`,
+    `| **Lifetime** | ${cell(lifetimeLine(env))} |`,
+    `| **Sleep** | Sleeps after ${sleepWords(sleepSecondsForRepo(env.repository))} without visits and wakes on the next one. |`,
     "",
-    lifetimeLine(env),
-    "",
-    `Sleeps after ${sleepWords(sleepSecondsForRepo(env.repository))} without visits and wakes on the next one. Removed when the pull request is closed or merged.`,
-    "",
-    lastUpdatedLine(at),
+    `Removed when the pull request is closed or merged. ${lastUpdatedLine(at)}`,
   ].join("\n");
 }
 
@@ -173,12 +181,19 @@ async function refreshReadyComment(id: string) {
 }
 
 function failedComment(env: Environment, message: string) {
+  // The error goes in a code block; a ``` inside it would end the block early.
+  const text = message.slice(0, 500).replace(/```/g, "'''");
   return [
-    "**Mayfly couldn't build this preview**",
+    "### Mayfly couldn't build this preview",
     "",
-    message.slice(0, 500),
+    "```",
+    text,
+    "```",
     "",
-    `Commit \`${env.sha.slice(0, 8)}\` on \`${env.branch}\`. Fix the problem above and push again; Mayfly will try again on the new commit.`,
+    "| | |",
+    "| --- | --- |",
+    `| **Commit** | \`${env.sha.slice(0, 8)}\` on \`${cell(env.branch)}\` |`,
+    "| **Next** | Fix the problem above and push again; Mayfly will try again on the new commit. |",
     "",
     lastUpdatedLine(),
   ].join("\n");
@@ -187,7 +202,9 @@ function failedComment(env: Environment, message: string) {
 function destroyedComment(env: Environment) {
   const why = env.destroyReason ? ` because ${removedBecause(env.destroyReason)}` : "";
   return [
-    `**Mayfly preview removed**${why}. Its link no longer works.`,
+    "### Mayfly preview removed",
+    "",
+    `The preview was removed${why}. Its link no longer works.`,
     "",
     lastUpdatedLine(),
   ].join("\n");
@@ -471,7 +488,7 @@ export async function getOverview(): Promise<Overview> {
     },
     usage,
     costPerHour,
-    savedEstimate: (usage.asleepSeconds / 3600) * costPerHour,
+    savedEstimate: (moneySeconds(usage).asleep / 3600) * costPerHour,
     currency,
   };
 }
@@ -710,6 +727,8 @@ async function reserve(event: PullRequestEvent): Promise<LifecycleResult> {
       extensions: 0,
       ...(normalized.author ? { author: normalized.author } : {}),
       ...(normalized.title ? { title: normalized.title } : {}),
+      ...(normalized.size && normalized.size !== "standard" ? { size: normalized.size } : {}),
+      ...(typeof normalized.budget === "number" && normalized.budget > 0 ? { budget: normalized.budget } : {}),
     };
     if (hasKeepLabel(created.labels)) {
       pushEnvironmentEvent(created, { at: now, type: "kept", detail: currentPolicy().keepLabel });
@@ -729,6 +748,7 @@ function startDeploy(environment: Environment, action: "created" | "updated"): P
     sha: environment.sha,
     branch: environment.branch,
     deploymentId: environment.deploymentId,
+    size: environment.size,
   };
   const work = action === "created" ? () => deployer.provision(request) : () => deployer.update(request);
   return runDeploy(environment, work, action);
@@ -952,11 +972,22 @@ function dayKey(ms: number) {
 
 const USAGE_DAY_RETENTION = 31;
 
-function pruneUsageDays(
-  days: Record<string, { awakeSeconds: number; asleepSeconds: number }> | undefined,
-  nowMs: number,
-): Record<string, { awakeSeconds: number; asleepSeconds: number }> {
-  const kept: Record<string, { awakeSeconds: number; asleepSeconds: number }> = {};
+/**
+ * Add sampled time to a total: plain seconds for hours, and the same weighted by the preview's size for money.
+ * A total from before sizes existed starts its weighted figure at its plain one (every preview was Standard).
+ */
+function addTime(total: UsageDay, kind: "awake" | "asleep", seconds: number, weighted: number) {
+  if (kind === "awake") {
+    total.awakeWeighted = (total.awakeWeighted ?? total.awakeSeconds) + weighted;
+    total.awakeSeconds += seconds;
+  } else {
+    total.asleepWeighted = (total.asleepWeighted ?? total.asleepSeconds) + weighted;
+    total.asleepSeconds += seconds;
+  }
+}
+
+function pruneUsageDays(days: Record<string, UsageDay> | undefined, nowMs: number): Record<string, UsageDay> {
+  const kept: Record<string, UsageDay> = {};
   const cutoff = dayKey(nowMs - (USAGE_DAY_RETENTION - 1) * 24 * 60 * 60 * 1000);
   for (const [key, value] of Object.entries(days ?? {})) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(key) || key < cutoff) continue;
@@ -965,7 +996,12 @@ function pruneUsageDays(
     const asleep = value.asleepSeconds;
     if (typeof awake !== "number" || !Number.isFinite(awake) || awake < 0) continue;
     if (typeof asleep !== "number" || !Number.isFinite(asleep) || asleep < 0) continue;
-    kept[key] = { awakeSeconds: awake, asleepSeconds: asleep };
+    kept[key] = {
+      awakeSeconds: awake,
+      asleepSeconds: asleep,
+      ...(typeof value.awakeWeighted === "number" ? { awakeWeighted: value.awakeWeighted } : {}),
+      ...(typeof value.asleepWeighted === "number" ? { asleepWeighted: value.asleepWeighted } : {}),
+    };
   }
   return kept;
 }
@@ -1341,6 +1377,7 @@ export async function restorePreviews() {
         sha: env.sha,
         branch: env.branch,
         deploymentId: env.deploymentId,
+        size: env.size,
       });
       const until = env.keepAwakeUntil;
       if (until && Date.parse(until) > Date.now()) {
@@ -1537,14 +1574,15 @@ export async function reap(): Promise<ReapResult> {
           const sleep = gateById.get(env.id)?.sleep;
           if (sleep !== "asleep" && sleep !== "awake") continue;
           const preview = env.usage ?? { awakeSeconds: 0, asleepSeconds: 0 };
+          const weighted = elapsed * sizeWeight(env.size);
           if (sleep === "asleep") {
             preview.asleepSeconds += elapsed;
-            usage.asleepSeconds += elapsed;
-            day.asleepSeconds += elapsed;
+            addTime(usage, "asleep", elapsed, weighted);
+            addTime(day, "asleep", elapsed, weighted);
           } else {
             preview.awakeSeconds += elapsed;
-            usage.awakeSeconds += elapsed;
-            day.awakeSeconds += elapsed;
+            addTime(usage, "awake", elapsed, weighted);
+            addTime(day, "awake", elapsed, weighted);
           }
           env.usage = preview;
         }
@@ -1636,6 +1674,14 @@ export async function reap(): Promise<ReapResult> {
       if (now >= expiresMs) {
         targets.push({ id: env.id, reason: "expired" });
         continue;
+      }
+      // A budget set when the preview was started: remove it once its awake time has cost that much.
+      if (typeof env.budget === "number" && env.budget > 0 && env.usage) {
+        const spent = (env.usage.awakeSeconds / 3600) * hourlyRate(env, previewCostPerHour());
+        if (spent >= env.budget) {
+          targets.push({ id: env.id, reason: "budget" });
+          continue;
+        }
       }
       // Warn once per expiry time, and only when the preview lived longer than the warning window.
       const warnMs = currentPolicy().warnMinutes * 60_000;

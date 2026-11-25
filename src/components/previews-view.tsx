@@ -1,5 +1,6 @@
 "use client";
 
+import { hourlyRate } from "@/lib/sizes";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   BuildLog,
@@ -266,7 +267,7 @@ function PreviewRow(props: RowProps) {
   const avatar = repoAvatar(env.repository);
   const href = previewHref(env.url);
   const ends = expiresSoon(env, now, demo);
-  const cost = env.usage ? estimatedCost(env.usage.awakeSeconds, costPerHour) : null;
+  const cost = env.usage ? estimatedCost(env.usage.awakeSeconds, hourlyRate(env, costPerHour)) : null;
   const title = env.title?.trim() || `PR #${env.prNumber}`;
 
   let action: ReactNode;

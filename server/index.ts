@@ -9,6 +9,7 @@ import { eventsRouter } from "./routes/events";
 import { healthRouter } from "./routes/health";
 import { policyRouter } from "./routes/policy";
 import { previewRouter } from "./routes/preview";
+import { previewsRouter } from "./routes/previews";
 import { previewAccessRouter } from "./routes/preview-access";
 import { resourcesRouter } from "./routes/resources";
 import { webhooksRouter } from "./routes/webhooks";
@@ -104,6 +105,7 @@ async function main() {
   server.use(environmentsRouter);
   server.use(webhooksRouter);
   server.use(eventsRouter);
+  server.use(previewsRouter);
   server.use(policyRouter);
   server.use(resourcesRouter);
   server.use(previewAccessRouter);

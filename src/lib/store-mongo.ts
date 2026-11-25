@@ -45,6 +45,15 @@ export function usesMongo() {
   return Boolean(mongoUri());
 }
 
+/** The size-weighted totals, when present and valid. */
+function weightedOf(raw: Record<string, unknown>) {
+  const ok = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0;
+  return {
+    ...(ok(raw.awakeWeighted) ? { awakeWeighted: raw.awakeWeighted } : {}),
+    ...(ok(raw.asleepWeighted) ? { asleepWeighted: raw.asleepWeighted } : {}),
+  };
+}
+
 function asUsageDay(value: unknown): import("./types").UsageDay | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
@@ -54,7 +63,7 @@ function asUsageDay(value: unknown): import("./types").UsageDay | null {
   if (typeof raw.awakeSeconds !== "number" || !Number.isFinite(raw.awakeSeconds) || raw.awakeSeconds < 0) {
     return null;
   }
-  return { asleepSeconds: raw.asleepSeconds, awakeSeconds: raw.awakeSeconds };
+  return { asleepSeconds: raw.asleepSeconds, awakeSeconds: raw.awakeSeconds, ...weightedOf(raw) };
 }
 
 function asUsageDays(value: unknown): Record<string, import("./types").UsageDay> | undefined {
@@ -84,6 +93,7 @@ function asUsage(value: unknown): import("./types").UsageMonth | undefined {
     month: raw.month,
     asleepSeconds: raw.asleepSeconds,
     awakeSeconds: raw.awakeSeconds,
+    ...weightedOf(raw),
     lastSampleAt: raw.lastSampleAt,
     ...(days ? { days } : {}),
   };

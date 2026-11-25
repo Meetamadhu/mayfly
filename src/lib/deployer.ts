@@ -1,3 +1,4 @@
+import { sizeLimits, type PreviewSize } from "./sizes";
 import { execFile, spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import net from "node:net";
@@ -18,6 +19,8 @@ export interface DeployRequest {
   sha: string;
   branch: string;
   deploymentId?: string | null;
+  /** The preview's size; sets its container's CPU and memory. Absent means Standard. */
+  size?: PreviewSize;
 }
 
 export interface Deployment {
@@ -350,6 +353,7 @@ function startPreview(port: number, input: DeployRequest, image: string) {
       PREVIEW_RUNTIME: docker ? "docker" : "process",
       PREVIEW_IMAGE: image,
       PREVIEW_CONTAINER: `mayfly-app-${appPort}`,
+      ...sizeLimits(input.size),
     },
   });
   child.stderr?.on("data", (chunk) => console.error(String(chunk).trim()));

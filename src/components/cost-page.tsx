@@ -1,5 +1,6 @@
 "use client";
 
+import { hourlyRate } from "@/lib/sizes";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { cardState, estimatedCost, formatEstMoney, statePillLabel } from "@/components/board-parts";
@@ -81,7 +82,7 @@ export function CostPage() {
 
   const start = periodStart(period, now);
   const seconds = periodSeconds(overview?.usage, period, now);
-  const saved = estimatedCost(seconds.asleep, costPerHour);
+  const saved = estimatedCost(seconds.asleepMoney, costPerHour);
   const total = seconds.awake + seconds.asleep;
   const savedShare = total > 0 ? Math.round((seconds.asleep / total) * 100) : 0;
   const previews = previewsInPeriod(envs, start, now);
@@ -98,7 +99,7 @@ export function CostPage() {
 
   const savings = envs
     .filter((env) => matchesSearch(env, query))
-    .map((env) => ({ env, saved: env.usage ? estimatedCost(env.usage.asleepSeconds, costPerHour) : -1 }))
+    .map((env) => ({ env, saved: env.usage ? estimatedCost(env.usage.asleepSeconds, hourlyRate(env, costPerHour)) : -1 }))
     .sort((a, b) => b.saved - a.saved);
   const visible = showAll ? savings : savings.slice(0, TOP_SAVINGS);
   const biggest = Math.max(0.0001, ...savings.map((row) => row.saved));

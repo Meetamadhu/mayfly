@@ -115,6 +115,7 @@ const REMOVED_TITLE: Record<string, string> = {
   idle: "removed, nobody used it",
   failed: "removed, its build failed",
   stuck: "removed, its build got stuck",
+  budget: "removed, it reached its budget",
 };
 
 export type RowText = { subject: string; before: string; after: string; sub: string };

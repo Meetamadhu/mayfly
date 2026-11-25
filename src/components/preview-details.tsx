@@ -1,5 +1,6 @@
 "use client";
 
+import { SIZE_INFO, hourlyRate } from "@/lib/sizes";
 import { useEffect, useRef, useState } from "react";
 import {
   BuildLog,
@@ -106,8 +107,9 @@ function PanelBody(props: Props & { env: Environment }) {
   const title = demo ? "Demo preview" : env.title?.trim() || `PR #${env.prNumber}`;
   const usage = env.deploymentId ? resources?.previews?.[env.deploymentId] : undefined;
   const build = lastBuildMs(env);
-  const awakeCost = env.usage ? estimatedCost(env.usage.awakeSeconds, costPerHour) : null;
-  const savedCost = env.usage ? estimatedCost(env.usage.asleepSeconds, costPerHour) : null;
+  const rate = hourlyRate(env, costPerHour);
+  const awakeCost = env.usage ? estimatedCost(env.usage.awakeSeconds, rate) : null;
+  const savedCost = env.usage ? estimatedCost(env.usage.asleepSeconds, rate) : null;
   const events = timelineNewestFirst(env.events);
   // Keep-awake needs a preview whose sleep Mayfly can control (it reports awake or asleep).
   const canKeepAwake =
@@ -295,6 +297,20 @@ function PanelBody(props: Props & { env: Environment }) {
               <div>
                 <dt>Ends</dt>
                 <dd>{demo ? "never, it's the demo" : endsText(env, now)}</dd>
+              </div>
+            ) : null}
+            <div>
+              <dt>Size</dt>
+              <dd>
+                {SIZE_INFO[env.size ?? "standard"].label} · ~{formatEstMoney(rate, currency)}/hr awake
+              </dd>
+            </div>
+            {typeof env.budget === "number" ? (
+              <div>
+                <dt>Budget</dt>
+                <dd>
+                  {formatEstMoney(awakeCost ?? 0, currency)} of {formatEstMoney(env.budget, currency)} used
+                </dd>
               </div>
             ) : null}
             <div>
