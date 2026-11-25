@@ -5959,3 +5959,88 @@ html[data-theme="dark"] .ra-label[data-kind="update"] { color: #7dd3fc; }
 @media (max-width: 420px) {
   .lp-footer-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ═════════════════════════ PR comments (bot design) ═════════════════════════ */
+.prc-picker {
+  grid-template-columns: auto minmax(0, 22rem); align-items: center; gap: 0.75rem; max-width: none;
+  padding: 1rem 1.25rem; border: 1px solid var(--line); border-radius: 14px; background: var(--paper);
+}
+.prc-picker label { color: var(--muted); }
+.prc-card { border: 1px solid var(--line); border-radius: 16px; background: var(--paper); overflow: hidden; }
+.prc-card-head { display: flex; align-items: center; gap: 1rem; padding: 1.1rem 1.4rem; border-bottom: 1px solid var(--line); }
+.prc-pr-icon { display: inline-grid; place-items: center; width: 2.6rem; height: 2.6rem; flex: none; border-radius: 999px; background: var(--muted); color: #fff; }
+.prc-pr-icon svg { width: 1.3rem; height: 1.3rem; }
+.prc-pr-icon[data-tone="success"] { background: #1f883d; }
+.prc-pr-icon[data-tone="pending"] { background: var(--building); }
+.prc-pr-icon[data-tone="failure"] { background: var(--danger); }
+.prc-pr-icon[data-tone="neutral"] { background: #8250df; }
+.prc-card-title { display: grid; gap: 0.25rem; min-width: 0; flex: 1; }
+.prc-card-title h2 { margin: 0; font-size: 1.15rem; line-height: 1.3; overflow-wrap: anywhere; }
+.prc-card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.6rem; margin: 0; color: var(--muted); font-size: 0.88rem; }
+.prc-card-meta strong { color: var(--ink); }
+.prc-card-meta > * + *::before { content: "·"; margin-right: 0.6rem; color: var(--muted); }
+.prc-card-meta code { font-size: 0.85em; overflow-wrap: anywhere; }
+.prc-card-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; flex: none; }
+.prc-btn {
+  display: inline-flex; align-items: center; gap: 0.45rem; min-height: 40px; padding: 0 0.9rem;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--ink);
+  font: inherit; font-size: 0.92rem; font-weight: 600; text-decoration: none; cursor: pointer; white-space: nowrap;
+}
+.prc-btn:hover { border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
+.prc-btn svg { width: 1rem; height: 1rem; }
+.prc-card-body { display: grid; gap: 1.25rem; padding: 1.4rem; background: color-mix(in srgb, var(--soft) 45%, var(--paper)); }
+.prc-card .prc-comment { border-radius: 14px; border-color: color-mix(in srgb, var(--asleep) 22%, var(--line)); }
+.prc-card .prc-comment-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.8rem 1.2rem; background: color-mix(in srgb, var(--asleep-bg) 45%, var(--paper)); border-bottom: 1px solid var(--line); }
+.prc-card .prc-avatar { background: var(--asleep); color: #fff; }
+.prc-status { display: inline-flex; align-items: center; gap: 0.4rem; margin-left: auto; font-size: 0.9rem; font-weight: 600; color: var(--muted); }
+.prc-status[data-tone="success"] { color: var(--awake); }
+.prc-status[data-tone="success"] .prc-check-dot { background: var(--success, var(--awake)); }
+.prc-status[data-tone="pending"] { color: var(--building); }
+.prc-status[data-tone="pending"] .prc-check-dot { background: var(--building); }
+.prc-status[data-tone="failure"] { color: var(--danger); }
+.prc-status[data-tone="failure"] .prc-check-dot { background: var(--danger); }
+.prc-comment-main { padding: 0.4rem 1.2rem 0.6rem; }
+.prc-card .prc-body { padding: 0.6rem 0; font-size: 0.95rem; }
+.prc-body h3 { margin: 0.4rem 0 0.75rem; font-size: 1.3rem; letter-spacing: -0.01em; }
+.prc-body p { margin: 0 0 0.8rem; }
+.prc-body .prc-cta a {
+  display: inline-flex; align-items: center; min-height: 42px; padding: 0 1.1rem; border-radius: 10px;
+  background: var(--asleep); color: #fff; font-weight: 650; text-decoration: none;
+}
+.prc-body .prc-cta a::after { content: "↗"; margin-left: 0.45rem; }
+.prc-body .prc-cta a:hover { background: color-mix(in srgb, var(--asleep) 85%, #000); }
+.prc-body .prc-cta strong { font-weight: inherit; }
+.prc-body table { width: 100%; margin: 0 0 0.9rem; border-collapse: collapse; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; font-size: 0.9rem; }
+.prc-body td, .prc-body th { padding: 0.6rem 0.85rem; border-top: 1px solid var(--line); text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+.prc-body tr:first-child td { border-top: 0; }
+.prc-body td:first-child { width: 7.5rem; color: var(--muted); white-space: nowrap; }
+.prc-body td:first-child strong { font-weight: 600; }
+.prc-body pre { margin: 0 0 0.9rem; padding: 0.75rem 0.9rem; border-radius: 10px; background: #0b1322; color: #fca5a5; font-size: 0.85rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.prc-body a { color: var(--asleep); }
+.prc-boxes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; }
+.prc-box { display: grid; align-content: start; gap: 0.45rem; padding: 0.9rem 1rem; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); min-width: 0; }
+.prc-box-label { color: var(--muted); font-size: 0.78rem; font-weight: 650; letter-spacing: 0.03em; text-transform: uppercase; }
+.prc-box-value { font-weight: 600; }
+.prc-box-sub { color: var(--muted); font-weight: 400; }
+.prc-box .prc-url { color: var(--asleep); overflow-wrap: anywhere; }
+.prc-box .state-pill { justify-self: start; }
+.prc-card .prc-history { margin: 0; }
+@media (max-width: 1100px) { .prc-boxes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) {
+  .prc-picker { grid-template-columns: minmax(0, 1fr); }
+  .prc-card-head { flex-wrap: wrap; padding: 1rem; }
+  .prc-card-actions { width: 100%; }
+  .prc-card-actions .prc-btn { flex: 1; justify-content: center; }
+  .prc-card-body { padding: 1rem; }
+  .prc-card .prc-comment-head, .prc-comment-main { padding-left: 0.9rem; padding-right: 0.9rem; }
+  .prc-status { margin-left: 0; width: 100%; }
+  .prc-body td:first-child { width: auto; white-space: normal; }
+  .prc-boxes { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .prc-body table, .prc-body tbody, .prc-body tr, .prc-body td { display: block; width: auto; }
+  .prc-body tr { padding: 0.55rem 0.8rem; border-top: 1px solid var(--line); }
+  .prc-body tr:first-child { border-top: 0; }
+  .prc-body td { padding: 0; border: 0; }
+  .prc-body td:first-child { width: auto; margin-bottom: 0.15rem; font-size: 0.8rem; white-space: nowrap; }
+}

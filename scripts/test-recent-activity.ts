@@ -27,6 +27,7 @@ async function main() {
     assert.equal(r.noteText("**Mayfly preview ready**\n\n[Open preview](https://x/p/a/b/1)"), "Mayfly preview ready");
     assert.equal(r.noteText("<!-- mayfly -->\n## Preview updated: https://x/p/1"), "Preview updated");
     assert.equal(r.noteText("**Mayfly couldn't build this preview**"), "Mayfly couldn't build this preview");
+    assert.equal(r.noteText("### Mayfly preview ready\n\n**[Open preview](https://x)**"), "Mayfly preview ready");
   });
 
   const a = env({

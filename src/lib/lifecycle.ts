@@ -134,23 +134,29 @@ function lifetimeLine(env: Environment) {
   return `Expires ${formatUtc(env.expiresAt)}.${keep}`;
 }
 
+/** A table cell's text: pipes and line breaks would break the Markdown table. */
+function cell(text: string) {
+  return text.replace(/\|/g, "\\|").replace(/\s*\n\s*/g, " ");
+}
+
 function readyComment(env: Environment, refreshed: boolean) {
   const verb = refreshed ? "updated" : "ready";
   const build =
-    typeof env.buildMs === "number" && env.buildMs >= 0 ? ` Built in ${formatDurationMs(env.buildMs)}.` : "";
+    typeof env.buildMs === "number" && env.buildMs >= 0 ? ` · built in ${formatDurationMs(env.buildMs)}` : "";
   const at = iso();
   return [
-    `**Mayfly preview ${verb}**`,
+    `### Mayfly preview ${verb}`,
     "",
-    env.url ? `[Open preview](${env.url})` : "Preview URL is not available yet.",
+    env.url ? `**[Open preview](${env.url})**` : "Preview URL is not available yet.",
     "",
-    `Commit \`${env.sha.slice(0, 8)}\` on \`${env.branch}\`.${build}`,
+    "| | |",
+    "| --- | --- |",
+    env.url ? `| **Preview** | ${env.url} |` : "| **Preview** | The link is not available yet. |",
+    `| **Commit** | \`${env.sha.slice(0, 8)}\` on \`${cell(env.branch)}\`${build} |`,
+    `| **Lifetime** | ${cell(lifetimeLine(env))} |`,
+    `| **Sleep** | Sleeps after ${sleepWords(sleepSecondsForRepo(env.repository))} without visits and wakes on the next one. |`,
     "",
-    lifetimeLine(env),
-    "",
-    `Sleeps after ${sleepWords(sleepSecondsForRepo(env.repository))} without visits and wakes on the next one. Removed when the pull request is closed or merged.`,
-    "",
-    lastUpdatedLine(at),
+    `Removed when the pull request is closed or merged. ${lastUpdatedLine(at)}`,
   ].join("\n");
 }
 
@@ -173,12 +179,19 @@ async function refreshReadyComment(id: string) {
 }
 
 function failedComment(env: Environment, message: string) {
+  // The error goes in a code block; a ``` inside it would end the block early.
+  const text = message.slice(0, 500).replace(/```/g, "'''");
   return [
-    "**Mayfly couldn't build this preview**",
+    "### Mayfly couldn't build this preview",
     "",
-    message.slice(0, 500),
+    "```",
+    text,
+    "```",
     "",
-    `Commit \`${env.sha.slice(0, 8)}\` on \`${env.branch}\`. Fix the problem above and push again; Mayfly will try again on the new commit.`,
+    "| | |",
+    "| --- | --- |",
+    `| **Commit** | \`${env.sha.slice(0, 8)}\` on \`${cell(env.branch)}\` |`,
+    "| **Next** | Fix the problem above and push again; Mayfly will try again on the new commit. |",
     "",
     lastUpdatedLine(),
   ].join("\n");
@@ -187,7 +200,9 @@ function failedComment(env: Environment, message: string) {
 function destroyedComment(env: Environment) {
   const why = env.destroyReason ? ` because ${removedBecause(env.destroyReason)}` : "";
   return [
-    `**Mayfly preview removed**${why}. Its link no longer works.`,
+    "### Mayfly preview removed",
+    "",
+    `The preview was removed${why}. Its link no longer works.`,
     "",
     lastUpdatedLine(),
   ].join("\n");
