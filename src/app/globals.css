@@ -16,6 +16,12 @@
   --accent: #0f8f6b;
   --mint: #0f8f6b;
   --mint-bg: #d8f3e8;
+  /* Brand: dark teal for primary actions and selected states; mint for small accents. */
+  --brand: #0e5f52;
+  --brand-hover: #0a4b41;
+  --brand-line: #0e5f52;
+  --on-brand: #ffffff;
+  --brand-text: #0e5f52;
   --success: #0f6b4a;
   --success-bg: #d8f3e8;
   --warn: #8a5a12;
@@ -69,8 +75,14 @@ html:not([data-theme="dark"]) .board-topbar {
   --field: #131d33;
   --on-ink: #020618;
   --glow: rgba(61, 214, 165, 0.06);
-  --accent: #3dd6a5;
-  --mint: #3dd6a5;
+  --accent: #3cc79c;
+  --mint: #3cc79c;
+  /* Brand: dark teal fills with soft mint text, edged a little lighter so they stand off the navy. */
+  --brand: #0f5c50;
+  --brand-hover: #136d5f;
+  --brand-line: #1f7f6c;
+  --on-brand: #d8f8ec;
+  --brand-text: #5fd3ae;
   --mint-bg: #14352c;
   --success: #3dd6a5;
   --success-bg: #14352c;
@@ -994,22 +1006,19 @@ input {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--accent);
+  border: 1px solid var(--brand-line);
   border-radius: var(--radius);
-  background: var(--accent);
-  color: #fff;
+  background: var(--brand);
+  color: var(--on-brand);
   min-height: var(--btn-height);
   padding: var(--btn-pad-y) var(--btn-pad-x);
   font-weight: 600;
   text-decoration: none;
 }
 
-/* In dark mode the accent is a light mint, so text on a filled button is dark. */
-:where(html[data-theme="dark"]) :where(button, .btn, a.btn) { color: #062a21; }
-
 :where(button, .btn, a.btn):where(:hover:not(:disabled)) {
-  background: color-mix(in srgb, var(--accent) 86%, #000);
-  border-color: color-mix(in srgb, var(--accent) 86%, #000);
+  background: var(--brand-hover);
+  border-color: var(--brand-line);
 }
 
 button.secondary,
@@ -5951,7 +5960,7 @@ html[data-theme="dark"] .ra-label[data-kind="update"] { color: #7dd3fc; }
 .lp-app-get h3 { margin: 0; font-size: 1.25rem; }
 .lp-app-get p { margin: 0; color: #a9b6cb; line-height: 1.55; }
 .lp-app-get .lp-btn { background: #3ddbb0; color: #04221a; }
-.lp-app-get .lp-btn:hover { background: #63e6c3; }
+.lp-app-get .lp-btn:hover { background: #63e6c3; color: #04221a; }
 .lp-app-get .lp-app-small { font-size: 0.85rem; }
 @media (max-width: 900px) {
   .lp-app { grid-template-columns: minmax(0, 1fr); }
@@ -6145,10 +6154,10 @@ html[data-theme="dark"] .ra-label[data-kind="update"] { color: #7dd3fc; }
 .rv-heading strong { font-size: 0.98rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rv-heading > span { color: var(--muted); font-size: 0.86rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rv-path { flex: 0 1 auto; min-width: 0; max-width: 32ch; margin-left: auto; padding: 0.35rem 0.6rem; border-radius: 8px; background: var(--soft); color: var(--muted); font-size: 0.84rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rv-comment { display: inline-flex; align-items: center; gap: 0.45rem; flex: none; min-height: 42px; padding: 0 1rem; border: 1px solid var(--asleep); border-radius: 10px; background: var(--asleep); color: #fff; font: inherit; font-weight: 650; cursor: pointer; }
+.rv-comment { display: inline-flex; align-items: center; gap: 0.45rem; flex: none; min-height: 42px; padding: 0 1rem; border: 1px solid var(--brand-line); border-radius: 10px; background: var(--brand); color: var(--on-brand); font: inherit; font-weight: 650; cursor: pointer; }
 .rv-comment svg { width: 1.15rem; height: 1.15rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.rv-comment:hover:not(:disabled) { background: color-mix(in srgb, var(--asleep) 86%, #000); border-color: color-mix(in srgb, var(--asleep) 86%, #000); }
-.rv-comment[aria-pressed="true"], .rv-comment[aria-pressed="true"]:hover { background: var(--paper); color: var(--asleep); }
+.rv-comment:hover:not(:disabled) { background: var(--brand-hover); border-color: var(--brand-line); }
+.rv-comment[aria-pressed="true"], .rv-comment[aria-pressed="true"]:hover { background: var(--paper); color: var(--brand-text); }
 .rv-list-toggle:hover, .rv-tabs button:hover, .rv-item-main:hover, .rv-as button:hover { color: inherit; }
 .rv-list-toggle:hover { background: var(--surface); }
 .rv-tabs button:hover { background: color-mix(in srgb, var(--paper) 60%, transparent); }
@@ -6156,7 +6165,6 @@ html[data-theme="dark"] .ra-label[data-kind="update"] { color: #7dd3fc; }
 .rv-as button:hover { background: none; color: var(--asleep); }
 .rv-delete:hover { color: var(--danger); }
 .rv-comment:disabled { opacity: 0.55; cursor: progress; }
-html[data-theme="dark"] .rv-comment:not([aria-pressed="true"]) { color: #0f172a; }
 .rv-comment:focus-visible, .rv-list-toggle:focus-visible, .rv-item-main:focus-visible, .rv-tabs button:focus-visible { outline: 2px solid var(--asleep); outline-offset: 2px; }
 .rv-list-toggle { display: inline-flex; flex: none; align-items: center; gap: 0.4rem; min-height: 42px; padding: 0 0.85rem; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
 .rv-list-toggle span, .rv-tabs span { display: inline-grid; place-items: center; min-width: 1.4rem; height: 1.4rem; padding: 0 0.35rem; border-radius: 999px; background: var(--soft); color: var(--muted); font-size: 0.78rem; font-weight: 700; }
@@ -6313,3 +6321,29 @@ html[data-theme="dark"] .rv-comment:not([aria-pressed="true"]) { color: #0f172a;
   .ps-foot .help { margin: 0; flex-basis: 100%; }
   .ps-foot .np-primary { flex: 1; justify-content: center; }
 }
+
+
+/* ═════════════════════════ Brand colours ═════════════════════════
+ * Dark teal for primary actions, selected states, badges and the avatar, with soft mint text; mint itself stays
+ * for small accents (dots, bars, icons, the active page marker). Placed last so it wins over each control's own
+ * neutral fill.
+ */
+.lp-btn, .pv-act-open, .pd-btn-main, .adm-btn-main, .np-primary, .onb-next,
+.board-filter-pill[aria-pressed="true"],
+.adm-tabs button[aria-selected="true"], .ra-pills button[aria-selected="true"],
+.theme-toggle button[aria-pressed="true"], .board-appearance .theme-toggle button[aria-pressed="true"],
+.prc-body .prc-cta a {
+  border-color: var(--brand-line);
+  background: var(--brand);
+  color: var(--on-brand);
+}
+.lp-btn:hover, .pv-act-open:hover, .pd-btn-main:hover:not(:disabled), .adm-btn-main:hover:not(:disabled), .np-primary:hover:not(:disabled),
+.onb-next:hover, .onb-next:focus, .prc-body .prc-cta a:hover {
+  background: var(--brand-hover);
+  color: var(--on-brand);
+}
+.pv-btn-primary, .pv-btn-primary:hover { border-color: var(--brand-line) !important; background: var(--brand) !important; color: var(--on-brand) !important; }
+.pv-btn-primary:hover { background: var(--brand-hover) !important; }
+.pv-badge, .adm-badge, .lp-shot-act i[data-state="awake"] { background: var(--brand); color: var(--on-brand); }
+.board-avatar, .board-avatar[data-signed-in="true"] { background: var(--brand); color: var(--on-brand); box-shadow: 0 0 0 2px color-mix(in srgb, var(--mint) 35%, transparent); }
+.board-avatar[data-signed-in="false"] { box-shadow: none; }
