@@ -1,4 +1,5 @@
 import { sizeLimits, type PreviewSize } from "./sizes";
+import { repoEnv, type RepoEnv } from "./preview-settings";
 import { execFile, spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import net from "node:net";
@@ -295,7 +296,7 @@ function isDemoRequest(input: DeployRequest) {
  * every other pull request builds its own Dockerfile from an allow-listed repository. This runs before the
  * deployer lock is taken, so a long build does not block the board.
  */
-async function prepareImage(input: DeployRequest): Promise<string> {
+async function prepareImage(input: DeployRequest, env: RepoEnv): Promise<string> {
   if (previewRuntime() !== "docker") return PREVIEW_IMAGE;
   if (!buildsPullRequests() || isDemoRequest(input)) {
     await ensurePreviewImage();
@@ -307,7 +308,13 @@ async function prepareImage(input: DeployRequest): Promise<string> {
   const tag = imageTag(input.repository, input.prNumber, input.sha);
   // The tag names the commit, so an image that already exists is this commit's code. Waking never rebuilds it.
   if (await imageExists(tag)) return tag;
-  return buildImage({ envId: input.envId, repository: input.repository, prNumber: input.prNumber, sha: input.sha });
+  return buildImage({
+    envId: input.envId,
+    repository: input.repository,
+    prNumber: input.prNumber,
+    sha: input.sha,
+    buildEnv: env.build,
+  });
 }
 
 /** Built images are removed with their preview. The placeholder image is shared and stays. */
@@ -332,7 +339,16 @@ function removeContainer(appPort: number) {
   });
 }
 
-function startPreview(port: number, input: DeployRequest, image: string) {
+/** The repository's preview variables, for the gate to hand to the app's container (never on a command line). */
+export const APP_ENV_PREFIX = "MAYFLY_APP_ENV_";
+
+function appEnvForGate(runtime: Record<string, string>) {
+  const out: Record<string, string> = {};
+  for (const [name, value] of Object.entries(runtime)) out[`${APP_ENV_PREFIX}${name}`] = value;
+  return out;
+}
+
+function startPreview(port: number, input: DeployRequest, image: string, env: RepoEnv) {
   const appPort = port + 1000;
   const docker = previewRuntime() === "docker";
   const child = spawn(process.execPath, [path.join(process.cwd(), "scripts", "preview-gate.mjs")], {
@@ -354,6 +370,7 @@ function startPreview(port: number, input: DeployRequest, image: string) {
       PREVIEW_IMAGE: image,
       PREVIEW_CONTAINER: `mayfly-app-${appPort}`,
       ...sizeLimits(input.size),
+      ...(docker ? appEnvForGate(env.runtime) : {}),
     },
   });
   child.stderr?.on("data", (chunk) => console.error(String(chunk).trim()));
@@ -385,7 +402,12 @@ async function remember(record: DeploymentRecord) {
   await writeJson(deployFile(), file);
 }
 
-async function launch(input: DeployRequest, previous: DeploymentRecord | undefined, image: string): Promise<Deployment> {
+async function launch(
+  input: DeployRequest,
+  previous: DeploymentRecord | undefined,
+  image: string,
+  env: RepoEnv,
+): Promise<Deployment> {
   const deploymentId = previous?.deploymentId || input.deploymentId || deploymentIdFor(input.envId);
   const docker = previewRuntime() === "docker";
   if (previous?.pid && gateAlive(previous.pid)) await killProcess(previous.pid);
@@ -397,7 +419,7 @@ async function launch(input: DeployRequest, previous: DeploymentRecord | undefin
     if (!imageUsedElsewhere(file.deployments, old, deploymentId)) await removeImage(old);
   }
   const port = await claimPort(previous?.port);
-  const pid = startPreview(port, input, image);
+  const pid = startPreview(port, input, image, env);
   const listenUrl = previewListenUrl(port);
   const url = publicPreviewUrl(input.repository, input.prNumber);
   try {
@@ -445,36 +467,46 @@ async function removeDeployment(deploymentId: string) {
 }
 
 /** Build or find the image; if that fails, nothing of an earlier version is left running. */
-async function prepareOrTearDown(input: DeployRequest, deploymentId: string) {
+async function prepareOrTearDown(input: DeployRequest, deploymentId: string, env: RepoEnv) {
   try {
-    return await prepareImage(input);
+    return await prepareImage(input, env);
   } catch (error) {
     await exclusive(() => removeDeployment(deploymentId)).catch(() => {});
     throw error;
   }
 }
 
+const NO_ENV: RepoEnv = { runtime: {}, build: {}, unreadable: [] };
+
+/** The repository's preview variables. Only Docker previews run the repository's own app; the demo gets none. */
+async function settingsEnv(input: DeployRequest): Promise<RepoEnv> {
+  if (previewRuntime() !== "docker" || isDemoRequest(input)) return NO_ENV;
+  return repoEnv(input.repository);
+}
+
 const processDeployer: Deployer = {
   async provision(input) {
     const deploymentId = deploymentIdFor(input.envId);
-    const image = await prepareOrTearDown(input, deploymentId);
+    const env = await settingsEnv(input);
+    const image = await prepareOrTearDown(input, deploymentId, env);
     return exclusive(async () => {
       const file = await loadDeployments();
       const existing = file.deployments.find((item) => item.deploymentId === deploymentId);
       if (existing?.pid && existing.sha === input.sha && gateAlive(existing.pid)) {
         return { deploymentId: existing.deploymentId, url: existing.url };
       }
-      return launch(input, existing ? { ...existing, deploymentId } : ({ deploymentId } as DeploymentRecord), image);
+      return launch(input, existing ? { ...existing, deploymentId } : ({ deploymentId } as DeploymentRecord), image, env);
     });
   },
 
   async update(input) {
     const deploymentId = input.deploymentId || deploymentIdFor(input.envId);
-    const image = await prepareOrTearDown(input, deploymentId);
+    const env = await settingsEnv(input);
+    const image = await prepareOrTearDown(input, deploymentId, env);
     return exclusive(async () => {
       const file = await loadDeployments();
       const existing = file.deployments.find((item) => item.deploymentId === deploymentId);
-      return launch(input, existing ?? ({ deploymentId } as DeploymentRecord), image);
+      return launch(input, existing ?? ({ deploymentId } as DeploymentRecord), image, env);
     });
   },
 
@@ -488,13 +520,14 @@ const processDeployer: Deployer = {
     const alive = await exclusive(running);
     if (alive) return { deploymentId: alive.deploymentId, url: alive.url };
     // Restarting uses the image that is already built. It is built again only if it was removed.
-    const image = await prepareImage(input);
+    const env = await settingsEnv(input);
+    const image = await prepareImage(input, env);
     return exclusive(async () => {
       const again = await running();
       if (again) return { deploymentId: again.deploymentId, url: again.url };
       const file = await loadDeployments();
       const existing = file.deployments.find((item) => item.deploymentId === deploymentId);
-      return launch(input, existing ?? ({ deploymentId } as DeploymentRecord), image);
+      return launch(input, existing ?? ({ deploymentId } as DeploymentRecord), image, env);
     });
   },
 

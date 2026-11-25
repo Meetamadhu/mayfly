@@ -9,6 +9,8 @@ export interface BuildRequest {
   repository: string;
   prNumber: number;
   sha: string;
+  /** Preview variables the app needs while building (passed as --build-arg NAME, the value from the environment). */
+  buildEnv?: Record<string, string>;
 }
 
 // Kept on the preview record for the card's build log: enough to see the real error, small enough to store.
@@ -33,7 +35,7 @@ export function imageTag(repository: string, prNumber: number, sha: string) {
  */
 export function childEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env, GIT_TERMINAL_PROMPT: "0", DOCKER_BUILDKIT: "0" };
-  for (const name of ["MAYFLY_ADMIN_TOKEN", "GITHUB_WEBHOOK_SECRET", "GITHUB_TOKEN", "MAYFLY_GITHUB_TOKEN"]) {
+  for (const name of ["MAYFLY_ADMIN_TOKEN", "MAYFLY_SECRETS_KEY", "GITHUB_WEBHOOK_SECRET", "GITHUB_TOKEN", "MAYFLY_GITHUB_TOKEN"]) {
     delete env[name];
   }
   return env;
@@ -158,7 +160,27 @@ async function hasDockerfile(dir: string) {
   }
 }
 
-function dockerBuild(tag: string, envId: string, dir: string) {
+/**
+ * The build log is kept on the preview and its error can be posted on the pull request, so any build value the
+ * Dockerfile printed is hidden first. Very short values (under 4 characters) would hide ordinary words, so they stay.
+ */
+export function hideValues(text: string, values: Record<string, string> = {}) {
+  let out = text;
+  const secrets = Object.values(values)
+    .flatMap((value) => [value, ...value.split(/\r?\n/)])
+    .map((value) => value.trim())
+    .filter((value) => value.length >= 4)
+    .sort((a, b) => b.length - a.length);
+  for (const secret of secrets) out = out.split(secret).join("[hidden]");
+  return out;
+}
+
+/** --build-arg NAME for each value: Docker reads the value from its own environment, so it's never on a command line. */
+export function buildArgs(buildEnv: Record<string, string> = {}) {
+  return Object.keys(buildEnv).flatMap((name) => ["--build-arg", name]);
+}
+
+function dockerBuild(tag: string, envId: string, dir: string, buildEnv: Record<string, string> = {}) {
   const limits = buildLimits();
   return new Promise<void>((resolve, reject) => {
     const tail: string[] = [];
@@ -173,7 +195,7 @@ function dockerBuild(tag: string, envId: string, dir: string) {
     };
     const finish = (prefix: string) => {
       if (partial.trim()) tail.push(partial);
-      return new Error([prefix, ...tail.slice(-LOG_LINES)].join("\n"));
+      return new Error(hideValues([prefix, ...tail.slice(-LOG_LINES)].join("\n"), buildEnv));
     };
 
     const child = spawn(
@@ -193,11 +215,12 @@ function dockerBuild(tag: string, envId: string, dir: string) {
         "mayfly.image=1",
         "--label",
         `mayfly.image.env=${envId}`,
+        ...buildArgs(buildEnv),
         "-t",
         tag,
         ".",
       ],
-      { cwd: dir, windowsHide: true, env: childEnv(), stdio: ["ignore", "pipe", "pipe"] },
+      { cwd: dir, windowsHide: true, env: { ...childEnv(), ...buildEnv }, stdio: ["ignore", "pipe", "pipe"] },
     );
     child.stdout.on("data", take);
     child.stderr.on("data", take);
@@ -278,7 +301,7 @@ export function buildImage(request: BuildRequest): Promise<string> {
         throw new Error(`The repository is bigger than Mayfly's ${limits.maxRepoMb} MB limit.`);
       }
       if (!(await hasDockerfile(source))) throw new Error("There's no Dockerfile at the top of the repository, so Mayfly doesn't know how to build it. Add one and push again.");
-      await dockerBuild(tag, request.envId, source);
+      await dockerBuild(tag, request.envId, source, request.buildEnv);
 
       const size = Number((await run("docker", ["image", "inspect", "--format", "{{.Size}}", tag]).catch(() => "0")).trim());
       if (size > limits.maxImageMb * MB) {

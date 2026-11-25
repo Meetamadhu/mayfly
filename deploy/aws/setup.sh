@@ -155,6 +155,15 @@ EOF
 fi
 chmod 600 .env.local
 
+# Encrypts the variables saved on the Preview settings page. Made once and kept: changing it makes saved values
+# unreadable, so they'd have to be entered again.
+if ! grep -q '^MAYFLY_SECRETS_KEY=.\{32,\}' .env.local; then
+  say "Adding MAYFLY_SECRETS_KEY for preview settings"
+  { grep -v '^MAYFLY_SECRETS_KEY=' .env.local || true; printf 'MAYFLY_SECRETS_KEY=%s\n' "$(openssl rand -hex 32)"; } >.env.local.new
+  chmod 600 .env.local.new
+  mv .env.local.new .env.local
+fi
+
 if [ -n "$set_token" ]; then
   say "Saving your GitHub token"
   [ -t 0 ] || fail "--github-token needs a terminal to paste the token into."

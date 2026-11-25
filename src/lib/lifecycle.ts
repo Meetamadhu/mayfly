@@ -743,7 +743,11 @@ async function reserve(event: PullRequestEvent): Promise<LifecycleResult> {
       extensions: 0,
       ...(normalized.author ? { author: normalized.author } : {}),
       ...(normalized.title ? { title: normalized.title } : {}),
-      ...(normalized.size && normalized.size !== "standard" ? { size: normalized.size } : {}),
+      // A size chosen by hand wins; otherwise the repository's preview settings decide (Standard when unset).
+      ...(() => {
+        const size = normalized.size ?? state.previewSettings?.[normalized.repository]?.size;
+        return size && size !== "standard" ? { size } : {};
+      })(),
       ...(typeof normalized.budget === "number" && normalized.budget > 0 ? { budget: normalized.budget } : {}),
     };
     if (hasKeepLabel(created.labels)) {
