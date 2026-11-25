@@ -71,6 +71,8 @@ function describe(type: string, detail: string | null | undefined): { kind: Rece
       return { kind: "asleep", label: "Fell asleep", detail: "no visitors" };
     case "destroyed":
       return { kind: "removed", label: "Removed", detail: detail ? removedBecause(detail) : null };
+    case "feedback":
+      return { kind: "note", label: "Feedback", detail: detail ? `from ${detail}` : null };
     default:
       return { kind: "time", label: timelineLabel({ at: "", type, detail: detail ?? undefined }), detail: null };
   }

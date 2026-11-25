@@ -42,6 +42,14 @@ import {
   type UsageMonth,
 } from "./types";
 import { hourlyRate, moneySeconds, sizeWeight } from "./sizes";
+import {
+  feedbackId,
+  feedbackLink,
+  feedbackNote,
+  MAX_FEEDBACK_PER_PREVIEW,
+  type FeedbackInput,
+  type FeedbackItem,
+} from "./feedback";
 
 const MAX_ENVIRONMENT_EVENTS = 50;
 
@@ -157,9 +165,17 @@ function readyComment(env: Environment, refreshed: boolean) {
     `| **Commit** | \`${env.sha.slice(0, 8)}\` on \`${cell(env.branch)}\`${build} |`,
     `| **Lifetime** | ${cell(lifetimeLine(env))} |`,
     `| **Sleep** | Sleeps after ${sleepWords(sleepSecondsForRepo(env.repository))} without visits and wakes on the next one. |`,
+    ...feedbackRow(env),
     "",
     `Removed when the pull request is closed or merged. ${lastUpdatedLine(at)}`,
   ].join("\n");
+}
+
+/** "Feedback: leave a comment on the preview", when feedback links are on (an admin token is set). */
+function feedbackRow(env: Environment) {
+  if (!env.url) return [];
+  const link = feedbackLink(getConfig().previewBaseUrl, env);
+  return link ? [`| **Feedback** | [Mark a spot on the preview and comment](${link}) |`] : [];
 }
 
 /**
@@ -1445,6 +1461,69 @@ async function postExpiryWarning(env: Environment) {
     if (!current) return;
     pushEnvironmentEvent(current, { at: iso(), type: "warned", detail: env.expiresAt });
     await saveState(state);
+  });
+}
+
+export type FeedbackResult =
+  | { ok: true; environment: Environment; item: FeedbackItem }
+  | { ok: false; code: "not_found" | "conflict"; error: string };
+
+/** The live preview for a pull request, with its feedback. Null when there is none. */
+export async function getLivePreview(repository: string, prNumber: number): Promise<Environment | null> {
+  const state = await loadState();
+  const env = findLive(state.environments, repository.trim().toLowerCase(), prNumber);
+  return env ? clone(env) : null;
+}
+
+/** Save a reviewer's comment on a live preview, note it in the history, then post it on the pull request. */
+export async function addFeedback(envId: string, input: FeedbackInput): Promise<FeedbackResult> {
+  const result = await exclusive(async (): Promise<FeedbackResult> => {
+    const state = await loadState();
+    const env = state.environments.find((item) => item.id === envId);
+    if (!env || !isLiveStatus(env.status) || env.status === "destroying") {
+      return { ok: false, code: "not_found", error: "This preview has been removed, so it can't take comments." };
+    }
+    const list = env.feedback ?? [];
+    if (list.length >= MAX_FEEDBACK_PER_PREVIEW) {
+      return {
+        ok: false,
+        code: "conflict",
+        error: `This preview already has ${MAX_FEEDBACK_PER_PREVIEW} comments. Ask an admin to clear some first.`,
+      };
+    }
+    const at = iso();
+    const item: FeedbackItem = { id: feedbackId(randomUUID), at, sha: env.sha, ...input };
+    env.feedback = [...list, item];
+    env.updatedAt = at;
+    pushEnvironmentEvent(env, { at, type: "feedback", detail: input.author });
+    await saveState(state);
+    return { ok: true, environment: clone(env), item };
+  });
+  if (result.ok) {
+    const { environment, item } = result;
+    try {
+      await postPullRequestNote(
+        environment.repository,
+        environment.prNumber,
+        feedbackNote(item, feedbackLink(getConfig().previewBaseUrl, environment)),
+      );
+    } catch (error) {
+      console.error("Feedback was not posted on the pull request", error);
+    }
+  }
+  return result;
+}
+
+/** An admin removes a comment (spam, or done with). The note on GitHub stays. */
+export async function deleteFeedback(envId: string, itemId: string): Promise<boolean> {
+  return exclusive(async () => {
+    const state = await loadState();
+    const env = state.environments.find((item) => item.id === envId);
+    const list = env?.feedback ?? [];
+    if (!env || !list.some((item) => item.id === itemId)) return false;
+    env.feedback = list.filter((item) => item.id !== itemId);
+    await saveState(state);
+    return true;
   });
 }
 

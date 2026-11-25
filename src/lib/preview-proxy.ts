@@ -54,6 +54,39 @@ export function forwardableCookie(value: string | string[] | undefined): string 
   return kept.length ? kept.join("; ") : undefined;
 }
 
+/**
+ * The review page (/review/...) shows a preview in a frame and needs a small helper inside it to draw the comment
+ * pins and let a reviewer mark a spot. Mayfly adds that helper to HTML pages it serves into a frame, and nowhere
+ * else, so a preview opened normally is byte-for-byte what the app sent.
+ */
+export const FEEDBACK_SCRIPT_TAG = '<script src="/feedback-frame.js" async></script>';
+const MAX_INJECT_BYTES = 5 * 1024 * 1024;
+
+/**
+ * The page with the feedback helper added: before </head>, else before </body>, else at the end. Works on the raw
+ * bytes (searched as latin1, which maps byte for byte), so a page in any ASCII-compatible charset stays intact.
+ */
+export function injectFeedbackScript(page: Buffer): Buffer {
+  const text = page.toString("latin1");
+  if (text.includes(FEEDBACK_SCRIPT_TAG)) return page;
+  const tag = Buffer.from(FEEDBACK_SCRIPT_TAG, "latin1");
+  for (const pattern of [/<\/head\s*>/i, /<\/body\s*>/i]) {
+    const match = pattern.exec(text);
+    if (match) return Buffer.concat([page.subarray(0, match.index), tag, page.subarray(match.index)]);
+  }
+  return Buffer.concat([page, tag]);
+}
+
+/** Adds Sec-Fetch-Dest to Vary, so a browser never reuses a framed page for a normal visit or the other way round. */
+function varyOnDest(existing: string | string[] | undefined) {
+  const parts = (Array.isArray(existing) ? existing.join(",") : (existing ?? ""))
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.some((part) => part === "*" || part.toLowerCase() === "sec-fetch-dest")) return parts.join(", ");
+  return [...parts, "Sec-Fetch-Dest"].join(", ");
+}
+
 function headerValue(headers: IncomingHttpHeaders, name: string): string | undefined {
   const value = headers[name];
   if (Array.isArray(value)) return value[0];
@@ -348,6 +381,15 @@ export async function proxyPreview(req: Request, res: Response): Promise<void> {
 
   const hasBody = method !== "GET" && method !== "HEAD";
 
+  // A page loading inside the review page's frame gets the feedback helper. Ask the app for it uncompressed and
+  // fresh, so it can be added (a cached or compressed copy can't be).
+  const framed = method === "GET" && headerValue(req.headers, "sec-fetch-dest") === "iframe" && !isStatus && !isProbe;
+  if (framed) {
+    headers["accept-encoding"] = "identity";
+    delete headers["if-none-match"];
+    delete headers["if-modified-since"];
+  }
+
   await new Promise<void>((resolve) => {
     let settled = false;
     const finish = () => {
@@ -361,9 +403,16 @@ export async function proxyPreview(req: Request, res: Response): Promise<void> {
       upstream = forward(
         { hostname: "127.0.0.1", port: target.port, path: `${path}${search}`, method, headers },
         (incoming) => {
+          const fromMayfly = Boolean(headerValue(incoming.headers, MAYFLY_PAGE_HEADER));
           const responseHeaders = copyResponseHeaders(incoming);
           const status = incoming.statusCode || 502;
           const noBody = method === "HEAD" || status === 204 || status === 205 || status === 304;
+          const html = /^text\/html\b/i.test(headerValue(incoming.headers, "content-type") ?? "");
+          if (html && !fromMayfly) responseHeaders.vary = varyOnDest(responseHeaders.vary);
+          const encoding = (headerValue(incoming.headers, "content-encoding") ?? "identity").trim().toLowerCase();
+          const declared = Number(headerValue(incoming.headers, "content-length") ?? "0");
+          const inject =
+            framed && !noBody && !fromMayfly && html && status === 200 && encoding === "identity" && declared <= MAX_INJECT_BYTES;
 
           res.status(status);
           for (const [key, value] of Object.entries(responseHeaders)) {
@@ -387,8 +436,37 @@ export async function proxyPreview(req: Request, res: Response): Promise<void> {
             incoming.destroy();
             finish();
           });
-          incoming.pipe(res);
           res.on("finish", finish);
+          if (!inject) {
+            incoming.pipe(res);
+            return;
+          }
+          // Hold the page, add the helper, then send it. A page that turns out bigger than 5 MB is sent as it is.
+          const chunks: Buffer[] = [];
+          let size = 0;
+          let passedThrough = false;
+          incoming.on("data", (chunk: Buffer) => {
+            if (passedThrough) return;
+            chunks.push(chunk);
+            size += chunk.length;
+            if (size > MAX_INJECT_BYTES) {
+              passedThrough = true;
+              incoming.pause();
+              for (const held of chunks) res.write(held);
+              chunks.length = 0;
+              incoming.removeAllListeners("data");
+              incoming.removeAllListeners("end");
+              incoming.pipe(res);
+              incoming.resume();
+            }
+          });
+          incoming.on("end", () => {
+            if (passedThrough) return;
+            const page = injectFeedbackScript(Buffer.concat(chunks));
+            res.removeHeader("etag");
+            res.setHeader("content-length", String(page.length));
+            res.end(page);
+          });
         },
       );
     } catch {

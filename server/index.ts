@@ -6,6 +6,7 @@ import { backupsRouter } from "./routes/backups";
 import { wellKnownRouter } from "./routes/well-known";
 import { environmentsRouter } from "./routes/environments";
 import { eventsRouter } from "./routes/events";
+import { feedbackRouter } from "./routes/feedback";
 import { healthRouter } from "./routes/health";
 import { policyRouter } from "./routes/policy";
 import { previewRouter } from "./routes/preview";
@@ -106,6 +107,7 @@ async function main() {
   server.use(webhooksRouter);
   server.use(eventsRouter);
   server.use(previewsRouter);
+  server.use(feedbackRouter);
   server.use(policyRouter);
   server.use(resourcesRouter);
   server.use(previewAccessRouter);

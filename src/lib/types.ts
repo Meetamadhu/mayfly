@@ -68,6 +68,8 @@ export interface Environment {
   size?: import("./sizes").PreviewSize;
   /** Remove the preview once its awake time has cost this much (in the configured currency). */
   budget?: number | null;
+  /** Comments reviewers pinned to spots on the preview (see feedback.ts). Oldest first; at most 100. */
+  feedback?: import("./feedback").FeedbackItem[];
   /** When set and in the future, the gate will not idle-sleep this preview. */
   keepAwakeUntil?: string | null;
   /** Effective idle seconds for this repo (overview-only; from the TTL policies / env defaults). */

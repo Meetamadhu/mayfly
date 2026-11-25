@@ -7,7 +7,7 @@ import { removedBecause, timelineLabel, timelineNewestFirst } from "./timeline";
  * awake/asleep hours per day for the chart.
  */
 
-export type ActivityKind = "build" | "wake" | "nap" | "time" | "removed";
+export type ActivityKind = "build" | "wake" | "nap" | "time" | "feedback" | "removed";
 export type ActivityTab = "all" | ActivityKind;
 
 export const ACTIVITY_TABS: { id: ActivityTab; label: string }[] = [
@@ -16,6 +16,7 @@ export const ACTIVITY_TABS: { id: ActivityTab; label: string }[] = [
   { id: "wake", label: "Wakes" },
   { id: "nap", label: "Naps" },
   { id: "time", label: "Extended" },
+  { id: "feedback", label: "Feedback" },
   { id: "removed", label: "Removed" },
 ];
 
@@ -35,6 +36,8 @@ export function activityKind(type: string): ActivityKind {
     case "unkept":
     case "warned":
       return "time";
+    case "feedback":
+      return "feedback";
     default:
       return "build";
   }
@@ -45,7 +48,7 @@ export function activityTone(type: string): "building" | "awake" | "asleep" | "f
   if (type === "woke" || type === "visited" || type === "ready") return "awake";
   if (type === "slept") return "asleep";
   if (type === "failed" || type === "destroyed") return "failed";
-  if (activityKind(type) === "time") return "time";
+  if (activityKind(type) === "time" || type === "feedback") return "time";
   return "building";
 }
 
@@ -197,6 +200,8 @@ export function describeRow(row: ActivityRow, options: { demoKey: string | null;
       return { subject, before: "", after: " keep label removed", sub: join(repo, "lifetime restarted") };
     case "warned":
       return { subject, before: "", after: " expiry warning posted", sub: join(repo, "on the pull request") };
+    case "feedback":
+      return { subject, before: "Feedback on ", after: title, sub: join(repo, detail ? `from ${detail}` : "") };
     default:
       return { subject, before: "", after: `: ${timelineLabel({ at: row.at, type: row.type, detail: row.detail ?? undefined }).toLowerCase()}`, sub: repo };
   }

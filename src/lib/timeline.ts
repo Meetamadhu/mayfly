@@ -77,6 +77,8 @@ export function timelineLabel(event: EnvironmentEvent): string {
       return "Keep label removed, lifetime restarted";
     case "warned":
       return "Expiry warning posted on the PR";
+    case "feedback":
+      return event.detail ? `Feedback from ${event.detail}` : "Feedback left on the preview";
     case "failed": {
       const first = event.detail?.split("\n")[0]?.trim();
       return first ? `Couldn’t build: ${first}` : "Couldn’t build";
