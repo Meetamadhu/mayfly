@@ -12,6 +12,7 @@ import {
 } from "@/components/board-parts";
 import { StateGlyph, repoAvatar } from "@/components/previews-view";
 import { detailState, endsText, lastBuildMs, statusCard, type DetailState } from "@/lib/preview-details";
+import { numbered, reviewPath } from "@/lib/review";
 import { formatEventTime, timelineLabel, timelineNewestFirst, timelineTone } from "@/lib/timeline";
 import type { Environment } from "@/lib/types";
 import type { PreviewAction } from "@/lib/use-preview-actions";
@@ -346,6 +347,8 @@ function PanelBody(props: Props & { env: Environment }) {
           </dl>
         </section>
 
+        {signedIn && !demo && (live || (env.feedback?.length ?? 0) > 0) ? <FeedbackSection env={env} now={now} live={live} /> : null}
+
         <section aria-labelledby="pd-history-title">
           <h3 className="pd-heading" id="pd-history-title">
             History
@@ -370,3 +373,59 @@ function PanelBody(props: Props & { env: Environment }) {
   );
 }
 
+
+/** The comments reviewers pinned on this preview, newest first, with the way in to see them on the page. */
+function FeedbackSection({ env, now, live }: { env: Environment; now: number; live: boolean }) {
+  const [copied, setCopied] = useState<"yes" | "failed" | null>(null);
+  const list = numbered(env.feedback ?? []).reverse();
+  const review = reviewPath(env.repository, env.prNumber);
+
+  async function copyFeedbackLink() {
+    try {
+      const response = await fetch(`/api/feedback${review.slice("/review".length)}`, { credentials: "same-origin", cache: "no-store" });
+      const body = (await response.json().catch(() => ({}))) as { link?: string | null };
+      if (!response.ok || !body.link) throw new Error("no link");
+      await navigator.clipboard.writeText(body.link);
+      setCopied("yes");
+    } catch {
+      setCopied("failed");
+    }
+    window.setTimeout(() => setCopied(null), 2000);
+  }
+
+  return (
+    <section aria-labelledby="pd-feedback-title">
+      <h3 className="pd-heading" id="pd-feedback-title">
+        Feedback{list.length ? ` (${list.length})` : ""}
+      </h3>
+      {list.length === 0 ? (
+        <p className="pd-hint">No comments yet. Reviewers open the feedback link, mark a spot on the page and comment.</p>
+      ) : (
+        <ol className="pd-feedback">
+          {list.slice(0, 5).map(({ item, n }) => (
+            <li key={item.id}>
+              <span className="rv-pin" aria-hidden="true">
+                {n}
+              </span>
+              <span className="pd-feedback-text">
+                <strong>{item.author}</strong> <span className="pd-feedback-time">{formatAgo(item.at, now)}</span>
+                <span className="pd-feedback-body">{item.body}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+      {live ? (
+        <div className="pd-feedback-actions">
+          <a className="pd-btn pd-btn-line" href={`${review}${list[0] ? `#c-${list[0].item.id}` : ""}`} target="_blank" rel="noopener noreferrer">
+            {list.length ? "See on the page" : "Open with comments"}
+            <span className="visually-hidden"> (opens in a new tab)</span>
+          </a>
+          <button type="button" className="pd-btn pd-btn-line" onClick={() => void copyFeedbackLink()}>
+            {copied === "yes" ? "Link copied" : copied === "failed" ? "Couldn't copy" : "Copy feedback link"}
+          </button>
+        </div>
+      ) : null}
+    </section>
+  );
+}
