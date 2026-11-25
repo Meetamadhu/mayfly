@@ -1,6 +1,6 @@
 import { request as forward, type IncomingHttpHeaders, type IncomingMessage } from "node:http";
 import type { Request, Response } from "express";
-import { ADMIN_COOKIE } from "./admin";
+import { ADMIN_COOKIE, checkAdmin } from "./admin";
 import { hasPreviewAccess, passwordPage, PREVIEW_ACCESS_COOKIE, safeNext } from "./preview-access";
 import { findProxyTarget, recordActivity } from "./lifecycle";
 
@@ -85,6 +85,25 @@ function varyOnDest(existing: string | string[] | undefined) {
     .filter(Boolean);
   if (parts.some((part) => part === "*" || part.toLowerCase() === "sec-fetch-dest")) return parts.join(", ");
   return [...parts, "Sec-Fetch-Dest"].join(", ");
+}
+
+/**
+ * Who is looking, for the "Back" link on Mayfly's own preview pages (the demo app, "Waking up", "No live preview"):
+ * a signed-in admin goes back to Admin, anyone else to the board. Sent to the gate as x-mayfly-viewer: admin. It's a
+ * yes/no, never the session itself, and the gate doesn't pass it on to a pull request's own app.
+ */
+export const VIEWER_HEADER = "x-mayfly-viewer";
+
+export function viewerIsAdmin(req: Request) {
+  const header = (name: string) => {
+    const value = req.headers[name.toLowerCase()];
+    return Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
+  };
+  return checkAdmin({ method: "GET", header }) === null;
+}
+
+export function backLink(admin: boolean) {
+  return admin ? { href: "/admin?from=preview", label: "Back to admin" } : { href: "/board?from=preview", label: "Back to board" };
 }
 
 function headerValue(headers: IncomingHttpHeaders, name: string): string | undefined {
@@ -214,7 +233,8 @@ const THEME_SCRIPT = `
       })();`;
 
 /** A 404 page for an address with no live preview. Repository and number come from the URL, so they are escaped. */
-function noPreview(res: Response, repository: string, pr: string, line: string) {
+function noPreview(res: Response, repository: string, pr: string, line: string, admin = false) {
+  const back = backLink(admin);
   const shown = (value: string) => escapeHtml(value.length > 100 ? `${value.slice(0, 100)}…` : value);
   const body = `<!doctype html>
 <html lang="en">
@@ -249,8 +269,7 @@ function noPreview(res: Response, repository: string, pr: string, line: string) 
           <span class="chip">PR #${shown(pr)}</span>
         </p>
         <p class="line">${escapeHtml(line)}</p>
-        <a class="back" id="back" href="/board?from=preview">Back to board</a>
-        <script>(function(){var a=document.getElementById("back");try{var fromAdmin=false;var r=document.referrer?new URL(document.referrer):null;if(r&&r.host===location.host&&r.pathname.indexOf("/admin")===0)fromAdmin=true;if(new URLSearchParams(location.search).get("mayfly_from")==="admin")fromAdmin=true;if(fromAdmin){a.href="/admin?from=preview";a.textContent="Back to admin";}}catch(e){}})();</script>
+        <a class="back" id="back" href="${back.href}">${back.label}</a>
       </div>
     </main>
   </body>
@@ -316,7 +335,7 @@ export async function proxyPreview(req: Request, res: Response): Promise<void> {
   const notAPreview = "This address is not a pull request preview.";
 
   if (!/^\d{1,9}$/.test(pr)) {
-    noPreview(res, `${owner}/${name}`, pr, notAPreview);
+    noPreview(res, `${owner}/${name}`, pr, notAPreview, viewerIsAdmin(req));
     return;
   }
 
@@ -324,7 +343,7 @@ export async function proxyPreview(req: Request, res: Response): Promise<void> {
   try {
     repository = `${decodeURIComponent(owner)}/${decodeURIComponent(name)}`;
   } catch {
-    noPreview(res, `${owner}/${name}`, pr, notAPreview);
+    noPreview(res, `${owner}/${name}`, pr, notAPreview, viewerIsAdmin(req));
     return;
   }
 
@@ -345,7 +364,7 @@ export async function proxyPreview(req: Request, res: Response): Promise<void> {
 
   const target = await findProxyTarget(repository, Number(pr));
   if (!target) {
-    noPreview(res, repository, pr, "This pull request was closed, expired or removed, so its preview is gone.");
+    noPreview(res, repository, pr, "This pull request was closed, expired or removed, so its preview is gone.", viewerIsAdmin(req));
     return;
   }
 
@@ -378,6 +397,8 @@ export async function proxyPreview(req: Request, res: Response): Promise<void> {
   if (originalHost) headers["x-forwarded-host"] = originalHost;
   // Same protocol value Express/Mayfly sees for this request (http behind a plain listen).
   headers["x-forwarded-proto"] = req.protocol;
+  delete headers[VIEWER_HEADER];
+  if (viewerIsAdmin(req)) headers[VIEWER_HEADER] = "admin";
 
   const hasBody = method !== "GET" && method !== "HEAD";
 

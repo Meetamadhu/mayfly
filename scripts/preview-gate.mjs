@@ -297,6 +297,12 @@ function appResponseHeaders(incoming) {
   return headers;
 }
 
+function appHeaders(req) {
+  const headers = { ...req.headers, host: `127.0.0.1:${appPort}` };
+  if (!appIsMayflyDemo) delete headers["x-mayfly-viewer"];
+  return headers;
+}
+
 function proxy(req, res) {
   const upstream = forward(
     {
@@ -304,7 +310,7 @@ function proxy(req, res) {
       port: appPort,
       path: req.url,
       method: req.method,
-      headers: { ...req.headers, host: `127.0.0.1:${appPort}` },
+      headers: appHeaders(req),
     },
     (response) => {
       // Never forward x-mayfly-page from the app — only this gate may mark Mayfly pages.
@@ -434,7 +440,7 @@ const wakePage = `<!doctype html>
           <p class="meta">${wakeLabel} <span class="sha">${wakeSha}</span></p>
           <div class="spinner" aria-hidden="true"></div>
           <p class="meta" role="status"><span id="elapsed">0</span>s</p>
-          <a class="back" id="back" href="/board?from=preview">Back to board</a>
+          <a class="back" href="__BACK_HREF__">__BACK_LABEL__</a>
         </div>
       </div>
       <div id="failed" hidden>
@@ -445,29 +451,12 @@ const wakePage = `<!doctype html>
         <div class="body">
           <p class="meta">${wakeLabel} <span class="sha">${wakeSha}</span></p>
           <p><a id="retry" href="">Retry</a></p>
-          <a class="back" href="/board?from=preview">Back to board</a>
+          <a class="back" href="__BACK_HREF__">__BACK_LABEL__</a>
         </div>
       </div>
     </main>
     <script>
       (function () {
-        function fromAdmin() {
-          try {
-            var r = document.referrer ? new URL(document.referrer) : null;
-            if (r && r.host === location.host && r.pathname.indexOf("/admin") === 0) return true;
-            if (new URLSearchParams(location.search).get("mayfly_from") === "admin") return true;
-          } catch (e) {}
-          return false;
-        }
-        function applyBack() {
-          document.querySelectorAll("a.back").forEach(function (a) {
-            if (fromAdmin()) {
-              a.href = "/admin?from=preview";
-              a.textContent = "Back to admin";
-            }
-          });
-        }
-        applyBack();
         var started = Date.now();
         var timer = null;
         function stop(failed) {
@@ -477,7 +466,6 @@ const wakePage = `<!doctype html>
             document.getElementById("failed").hidden = false;
             document.getElementById("card").setAttribute("data-failed", "true");
             document.getElementById("retry").href = location.href;
-            applyBack();
           }
         }
         function tick() {
@@ -489,15 +477,7 @@ const wakePage = `<!doctype html>
             .then(function (body) {
               if (body && body.state === "awake") {
                 stop(false);
-                // Reload would lose the /admin referrer; keep it in the query for the sandboxed app page.
                 var next = location.pathname + location.search;
-                try {
-                  if (fromAdmin()) {
-                    var q = new URLSearchParams(location.search);
-                    q.set("mayfly_from", "admin");
-                    next = location.pathname + "?" + q.toString();
-                  }
-                } catch (e) {}
                 location.replace(next);
               }
             })
@@ -508,6 +488,24 @@ const wakePage = `<!doctype html>
     </script>
   </body>
 </html>`;
+
+/**
+ * Where "Back" goes on this gate's own pages and Mayfly's demo app: Admin for a signed-in admin, the board for
+ * everyone else. Mayfly's proxy says which (x-mayfly-viewer: admin); the page can't tell, because it's sandboxed.
+ */
+function backFor(req) {
+  return req.headers["x-mayfly-viewer"] === "admin"
+    ? { href: "/admin?from=preview", label: "Back to admin" }
+    : { href: "/board?from=preview", label: "Back to board" };
+}
+
+function wakePageFor(req) {
+  const back = backFor(req);
+  return wakePage.replaceAll("__BACK_HREF__", back.href).replaceAll("__BACK_LABEL__", back.label);
+}
+
+// Only Mayfly's own demo app reads x-mayfly-viewer. A pull request's own app never gets it.
+const appIsMayflyDemo = !useDocker || image === "mayfly-preview:local";
 
 function wantsHtml(req) {
   return String(req.headers.accept || "").toLowerCase().includes("text/html");
@@ -604,7 +602,7 @@ const server = createServer((req, res) => {
       "cache-control": "no-store",
       "x-mayfly-page": "waking",
     });
-    res.end(wakePage);
+    res.end(wakePageFor(req));
     return;
   }
   boot()

@@ -189,6 +189,16 @@ try {
   const adminEnv = (await allEnvs()).find((e) => e.id === env.id);
   check(adminEnv.feedback?.length === 1 && adminEnv.events.some((e) => e.type === "feedback" && e.detail === "Priya"), "admins do", adminEnv.feedback);
 
+  // "Back" on Mayfly's own preview pages: Admin for a signed-in admin, the board for everyone else.
+  const asVisitor = await (await fetch(`${BASE}/p/acme/web/42/`, { headers: { accept: "text/html" } })).text();
+  check(asVisitor.includes('href="/board?from=preview">Back to board<'), "a visitor's Back link goes to the board", asVisitor.slice(-600));
+  const adminPage = await (await fetch(`${BASE}/p/acme/web/42/`, { headers: { accept: "text/html", authorization: `Bearer ${ADMIN}` } })).text();
+  check(adminPage.includes('href="/admin?from=preview">Back to admin<'), "a signed-in admin's Back link goes to Admin", adminPage.slice(-600));
+  const spoofed = await (await fetch(`${BASE}/p/acme/web/42/`, { headers: { accept: "text/html", "x-mayfly-viewer": "admin" } })).text();
+  check(spoofed.includes("Back to board"), "a visitor can't claim to be an admin");
+  const missingPage = await (await fetch(`${BASE}/p/acme/web/999/`, { headers: { accept: "text/html", authorization: `Bearer ${ADMIN}` } })).text();
+  check(missingPage.includes("Back to admin"), "the No live preview page follows the same rule");
+
   // The helper goes into pages loaded in a frame, and only those.
   const framed = await fetch(`${BASE}/p/acme/web/42/`, { headers: { "sec-fetch-dest": "iframe", "accept-encoding": "gzip" } });
   const framedHtml = await framed.text();
