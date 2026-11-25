@@ -5,6 +5,32 @@ import { MayflyMark } from "@/components/admin-header";
 
 /** Set when the intro is finished or skipped. Kept for this app session only, so it shows on every launch. */
 export const ONBOARDED_KEY = "mayfly-onboarded";
+
+/**
+ * Whether this browser has seen the intro. Kept in localStorage as well as sessionStorage, so it shows once per
+ * browser rather than once per tab: previews open in their own tab, and an app's own "Back" link (which Mayfly
+ * doesn't control) would otherwise bring up the intro again. The Intro button in the top bar still shows it.
+ */
+function introSeen() {
+  for (const store of [() => window.sessionStorage, () => window.localStorage]) {
+    try {
+      if (store().getItem(ONBOARDED_KEY) === "1") return true;
+    } catch {
+      // Storage blocked: try the other one; if both are, the intro may show again, which is harmless.
+    }
+  }
+  return false;
+}
+
+function markIntroSeen() {
+  for (const store of [() => window.sessionStorage, () => window.localStorage]) {
+    try {
+      store().setItem(ONBOARDED_KEY, "1");
+    } catch {
+      // Ignore: see introSeen.
+    }
+  }
+}
 /** Fired by "Show the intro again" in the app's More sheet. */
 export const SHOW_INTRO_EVENT = "mayfly:show-intro";
 
@@ -101,12 +127,7 @@ export function AppOnboarding() {
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    let seen = false;
-    try {
-      seen = sessionStorage.getItem(ONBOARDED_KEY) === "1";
-    } catch {
-      // Storage blocked: show it; it may show again on the next page, which is harmless.
-    }
+    const seen = introSeen();
     // Tapping the app icon opens the start page with an android-app:// referrer; pages opened inside the app don't
     // have one. So that's a fresh launch even when Android kept the previous session's storage.
     const launchedFromIcon = document.referrer.startsWith("android-app://");
@@ -115,11 +136,7 @@ export function AppOnboarding() {
     const params = new URLSearchParams(window.location.search);
     const backFromPreview = params.get("from") === "preview";
     if (backFromPreview) {
-      try {
-        sessionStorage.setItem(ONBOARDED_KEY, "1");
-      } catch {
-        // Ignore: see above.
-      }
+      markIntroSeen();
       params.delete("from");
       const query = params.toString();
       window.history.replaceState(window.history.state, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`);
@@ -144,11 +161,7 @@ export function AppOnboarding() {
   }, [open]);
 
   function finish() {
-    try {
-      sessionStorage.setItem(ONBOARDED_KEY, "1");
-    } catch {
-      // Ignore: see above.
-    }
+    markIntroSeen();
     setOpen(false);
   }
 
