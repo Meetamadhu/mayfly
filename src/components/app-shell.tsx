@@ -113,18 +113,8 @@ function PersonIcon() {
   );
 }
 
-/** Top bar, right: who you are, light/dark, the intro, and signing in or out, behind the avatar. */
-function AccountMenu({
-  signedIn,
-  theme,
-  onTheme,
-  onSignOut,
-}: {
-  signedIn: boolean;
-  theme: "light" | "dark";
-  onTheme: (next: "light" | "dark") => void;
-  onSignOut: () => void;
-}) {
+/** Top bar, right: who you are and signing in or out, behind the avatar. The intro and light/dark sit beside it. */
+function AccountMenu({ signedIn, onSignOut }: { signedIn: boolean; onSignOut: () => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -167,20 +157,6 @@ function AccountMenu({
               <span>{signedIn ? "Signed in" : "Viewing only"}</span>
             </span>
           </div>
-          <div className="board-account-row">
-            <span>Appearance</span>
-            <ThemeToggle theme={theme} onChange={onTheme} />
-          </div>
-          <button
-            type="button"
-            className="board-account-item"
-            onClick={() => {
-              setOpen(false);
-              window.dispatchEvent(new Event(SHOW_INTRO_EVENT));
-            }}
-          >
-            Show the intro
-          </button>
           {signedIn ? (
             <button
               type="button"
@@ -390,18 +366,19 @@ export function AppShell({
             <button
               type="button"
               className="board-help"
-              aria-label="How Mayfly works"
               title="How Mayfly works"
               onClick={() => window.dispatchEvent(new Event(SHOW_INTRO_EVENT))}
             >
-              ?
+              <span className="board-help-mark" aria-hidden="true">
+                ?
+              </span>
+              <span className="board-help-label">Intro</span>
             </button>
-            <AccountMenu
-              signedIn={signedIn}
-              theme={theme}
-              onTheme={chooseTheme}
-              onSignOut={() => void signOut()}
-            />
+            <div className="board-appearance" title="Appearance">
+              <span className="visually-hidden">Appearance</span>
+              <ThemeToggle theme={theme} onChange={chooseTheme} />
+            </div>
+            <AccountMenu signedIn={signedIn} onSignOut={() => void signOut()} />
           </div>
         </header>
 
