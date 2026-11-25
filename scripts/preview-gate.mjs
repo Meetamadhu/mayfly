@@ -449,7 +449,7 @@ const wakePage = `<!doctype html>
         function applyBack() {
           document.querySelectorAll("a.back").forEach(function (a) {
             if (fromAdmin()) {
-              a.href = "/admin";
+              a.href = "/admin?from=preview";
               a.textContent = "Back to admin";
             }
           });

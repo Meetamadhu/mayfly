@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { BackupsPanel } from "@/components/backups-panel";
 import { ResourcesPanel } from "@/components/resources-panel";
-import { Lifespan, OpenedBy, cardState, statePillLabel } from "@/components/board-parts";
+import { Lifespan, OpenedBy, cardState, previewHref, statePillLabel } from "@/components/board-parts";
 import { StateGlyph, repoAvatar } from "@/components/previews-view";
 import { RecentActivitySheet } from "@/components/recent-activity-sheet";
 import { READ_KEY, isUnread, readSince, recentItems } from "@/lib/recent-activity";
@@ -24,14 +24,6 @@ const SAMPLE = {
   branch: "",
   sha: "",
 };
-
-function previewPath(url: string) {
-  try {
-    return new URL(url).pathname;
-  } catch {
-    return url;
-  }
-}
 
 function formatLifetime(hours: number) {
   if (hours >= 48) {
@@ -500,7 +492,7 @@ export function AdminPanel() {
                   </p>
                   <div className="adm-actions">
                     {env.url ? (
-                      <a className="adm-btn adm-btn-main" href={previewPath(env.url)} target="_blank" rel="noopener noreferrer">
+                      <a className="adm-btn adm-btn-main" href={previewHref(env.url, { from: "admin" })} target="_blank" rel="noopener noreferrer">
                         Open preview <span aria-hidden="true">↗</span>
                         <span className="visually-hidden"> (opens in a new tab)</span>
                       </a>
