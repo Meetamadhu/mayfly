@@ -199,6 +199,12 @@ try {
   const missingPage = await (await fetch(`${BASE}/p/acme/web/999/`, { headers: { accept: "text/html", authorization: `Bearer ${ADMIN}` } })).text();
   check(missingPage.includes("Back to admin"), "the No live preview page follows the same rule");
 
+  // /back, for an app's own Back link: Admin for a signed-in admin, the board for everyone else.
+  const backVisitor = await fetch(`${BASE}/back`, { redirect: "manual" });
+  check(backVisitor.status === 302 && backVisitor.headers.get("location") === "/board?from=preview", "/back sends a visitor to the board", backVisitor.headers.get("location"));
+  const backAdmin = await fetch(`${BASE}/back`, { redirect: "manual", headers: { authorization: `Bearer ${ADMIN}` } });
+  check(backAdmin.headers.get("location") === "/admin?from=preview", "/back sends an admin to Admin", backAdmin.headers.get("location"));
+
   // The helper goes into pages loaded in a frame, and only those.
   const framed = await fetch(`${BASE}/p/acme/web/42/`, { headers: { "sec-fetch-dest": "iframe", "accept-encoding": "gzip" } });
   const framedHtml = await framed.text();
