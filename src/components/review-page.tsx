@@ -111,6 +111,11 @@ export function ReviewPage({ owner, name, pr }: { owner: string; name: string; p
     [api],
   );
 
+  // The comments panel starts open beside the preview on a wide screen, and closed (a sheet) on a phone.
+  useEffect(() => {
+    if (!window.matchMedia("(max-width: 800px)").matches) setSheetOpen(true);
+  }, []);
+
   useEffect(() => {
     const given = new URLSearchParams(location.search).get("key");
     const k = given && /^[0-9a-f]{16,64}$/.test(given) ? given : null;
@@ -310,7 +315,7 @@ export function ReviewPage({ owner, name, pr }: { owner: string; name: string; p
   const title = data ? data.preview.title || data.preview.branch : "";
 
   return (
-    <div className="rv" data-mode={mode ? "1" : undefined}>
+    <div className="rv" data-mode={mode ? "1" : undefined} data-panel={sheetOpen ? "open" : "closed"}>
       <header className="rv-top">
         <Link className="rv-home" href={data?.admin ? "/board" : "/"} aria-label="Mayfly">
           <MayflyMark className="rv-mark" />
@@ -347,7 +352,14 @@ export function ReviewPage({ owner, name, pr }: { owner: string; name: string; p
           </svg>
           {mode ? "Cancel" : "Comment"}
         </button>
-        <button type="button" className="rv-list-toggle" aria-expanded={sheetOpen} onClick={() => setSheetOpen((open) => !open)}>
+        <button
+          type="button"
+          className="rv-list-toggle"
+          aria-expanded={sheetOpen}
+          aria-controls="rv-side"
+          title={sheetOpen ? "Hide comments" : "Show comments"}
+          onClick={() => setSheetOpen((open) => !open)}
+        >
           Comments <span>{items.length}</span>
         </button>
       </header>
@@ -373,7 +385,7 @@ export function ReviewPage({ owner, name, pr }: { owner: string; name: string; p
           ) : null}
         </div>
 
-        <aside className="rv-side" data-open={sheetOpen ? "1" : undefined} aria-label="Comments">
+        <aside id="rv-side" className="rv-side" data-open={sheetOpen ? "1" : undefined} aria-label="Comments">
           <div className="rv-side-head">
             <h2>Comments</h2>
             <button type="button" className="ra-close rv-side-close" aria-label="Close comments" onClick={() => setSheetOpen(false)}>
