@@ -110,7 +110,21 @@ export function AppOnboarding() {
     // Tapping the app icon opens the start page with an android-app:// referrer; pages opened inside the app don't
     // have one. So that's a fresh launch even when Android kept the previous session's storage.
     const launchedFromIcon = document.referrer.startsWith("android-app://");
-    if (!seen || launchedFromIcon) setOpen(true);
+    // "Back to board" on a preview page adds ?from=preview. Previews open in their own tab, which starts with empty
+    // session storage, and their sandbox sends no referrer, so without it coming back would look like a first visit.
+    const params = new URLSearchParams(window.location.search);
+    const backFromPreview = params.get("from") === "preview";
+    if (backFromPreview) {
+      try {
+        sessionStorage.setItem(ONBOARDED_KEY, "1");
+      } catch {
+        // Ignore: see above.
+      }
+      params.delete("from");
+      const query = params.toString();
+      window.history.replaceState(window.history.state, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`);
+    }
+    if ((!seen && !backFromPreview) || launchedFromIcon) setOpen(true);
     const show = () => {
       setIndex(0);
       setOpen(true);
