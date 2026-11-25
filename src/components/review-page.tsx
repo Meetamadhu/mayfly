@@ -209,6 +209,34 @@ export function ReviewPage({ owner, name, pr }: { owner: string; name: string; p
     return () => window.removeEventListener("keydown", onKey);
   }, [mode, framePath]);
 
+  /**
+   * A link inside the preview that leads out of it (its "Back to board" button, or the app linking to Mayfly's own
+   * pages) would otherwise open that page inside this frame, under the review bar. The preview itself is
+   * sandboxed, so reading its address throws; a page this frame can read is one of Mayfly's own, and the whole
+   * tab goes there instead. (Mayfly's own page flashes in the frame for a moment first.)
+   */
+  function leaveIfOutsidePreview() {
+    const frame = frameRef.current;
+    if (!frame || !data) return;
+    let href: string;
+    try {
+      const at = frame.contentWindow?.location;
+      if (!at || at.origin !== window.location.origin || !/^https?:$/.test(at.protocol)) return;
+      const prefix = data.preview.path.replace(/\/$/, "");
+      if (at.pathname === prefix || at.pathname.startsWith(`${prefix}/`)) return;
+      href = at.href;
+      // Inside this frame the sign-in cookie isn't sent (the click came from the sandboxed preview), so an admin
+      // page lands on the sign-in page. Go where it was headed instead; the whole tab is signed in.
+      if (at.pathname === "/admin/login") {
+        const next = new URLSearchParams(at.search).get("next");
+        href = next && next.startsWith("/") && !next.startsWith("//") ? next : "/admin";
+      }
+    } catch {
+      return;
+    }
+    window.location.assign(href);
+  }
+
   function cancelDraft() {
     setDraft(null);
     setText("");
@@ -373,7 +401,10 @@ export function ReviewPage({ owner, name, pr }: { owner: string; name: string; p
               className="rv-frame"
               src={frameSrc}
               title={data ? `Preview of ${data.preview.repository} #${data.preview.prNumber}` : "Preview"}
-              onLoad={() => setNow(Date.now())}
+              onLoad={() => {
+                setNow(Date.now());
+                leaveIfOutsidePreview();
+              }}
             />
           ) : (
             <div className="rv-loading">Loading the preview…</div>
