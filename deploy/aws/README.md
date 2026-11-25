@@ -41,6 +41,8 @@ Create a fine-grained token limited to the repositories in `PREVIEW_REPOS`, with
 
 Every run of `setup.sh` checks the saved token: that it looks like one token, and that GitHub accepts it for each repository in `PREVIEW_REPOS`. GitHub doesn't let it check write permissions, so a missing permission shows up only in the logs when Mayfly tries to post.
 
+`setup.sh` also adds `MAYFLY_SECRETS_KEY` to `.env.local` once (and keeps it), for the variables saved on **Preview settings**. Don't change it: saved values would have to be entered again.
+
 State is kept in `~/mayfly/data/state.json`. Leave `MONGODB_URI` empty here, because only one Mayfly may use a database.
 
 Only one Mayfly should receive a repository's webhook. When you point the webhooks here, a codespace that was using them stops getting events.

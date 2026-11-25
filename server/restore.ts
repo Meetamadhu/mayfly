@@ -53,6 +53,7 @@ async function main() {
     console.log(`  ${state.environments.length} preview record(s), ${live} not removed`);
     console.log(`  lifetime rules: ${state.policy ? "saved" : "server defaults"}`);
     console.log(`  usage month: ${state.usage?.month ?? "none"}`);
+    console.log(`  preview settings: ${Object.keys(state.previewSettings ?? {}).length} repositories (values stay encrypted)`);
     if (command === "show") return;
 
     if (flag !== "--yes") {

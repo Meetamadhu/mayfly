@@ -1,6 +1,18 @@
 import { execFile, spawn } from "node:child_process";
 import { createServer, request as forward } from "node:http";
 
+// The repository's preview variables (src/lib/preview-settings.ts). They're taken out of this process's own
+// environment straight away and handed to Docker by name (-e NAME, the value read from Docker's environment), so
+// a value never appears on a command line or reaches anything else this gate starts.
+const APP_ENV_PREFIX = "MAYFLY_APP_ENV_";
+const appVars = {};
+for (const [name, value] of Object.entries(process.env)) {
+  if (!name.startsWith(APP_ENV_PREFIX)) continue;
+  const appName = name.slice(APP_ENV_PREFIX.length);
+  if (/^[A-Za-z_][A-Za-z0-9_]{0,99}$/.test(appName) && value !== undefined) appVars[appName] = value;
+  delete process.env[name];
+}
+
 const port = Number(process.env.PORT);
 const appPort = Number(process.env.APP_PORT);
 /** Idle time before the app sleeps. Mayfly can change it at runtime with POST /__preview_idle. */
@@ -229,9 +241,10 @@ function boot() {
               `PREVIEW_SHA=${process.env.PREVIEW_SHA ?? ""}`,
               "-e",
               `PREVIEW_BRANCH=${process.env.PREVIEW_BRANCH ?? ""}`,
+              ...Object.keys(appVars).flatMap((name) => ["-e", name]),
               image,
             ],
-            { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] },
+            { windowsHide: true, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, ...appVars } },
           )
         : spawn(process.execPath, [script], {
             // Own process group on Linux so stopApp can kill the whole app tree without killing the gate.

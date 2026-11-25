@@ -5,7 +5,8 @@ import { Watch, sendAlert } from "./alerts";
 import { asState, dataDir, loadState, saveState, type State } from "./store";
 
 /**
- * Daily backups of Mayfly's saved state: every preview record, the month's usage and the lifetime rules.
+ * Daily backups of Mayfly's saved state: every preview record, the month's usage, the lifetime rules and the
+ * preview settings (their values stay encrypted).
  * Works the same with the JSON file and with MongoDB, because it goes through loadState/saveState.
  *
  * Backups are gzip files in data/backups, one a day, newest BACKUP_KEEP kept (default 7). They live on the same

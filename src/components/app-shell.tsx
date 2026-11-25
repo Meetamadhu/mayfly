@@ -5,7 +5,7 @@ import { MayflyMark } from "@/components/admin-header";
 import { AppOnboarding, SHOW_INTRO_EVENT } from "@/components/app-onboarding";
 import { ThemeToggle } from "@/components/theme-toggle";
 
-export type AppPage = "dashboard" | "activity" | "cost" | "policies" | "comments" | "admin";
+export type AppPage = "dashboard" | "activity" | "cost" | "policies" | "settings" | "comments" | "admin";
 
 const NAV: { id: AppPage; href: string; label: string; group: "workspace" | "admin" }[] = [
   { id: "dashboard", href: "/board", label: "Previews", group: "workspace" },
@@ -13,6 +13,7 @@ const NAV: { id: AppPage; href: string; label: string; group: "workspace" | "adm
   { id: "cost", href: "/cost", label: "Cost", group: "workspace" },
   { id: "admin", href: "/admin", label: "Admin", group: "admin" },
   { id: "policies", href: "/policies", label: "Lifetime rules", group: "admin" },
+  { id: "settings", href: "/preview-settings", label: "Preview settings", group: "admin" },
   { id: "comments", href: "/pr-comments", label: "PR comments", group: "admin" },
 ];
 
@@ -22,13 +23,14 @@ const TABS: { id: AppPage; href: string; label: string }[] = [
   { id: "activity", href: "/activity", label: "Activity" },
   { id: "cost", href: "/cost", label: "Cost" },
 ];
-const MORE: AppPage[] = ["admin", "policies", "comments"];
+const MORE: AppPage[] = ["admin", "policies", "settings", "comments"];
 
 const TITLES: Record<AppPage, string> = {
   dashboard: "Previews",
   activity: "Activity",
   cost: "Cost",
   policies: "Lifetime rules",
+  settings: "Preview settings",
   comments: "PR comments",
   admin: "Admin",
 };
@@ -74,6 +76,15 @@ function NavIcon({ page }: { page: AppPage }) {
         <svg {...common}>
           <path d="M6.5 3h11M6.5 21h11" />
           <path d="M7.5 3v3.5c0 2 4.5 3.5 4.5 5.5s-4.5 3.5-4.5 5.5V21M16.5 3v3.5c0 2-4.5 3.5-4.5 5.5s4.5 3.5 4.5 5.5V21" />
+        </svg>
+      );
+    case "settings":
+      return (
+        <svg {...common}>
+          <path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1" />
+          <circle cx="15" cy="6" r="2" />
+          <circle cx="9" cy="12" r="2" />
+          <circle cx="17" cy="18" r="2" />
         </svg>
       );
     case "comments":
