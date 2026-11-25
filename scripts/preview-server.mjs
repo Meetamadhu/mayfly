@@ -120,16 +120,21 @@ const page = `<!doctype html>
           <span class="chip">${escapeHtml(branch)}</span>
           <span class="chip mono">${escapeHtml(sha)}</span>
         </p>
-        <a class="back" id="back" href="/board?from=preview">Back to board</a>
-        <script>(function(){var a=document.getElementById("back");try{var fromAdmin=false;var r=document.referrer?new URL(document.referrer):null;if(r&&r.host===location.host&&r.pathname.indexOf("/admin")===0)fromAdmin=true;if(new URLSearchParams(location.search).get("mayfly_from")==="admin")fromAdmin=true;if(fromAdmin){a.href="/admin?from=preview";a.textContent="Back to admin";}}catch(e){}})();</script>
+        <a class="back" id="back" href="__BACK_HREF__">__BACK_LABEL__</a>
       </div>
     </main>
   </body>
 </html>`;
 
-const server = createServer((_req, res) => {
+// "Back" goes to Admin for a signed-in admin and to the board for everyone else. Mayfly's proxy says which
+// (x-mayfly-viewer: admin), since this sandboxed page can't read Mayfly's sign-in.
+const server = createServer((req, res) => {
+  const admin = req.headers["x-mayfly-viewer"] === "admin";
+  const html = page
+    .replaceAll("__BACK_HREF__", admin ? "/admin?from=preview" : "/board?from=preview")
+    .replaceAll("__BACK_LABEL__", admin ? "Back to admin" : "Back to board");
   res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
-  res.end(page);
+  res.end(html);
 });
 
 // Simulated start time for demos; not a real cold start.
