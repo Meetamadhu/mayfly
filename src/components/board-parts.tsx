@@ -600,8 +600,12 @@ export function previewPath(url: string) {
   }
 }
 
-/** Sandboxed previews cannot read localStorage; pass the board theme in the URL. */
-export function previewHref(url: string | null | undefined) {
+/**
+ * The link that opens a preview. Sandboxed previews can't read localStorage, so the theme goes in the URL; and they
+ * get no referrer, so a preview opened from the Admin page is told so (mayfly_from=admin) and its "Back" link
+ * returns there instead of to the board.
+ */
+export function previewHref(url: string | null | undefined, options: { from?: "admin" } = {}) {
   if (!url) return undefined;
   const path = previewPath(url);
   try {
@@ -610,9 +614,10 @@ export function previewHref(url: string | null | undefined) {
       (document.documentElement.dataset.theme === "dark" || document.documentElement.dataset.theme === "light")
         ? document.documentElement.dataset.theme
         : null;
-    if (!theme) return path;
+    if (!theme && !options.from) return path;
     const next = new URL(path, typeof window !== "undefined" ? window.location.origin : "http://localhost");
-    next.searchParams.set("mayfly_theme", theme);
+    if (theme) next.searchParams.set("mayfly_theme", theme);
+    if (options.from) next.searchParams.set("mayfly_from", options.from);
     return `${next.pathname}${next.search}`;
   } catch {
     return path;
