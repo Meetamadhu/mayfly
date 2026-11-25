@@ -366,11 +366,16 @@ export function AppShell({
             <button
               type="button"
               className="board-help"
+              aria-label="Intro: how Mayfly works"
               title="How Mayfly works"
               onClick={() => window.dispatchEvent(new Event(SHOW_INTRO_EVENT))}
             >
               <span className="board-help-mark" aria-hidden="true">
-                ?
+                {/* An open book: the intro is a short guide to how Mayfly works. */}
+                <svg viewBox="0 0 24 24">
+                  <path d="M3 5.5c3-1.2 6-1 9 1 3-2 6-2.2 9-1v13c-3-1.2-6-1-9 1-3-2-6-2.2-9-1z" />
+                  <path d="M12 6.5v13" />
+                </svg>
               </span>
               <span className="board-help-label">Intro</span>
             </button>

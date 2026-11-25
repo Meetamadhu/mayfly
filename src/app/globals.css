@@ -59,7 +59,8 @@ html:not([data-theme="dark"]) .board-topbar {
   --bg: #020618;
   --surface: #0b1324;
   --paper: #0f172b;
-  --ink: #e8edf5;
+  /* A soft off-white, easier on the eyes than near-white on navy (still about 13:1 contrast). */
+  --ink: #d3dae4;
   --text: var(--ink);
   --muted: #94a3b8;
   --line: #1d293d;
@@ -96,7 +97,7 @@ html:not([data-theme="dark"]) .board-topbar {
   --band-work: #1d4f91;
   --band-failed: #9b1c1c;
   --sidebar: #060c1e;
-  --sidebar-ink: #e8edf5;
+  --sidebar-ink: #d3dae4;
   --sidebar-muted: #94a3b8;
 }
 
@@ -4475,7 +4476,7 @@ html[data-onboarding="open"] body { overflow: hidden; }
 .onb-pill[data-tone="ready"] { background: #d8f3e8; color: #0f6b4a; }
 .onb-pill[data-tone="work"] { background: #e2eefc; color: #1d4f91; }
 .onb-pill[data-tone="asleep"] { background: #f8efd4; color: #8a5a12; }
-.onb-sleep { top: 14%; background: #1a2438; color: #e8edf5; }
+.onb-sleep { top: 14%; background: #1a2438; color: #d3dae4; }
 .onb-sleep .onb-branch { color: #94a3b8; }
 .onb-sleep svg { color: #f0c46b; }
 .onb-wake { top: 50%; }
@@ -4835,7 +4836,8 @@ html[data-theme="dark"] .board-sidebar { --sidebar: #070d1d; }
   font-size: 0.9rem;
 }
 .board-help:hover:not(:disabled) { background: var(--soft); border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
-.board-help-mark { display: inline-grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 999px; background: var(--soft); font-weight: 800; font-size: 0.85rem; }
+.board-help-mark { display: inline-grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 999px; background: var(--soft); }
+.board-help-mark svg { width: 0.95rem; height: 0.95rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .board-help:hover .board-help-mark { background: var(--paper); }
 .board-appearance .theme-toggle { border-color: var(--line); border-radius: 999px; background: var(--paper); }
 .board-appearance .theme-toggle button { min-width: 2.4rem; min-height: 2.25rem; padding: 0 0.6rem; color: var(--muted); }
