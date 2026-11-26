@@ -55,6 +55,40 @@ const APP_PEOPLE: { title: string; text: string }[] = [
   { title: "Team leads and admins", text: "Keep a preview awake for a demo, remove old ones and catch up on recent activity." },
   { title: "Managers", text: "See on the Cost page how much sleeping previews are saving." },
 ];
+/** Situations Mayfly is used in, each with the part of Mayfly that does it. */
+const USE_CASES: { title: string; text: string; feature: string }[] = [
+  {
+    title: "Review a design change before it ships",
+    text: "A designer opens the preview from the pull request, marks the spot that looks wrong and leaves a comment. It shows up on the pull request too.",
+    feature: "Feedback pins",
+  },
+  {
+    title: "Test each change on its own",
+    text: "QA tests one pull request at a time on its own preview, instead of queueing for a shared staging server where changes get mixed together.",
+    feature: "A preview per pull request",
+  },
+  {
+    title: "Get a client’s sign-off",
+    text: "Send the client the preview link and they see the real thing, not screenshots. With a team password set, the link stays private.",
+    feature: "Team password",
+  },
+  {
+    title: "Show work in a stand-up or demo",
+    text: "Open the live preview instead of sharing your screen. A keep-preview label keeps it up until the demo is over.",
+    feature: "keep-preview label",
+  },
+  {
+    title: "Cut what staging costs",
+    text: "Previews nobody is looking at sleep and use nothing, then wake in seconds. The Cost page shows what that saved this month.",
+    feature: "Sleep and wake",
+  },
+  {
+    title: "Try a branch before opening a pull request",
+    text: "Admins start a preview of any branch from the dashboard, with its own size, lifetime and budget.",
+    feature: "New preview",
+  },
+];
+
 const PILL = { awake: "Awake", asleep: "Asleep", building: "Building" } as const;
 
 function PreviewsPicture() {
@@ -317,6 +351,20 @@ export function Landing() {
         </figure>
       </section>
 
+      <section className="lp-section" id="use-cases" aria-labelledby="lp-uses-title">
+        <p className="lp-kicker">Use cases</p>
+        <h2 id="lp-uses-title">What teams use it for.</h2>
+        <ul className="lp-uses">
+          {USE_CASES.map((use) => (
+            <li key={use.title}>
+              <h3>{use.title}</h3>
+              <p>{use.text}</p>
+              <span className="lp-use-feature">{use.feature}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
       <section className="lp-section" id="app" aria-labelledby="lp-app-title">
         <p className="lp-kicker">Android app</p>
         <h2 id="lp-app-title">Mayfly on your phone.</h2>
@@ -430,6 +478,7 @@ export function Landing() {
             <div>
               <h2>Product</h2>
               <a href="#how">How it works</a>
+              <a href="#use-cases">Use cases</a>
               <a href="#app">Android app</a>
               <a href="#plans">Plans</a>
               <a href="#faq">Questions</a>
