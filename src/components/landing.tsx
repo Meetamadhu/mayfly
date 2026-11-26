@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { MayflyMark } from "@/components/admin-header";
 import { StateGlyph } from "@/components/previews-view";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { PLAN_IDS, PLANS, formatPrice, planLines } from "@/lib/plans";
 
 /**
  * The public home page from the design: a top bar, the headline, a picture of the Previews page in a browser
@@ -346,6 +347,37 @@ export function Landing() {
         </div>
       </section>
 
+      <section className="lp-section" id="plans" aria-labelledby="lp-plans-title">
+        <p className="lp-kicker">Plans</p>
+        <h2 id="lp-plans-title">Pick how many previews run at once.</h2>
+        <p className="lp-app-lede">
+          Every plan sleeps idle previews, so you only pay for awake time on top. This is demo pricing: nothing is
+          charged, and admins change plan on the Pricing page.
+        </p>
+        <ul className="lp-plans">
+          {PLAN_IDS.map((id) => {
+            const plan = PLANS[id];
+            return (
+              <li key={plan.id}>
+                <h3>{plan.name}</h3>
+                <p className="lp-plan-price">
+                  <strong>{formatPrice(plan.price)}</strong> <span>a month</span>
+                </p>
+                <p className="lp-plan-blurb">{plan.blurb}</p>
+                <ul>
+                  {planLines(plan).map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </li>
+            );
+          })}
+        </ul>
+        <a className="lp-btn lp-btn-lg lp-plans-cta" href="/pricing">
+          See plans
+        </a>
+      </section>
+
       <section className="lp-section lp-faq" id="faq" aria-labelledby="lp-faq-title">
         <h2 id="lp-faq-title">Questions people ask first</h2>
         <details>
@@ -364,7 +396,10 @@ export function Landing() {
         </details>
         <details>
           <summary>What does it cost?</summary>
-          <p>Only the time a preview is awake. The Cost page shows an estimate of what sleeping has saved.</p>
+          <p>
+            A plan sets how many previews run at once (see <a href="#plans">Plans</a>), and on top of that you only pay
+            for the time a preview is awake. The Cost page shows an estimate of what sleeping has saved.
+          </p>
         </details>
         <details>
           <summary>Can I keep previews private?</summary>
@@ -396,6 +431,7 @@ export function Landing() {
               <h2>Product</h2>
               <a href="#how">How it works</a>
               <a href="#app">Android app</a>
+              <a href="#plans">Plans</a>
               <a href="#faq">Questions</a>
             </div>
             <div>

@@ -6325,6 +6325,20 @@ html[data-theme="dark"] .ps-warn { border-color: #c2621c; background: #9a4a12; c
 }
 
 
+.lp-plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; margin: 0 0 1.75rem; padding: 0; list-style: none; }
+.lp-plans > li { display: grid; align-content: start; gap: 0.7rem; padding: 1.5rem 1.4rem; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); }
+.lp-plans h3 { margin: 0; font-size: 1.15rem; }
+.lp-plan-price { margin: 0; color: var(--muted); }
+.lp-plan-price strong { color: var(--ink); font-size: 2.2rem; line-height: 1; letter-spacing: -0.02em; }
+.lp-plan-blurb { margin: 0; color: var(--muted); line-height: 1.5; }
+.lp-plans ul { display: grid; gap: 0.45rem; margin: 0.2rem 0 0; padding: 0.9rem 0 0; border-top: 1px solid var(--line); list-style: none; }
+.lp-plans ul li { position: relative; padding-left: 1.2rem; line-height: 1.4; }
+.lp-plans ul li::before { content: ""; position: absolute; left: 0.1rem; top: 0.5em; width: 0.45rem; height: 0.45rem; border-radius: 50%; background: var(--mint); }
+.lp-plans-cta { text-decoration: none; }
+/* Links to #plans, #how and the rest land below the sticky top bar, not under it. */
+.lp-section { scroll-margin-top: 6rem; }
+@media (max-width: 860px) { .lp-plans { grid-template-columns: minmax(0, 1fr); } }
+
 /* ═════════════════════════ Pricing (demo plans) ═════════════════════════ */
 .np-size[data-locked="1"] { cursor: not-allowed; background: var(--soft); }
 .np-size[data-locked="1"] strong, .np-size[data-locked="1"] .np-price { opacity: 0.55; }
