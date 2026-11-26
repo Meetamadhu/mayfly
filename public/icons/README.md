@@ -14,5 +14,8 @@ until then the site simply has no icon. See `src/lib/app-icons.ts`.
 
 These are the **final logo** (design 8.2): an open window with an "m" and a trail of four mint dots, getting smaller, leaving through the gap.
 `icon-512.png` and `favicon.svg` are the rounded navy square; `maskable-512.png` and `apple-touch-icon.png` fill the
-square to the edges with the mark shrunk inside the safe area, because Android and iOS cut their own shape. The
+square to the edges with the mark inside, because Android and iOS cut their own shape. In `maskable-512.png` the mark
+is drawn at 0.98 of its favicon size and nudged 10 px down and left, so the trail of dots has room: on the rounded-
+square icons most Android phones use, all four dots show and the mark is about as big as other apps' icons; a phone
+with round icons trims the tip of the smallest dot (as the earlier, smaller version did too). The
 same drawing is `MayflyMark` in `src/components/admin-header.tsx`, used on the site itself.
