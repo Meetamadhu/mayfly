@@ -130,6 +130,20 @@ The page also shows this month's bill so far (from the awake time Mayfly already
 
 Limits are checked when a new preview would start. Over a limit (including the Sandbox's monthly hours), the preview doesn't start and the pull request gets a note saying why, with a link to the plans. A Large size picked by hand on the Sandbox is refused; a repository's saved Large size falls back to Standard. Running previews are never stopped by a plan change. A new install is on Pay as you go, so installs from before plans existed have no new limits; plans saved as Free, Team or Business load as Sandbox, Pay as you go and Pay as you go.
 
+### Payments: prepaid credit with Razorpay
+
+Admins add **prepaid credit** on the Pricing page (₹500, ₹1,000, ₹2,000 or their own amount, ₹100 to ₹50,000) and pay through **Razorpay Checkout**: UPI, cards, net banking and wallets. On Pay as you go, each awake second comes off the credit at the size's hourly rate. When it runs out, new previews wait (with a note on the pull request) until credit is added; running previews carry on.
+
+Payments are off until you add keys, and then Pay as you go needs credit. To set up **test mode** (no real money):
+
+1. Sign up at razorpay.com, switch the Dashboard to **Test Mode**, and generate API keys (Account & Settings → API Keys → Generate Key). Copy the secret straight away: the Dashboard shows it only once. Test key ids start with `rzp_test_`.
+2. On the server, add them to `.env.local` with an editor (`nano ~/mayfly/.env.local`), never in the repository or a chat:
+   `RAZORPAY_KEY_ID=rzp_test_…` and `RAZORPAY_KEY_SECRET=…`
+3. Restart Mayfly: `sudo docker compose -f docker-compose.yml -f deploy/aws/docker-compose.aws.yml up -d --force-recreate mayfly`
+4. Optional but recommended: in the Razorpay Dashboard add a webhook to `https://<your Mayfly>/api/webhooks/razorpay` with the events `order.paid` and `payment.captured`, choose a secret, and put it in `.env.local` as `RAZORPAY_WEBHOOK_SECRET`. It adds credit even if someone closes the tab mid-payment.
+
+In test mode, pay with the UPI ID `success@razorpay` (or `failure@razorpay` to see a failure) or Razorpay's test cards. Mayfly checks Razorpay's signature on the server before adding any credit, uses its own record of each order's amount, and adds each payment once even if the browser and the webhook both report it. The key secret and webhook secret never leave the server. **Live keys** (`rzp_live_…`, real money) are refused unless `RAZORPAY_ALLOW_LIVE=true`; taking real payments also needs Razorpay's business KYC and your own refund and terms pages.
+
 ## Previews by person
 
 Each preview records the GitHub username of whoever opened the pull request, and its card says **Opened by @username**. On the board, the **Opened by** menu shows one person's previews; clicking a name on a card does the same. The address becomes `/board?by=<username>`, so the link can be shared. The search box matches people too, and `@name` searches people only. Previews opened before this was recorded (or from the admin simulator) have no name until their next commit.

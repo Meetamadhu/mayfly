@@ -6454,6 +6454,42 @@ html[data-theme="dark"] .pc-result { background: radial-gradient(80% 90% at 100%
   .pc-amount input[type="range"] { flex-basis: 100%; }
 }
 
+/* Prepaid credit (admins): balance on the left, adding credit on the right. */
+.pay { display: grid; gap: 1rem; }
+.pay-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.pay-head h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.01em; }
+.pay-head .help { margin: 0.3rem 0 0; max-width: 44rem; }
+.pay-mode { padding: 0.25rem 0.65rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700; white-space: nowrap; }
+.pay-mode[data-mode="test"] { background: var(--warn-bg); color: var(--warn); }
+.pay-mode[data-mode="live"] { background: var(--danger-bg); color: var(--danger); }
+.pay-setup { padding: 0.9rem 1rem; border: 1px dashed var(--line); border-radius: 12px; background: var(--surface); }
+.pay-setup p { margin: 0.3rem 0 0; color: var(--muted); line-height: 1.5; }
+.pay-body { display: grid; grid-template-columns: minmax(12rem, 0.7fr) minmax(0, 1.3fr); gap: 1.5rem; align-items: start; }
+.pay-balance { display: grid; gap: 0.2rem; padding: 1.1rem 1.2rem; border-radius: 12px; background: var(--mint-bg); }
+.pay-balance > span { color: var(--muted); font-size: 0.92rem; }
+.pay-balance strong { font-size: 2.2rem; line-height: 1.1; letter-spacing: -0.02em; color: var(--ink); }
+.pay-balance small { color: var(--muted); }
+.pay-balance[data-low="1"] { background: var(--danger-bg); }
+.pay-balance[data-low="1"] strong { color: var(--danger); }
+.pay-add { display: grid; gap: 0.6rem; }
+.pay-chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; }
+.pay-chips .pc-size { text-align: center; }
+.pay-own { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; color: var(--muted); font-size: 0.92rem; }
+.pay-go { justify-content: center; margin: 0.2rem 0 0; }
+.pay-small { margin: 0; font-size: 0.86rem; }
+.pay > .notice, .pay > .error { margin: 0; }
+.pay-history h3 { margin: 0 0 0.5rem; font-size: 0.95rem; }
+.pay-history ul { display: grid; margin: 0; padding: 0; list-style: none; border: 1px solid var(--line); border-radius: 12px; }
+.pay-history li { display: grid; grid-template-columns: 7.5rem 6rem minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; padding: 0.6rem 0.9rem; font-size: 0.92rem; }
+.pay-history li + li { border-top: 1px solid var(--line); }
+.pay-history li > span:first-child { color: var(--muted); }
+.pay-ref { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-family: ui-monospace, monospace; font-size: 0.82rem; }
+@media (max-width: 760px) {
+  .pay-body { grid-template-columns: minmax(0, 1fr); }
+  .pay-history li { grid-template-columns: auto auto minmax(0, 1fr); }
+  .pay-history li .pay-mode { display: none; }
+}
+
 .pr-page { display: grid; gap: 1.25rem; }
 /* Grid items may shrink below their content (the rates table scrolls inside its own box instead). */
 .pr-page > * { min-width: 0; }

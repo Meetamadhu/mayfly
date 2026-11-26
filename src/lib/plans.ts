@@ -200,13 +200,28 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
  * - `defaultSize`: from the repository's preview settings. A size the plan doesn't include falls back to Standard,
  *   so a plan change never stops a repository's previews from building.
  * - `standardHours`: awake hours used this month, for the Sandbox's allowance.
+ * - `credit`: prepaid credit left on Pay as you go, when payments are set up.
  */
 export function checkNewPreview(
   plan: Plan,
   environments: Environment[],
-  request: { repository: string; size?: PreviewSize | null; defaultSize?: PreviewSize | null; standardHours?: number; now?: number },
+  request: {
+    repository: string;
+    size?: PreviewSize | null;
+    defaultSize?: PreviewSize | null;
+    standardHours?: number;
+    /** Prepaid credit left, in rupees, when payments are set up; null when they aren't (credit isn't enforced). */
+    credit?: number | null;
+    now?: number;
+  },
   isDemo?: (env: Environment) => boolean,
 ): PlanCheck {
+  if (plan.billed && typeof request.credit === "number" && request.credit <= 0) {
+    return {
+      ok: false,
+      error: `Pay as you go credit has run out (${request.credit < 0 ? "-" : ""}${formatRupees(Math.abs(request.credit))} left). An admin can add credit on the Pricing page; running previews carry on meanwhile.`,
+    };
+  }
   if (plan.freeHours !== null && (request.standardHours ?? 0) >= plan.freeHours) {
     const restart = nextMonthStart(request.now).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
     return {
