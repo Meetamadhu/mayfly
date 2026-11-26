@@ -308,123 +308,131 @@ export function Landing() {
         <PreviewsPicture />
       </div>
 
-      <section className="lp-section" id="how" aria-labelledby="lp-how-title">
-        <p className="lp-kicker">How it works</p>
-        <h2 id="lp-how-title">Four states, four colours.</h2>
-        <ol className="lp-states">
-          {STATES.map((state) => (
-            <li key={state.title} data-tone={state.tone}>
-              <span className="act-icon" data-tone={state.glyph === "failed" ? "failed" : state.glyph} aria-hidden="true">
-                <StateGlyph tone={state.glyph} />
-              </span>
-              <h3>{state.title}</h3>
-              <p>{state.text}</p>
-            </li>
-          ))}
-        </ol>
-
-        <figure className="lp-life">
-          <figcaption>The life of one preview</figcaption>
-          <div
-            className="lp-line"
-            role="img"
-            aria-label="A preview builds in seconds, is awake while people look at it, sleeps for most of its life, and is removed when the pull request is merged."
-          >
-            {LIFE.map((part, index) => (
-              <span key={index} data-life={part.state} style={{ flexGrow: part.share }} />
-            ))}
-            {MOMENTS.map((moment) => (
-              <i key={moment.what} className="lp-tick" style={{ left: `${moment.at}%` }} />
-            ))}
-          </div>
-          <ol className="lp-moments">
-            {MOMENTS.map((moment) => (
-              <li key={moment.what}>
-                <span className="lp-when">{moment.when}</span>
-                <span>{moment.what}</span>
+      <div className="lp-band lp-band-how">
+        <section className="lp-section" id="how" aria-labelledby="lp-how-title">
+          <p className="lp-kicker">How it works</p>
+          <h2 id="lp-how-title">Four states, four colours.</h2>
+          <ol className="lp-states">
+            {STATES.map((state) => (
+              <li key={state.title} data-tone={state.tone}>
+                <span className="act-icon" data-tone={state.glyph === "failed" ? "failed" : state.glyph} aria-hidden="true">
+                  <StateGlyph tone={state.glyph} />
+                </span>
+                <h3>{state.title}</h3>
+                <p>{state.text}</p>
               </li>
             ))}
           </ol>
-          <p className="lp-key">
-            <span data-life="awake" /> awake <span data-life="asleep" /> asleep <span data-life="build" /> building
-          </p>
-        </figure>
-      </section>
 
-      <section className="lp-section" id="use-cases" aria-labelledby="lp-uses-title">
-        <p className="lp-kicker">Use cases</p>
-        <h2 id="lp-uses-title">What teams use it for.</h2>
-        <ul className="lp-uses">
-          {USE_CASES.map((use) => (
-            <li key={use.title}>
-              <h3>{use.title}</h3>
-              <p>{use.text}</p>
-              <span className="lp-use-feature">{use.feature}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
+          <figure className="lp-life">
+            <figcaption>The life of one preview</figcaption>
+            <div
+              className="lp-line"
+              role="img"
+              aria-label="A preview builds in seconds, is awake while people look at it, sleeps for most of its life, and is removed when the pull request is merged."
+            >
+              {LIFE.map((part, index) => (
+                <span key={index} data-life={part.state} style={{ flexGrow: part.share }} />
+              ))}
+              {MOMENTS.map((moment) => (
+                <i key={moment.what} className="lp-tick" style={{ left: `${moment.at}%` }} />
+              ))}
+            </div>
+            <ol className="lp-moments">
+              {MOMENTS.map((moment) => (
+                <li key={moment.what}>
+                  <span className="lp-when">{moment.when}</span>
+                  <span>{moment.what}</span>
+                </li>
+              ))}
+            </ol>
+            <p className="lp-key">
+              <span data-life="awake" /> awake <span data-life="asleep" /> asleep <span data-life="build" /> building
+            </p>
+          </figure>
+        </section>
+      </div>
 
-      <section className="lp-section" id="app" aria-labelledby="lp-app-title">
-        <p className="lp-kicker">Android app</p>
-        <h2 id="lp-app-title">Mayfly on your phone.</h2>
-        <p className="lp-app-lede">
-          For people who check or approve work on the go. Developers can keep using the website, which does everything
-          the app does.
-        </p>
-        <div className="lp-app">
-          <ul className="lp-app-people">
-            {APP_PEOPLE.map((person) => (
-              <li key={person.title}>
-                <h3>{person.title}</h3>
-                <p>{person.text}</p>
+      <div className="lp-band lp-band-uses">
+        <section className="lp-section" id="use-cases" aria-labelledby="lp-uses-title">
+          <p className="lp-kicker">Use cases</p>
+          <h2 id="lp-uses-title">What teams use it for.</h2>
+          <ul className="lp-uses">
+            {USE_CASES.map((use) => (
+              <li key={use.title}>
+                <h3>{use.title}</h3>
+                <p>{use.text}</p>
+                <span className="lp-use-feature">{use.feature}</span>
               </li>
             ))}
           </ul>
-          <aside className="lp-app-get" aria-labelledby="lp-app-get-title">
-            <h3 id="lp-app-get-title">Get the Android app</h3>
-            <p>Opens full screen, like any other app, and keeps itself up to date: every improvement to Mayfly shows up the next time you open it.</p>
-            <a className="lp-btn lp-btn-lg" href="/downloads/mayfly.apk" download="Mayfly.apk">
-              Download for Android
-            </a>
-            <p className="lp-app-small">
-              APK, about 1 MB. Android asks once to allow installs from your browser. Not on Android? Add this page to
-              your home screen instead.
-            </p>
-          </aside>
-        </div>
-      </section>
+        </section>
+      </div>
 
-      <section className="lp-section" id="plans" aria-labelledby="lp-plans-title">
-        <p className="lp-kicker">Plans</p>
-        <h2 id="lp-plans-title">Pick how many previews run at once.</h2>
-        <p className="lp-app-lede">
-          Every plan sleeps idle previews, so you only pay for awake time on top. This is demo pricing: nothing is
-          charged, and admins change plan on the Pricing page.
-        </p>
-        <ul className="lp-plans">
-          {PLAN_IDS.map((id) => {
-            const plan = PLANS[id];
-            return (
-              <li key={plan.id}>
-                <h3>{plan.name}</h3>
-                <p className="lp-plan-price">
-                  <strong>{formatPrice(plan.price)}</strong> <span>a month</span>
-                </p>
-                <p className="lp-plan-blurb">{plan.blurb}</p>
-                <ul>
-                  {planLines(plan).map((line) => (
-                    <li key={line}>{line}</li>
-                  ))}
-                </ul>
-              </li>
-            );
-          })}
-        </ul>
-        <a className="lp-btn lp-btn-lg lp-plans-cta" href="/pricing">
-          See plans
-        </a>
-      </section>
+      <div className="lp-band lp-band-app">
+        <section className="lp-section" id="app" aria-labelledby="lp-app-title">
+          <p className="lp-kicker">Android app</p>
+          <h2 id="lp-app-title">Mayfly on your phone.</h2>
+          <p className="lp-app-lede">
+            For people who check or approve work on the go. Developers can keep using the website, which does everything
+            the app does.
+          </p>
+          <div className="lp-app">
+            <ul className="lp-app-people">
+              {APP_PEOPLE.map((person) => (
+                <li key={person.title}>
+                  <h3>{person.title}</h3>
+                  <p>{person.text}</p>
+                </li>
+              ))}
+            </ul>
+            <aside className="lp-app-get" aria-labelledby="lp-app-get-title">
+              <h3 id="lp-app-get-title">Get the Android app</h3>
+              <p>Opens full screen, like any other app, and keeps itself up to date: every improvement to Mayfly shows up the next time you open it.</p>
+              <a className="lp-btn lp-btn-lg" href="/downloads/mayfly.apk" download="Mayfly.apk">
+                Download for Android
+              </a>
+              <p className="lp-app-small">
+                APK, about 1 MB. Android asks once to allow installs from your browser. Not on Android? Add this page to
+                your home screen instead.
+              </p>
+            </aside>
+          </div>
+        </section>
+      </div>
+
+      <div className="lp-band lp-band-plans">
+        <section className="lp-section" id="plans" aria-labelledby="lp-plans-title">
+          <p className="lp-kicker">Plans</p>
+          <h2 id="lp-plans-title">Pick how many previews run at once.</h2>
+          <p className="lp-app-lede">
+            Every plan sleeps idle previews, so you only pay for awake time on top. This is demo pricing: nothing is
+            charged, and admins change plan on the Pricing page.
+          </p>
+          <ul className="lp-plans">
+            {PLAN_IDS.map((id) => {
+              const plan = PLANS[id];
+              return (
+                <li key={plan.id}>
+                  <h3>{plan.name}</h3>
+                  <p className="lp-plan-price">
+                    <strong>{formatPrice(plan.price)}</strong> <span>a month</span>
+                  </p>
+                  <p className="lp-plan-blurb">{plan.blurb}</p>
+                  <ul>
+                    {planLines(plan).map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                </li>
+              );
+            })}
+          </ul>
+          <a className="lp-btn lp-btn-lg lp-plans-cta" href="/pricing">
+            See plans
+          </a>
+        </section>
+      </div>
 
       <section className="lp-section lp-faq" id="faq" aria-labelledby="lp-faq-title">
         <h2 id="lp-faq-title">Questions people ask first</h2>
