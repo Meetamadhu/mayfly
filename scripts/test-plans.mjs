@@ -1,14 +1,15 @@
 /**
- * Demo pricing end to end, against a mock GitHub API and signed webhooks: reading the plans, the demo checkout
- * (admins only), the Free plan's limits on previews, repositories and sizes (with a note on the pull request),
- * upgrading lifting them, running previews surviving a downgrade, and the plan surviving a restart.
+ * Plans and usage billing end to end, against a mock GitHub API and signed webhooks: reading the plans and rates, the
+ * demo checkout (admins only), the Sandbox's limits on previews, repositories, sizes and free monthly hours (with a
+ * note on the pull request), Pay as you go billing awake time with no limits, running previews surviving a move
+ * down, and plans saved before usage billing loading after a restart.
  * Run: npm run build && node scripts/test-plans.mjs
  * Uses ./data (JSON state) and deletes it afterwards, and ports 13030/18786. Run it on a dev machine, not where
  * Mayfly is live. MONGODB_URI is ignored, so it never touches the real database.
  */
 import { createHmac, randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
-import { readFile, rm } from "node:fs/promises";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -155,72 +156,92 @@ try {
 
   // ---- reading the plans ----
   const first = await api("GET", "/api/plan", undefined, {});
-  check(first.status === 200 && first.json.current.id === "team" && first.json.current.chosen === false, "anyone can read the plans; a new install is on Team", first.json?.current);
-  check(first.json.plans.map((p) => `${p.id}:${p.price}`).join() === "free:0,team:999,business:2999", "three plans, priced in rupees", first.json.plans);
-  check(first.json.demo === true && first.json.usage.previews === 0, "it says it's a demo and nothing is running");
+  check(first.status === 200 && first.json.current.id === "payg" && first.json.current.chosen === false, "anyone can read the plans; a new install is on Pay as you go", first.json?.current);
+  check(first.json.plans.map((p) => `${p.id}:${p.price}`).join() === "sandbox:₹0,payg:₹5,enterprise:Custom", "Sandbox, Pay as you go and Enterprise, priced in rupees", first.json.plans);
+  check(first.json.rates.standard === 5 && first.json.rates.small === 2.5 && first.json.rates.large === 10, "rates per awake hour by size", first.json.rates);
+  check(first.json.demo === true && first.json.usage.previews === 0 && first.json.bill.amount === 0, "it says it's a demo, nothing is running and nothing is owed", first.json.bill);
   const page = await fetch(`${BASE}/pricing`);
-  check(page.status === 200 && (await page.text()).includes("Pricing"), "the Pricing page loads");
+  check(page.status === 200 && (await page.text()).includes("Estimate your bill"), "the Pricing page loads, with the calculator");
 
   // ---- the demo checkout is for admins only ----
-  check((await setPlan("free", { origin: BASE })).status === 401, "changing plan needs an admin");
-  check((await setPlan("gold")).status === 400, "an unknown plan is refused");
-  const free = await setPlan("free");
-  check(free.status === 200 && free.json.current.id === "free" && free.json.current.chosen, "an admin changes to Free", free.json?.current);
+  check((await setPlan("sandbox", { origin: BASE })).status === 401, "changing plan needs an admin");
+  check((await setPlan("free")).status === 400, "an old or unknown plan name is refused");
+  const sandbox = await setPlan("sandbox");
+  check(sandbox.status === 200 && sandbox.json.current.id === "sandbox" && sandbox.json.bill.freeHoursLeft === 30, "an admin moves to the Sandbox, with 30 free hours", sandbox.json?.bill);
   const saved = JSON.parse(await readFile(stateFile, "utf8")).plan;
-  check(saved?.id === "free" && saved.demo === true && !Number.isNaN(Date.parse(saved.since)), "the plan is saved, marked as a demo", saved);
+  check(saved?.id === "sandbox" && saved.demo === true && !Number.isNaN(Date.parse(saved.since)), "the plan is saved, marked as a demo", saved);
 
-  // ---- Free: 3 previews at a time ----
-  for (const pr of [1, 2, 3]) {
+  // ---- Sandbox: 2 previews at a time ----
+  for (const pr of [1, 2]) {
     const opened = await webhook("opened", "acme/web", pr);
-    check(opened.status < 300, `preview ${pr} of 3 starts`, opened);
+    check(opened.status < 300, `preview ${pr} of 2 starts`, opened);
     await ready("acme/web", pr);
   }
-  const fourth = await webhook("opened", "acme/web", 4);
-  check(!(await live("acme/web", 4)), "a fourth preview doesn't start on Free", fourth);
-  const note = await waitFor(() => posted.find((c) => c.pr === 4 && c.body.includes("Mayfly preview not started")), "the note on PR 4");
-  check(/Free plan runs 3 previews at a time, and 3 are running/.test(note.body) && note.body.includes(`${BASE}/pricing`), "the pull request says why, with a link to the plans", note.body);
-  check((await api("GET", "/api/plan", undefined, {})).json.usage.previews === 3, "usage shows 3 running");
+  await webhook("opened", "acme/web", 3);
+  check(!(await live("acme/web", 3)), "a third preview doesn't start on the Sandbox");
+  const note = await waitFor(() => posted.find((c) => c.pr === 3 && c.body.includes("Mayfly preview not started")), "the note on PR 3");
+  check(/Sandbox runs 2 previews at a time, and 2 are running/.test(note.body) && note.body.includes(`${BASE}/pricing`), "the pull request says why, with a link to the plans", note.body);
 
-  // ---- Free: 1 repository ----
-  await close("acme/web", 3);
+  // ---- Sandbox: 1 repository ----
+  await close("acme/web", 2);
   await webhook("opened", "acme/api", 10);
-  check(!(await live("acme/api", 10)), "a second repository doesn't start on Free");
+  check(!(await live("acme/api", 10)), "a second repository doesn't start on the Sandbox");
   const repoNote = await waitFor(() => posted.find((c) => c.repo === "acme/api" && c.pr === 10), "the note on acme/api 10");
   check(/covers 1 repository at a time, and previews are running for acme\/web/.test(repoNote.body), "and the pull request says why", repoNote.body);
 
-  // ---- Free: sizes ----
+  // ---- Sandbox: sizes ----
   const sizeSaved = await api("PUT", "/api/preview-settings/acme/web", { size: "large", vars: [] });
   check(sizeSaved.status === 200, "the repository's previews are set to Large", sizeSaved.json);
   await webhook("opened", "acme/web", 5);
   const fallback = await ready("acme/web", 5).then(() => live("acme/web", 5));
-  check(!fallback.size, "on Free, the repository's Large falls back to Standard instead of failing", fallback);
+  check(!fallback.size, "on the Sandbox, the repository's Large falls back to Standard instead of failing", fallback);
   await close("acme/web", 5);
   const large = await api("POST", "/api/previews", { repository: "acme/web", branch: "feat/7", prNumber: 7, size: "large" });
-  check(large.status === 409 && large.json.code === "plan_cap" && /Large previews aren't part of the Free plan/.test(large.json.error), "a Large preview picked by hand is refused on Free", large.json);
+  check(large.status === 409 && large.json.code === "plan_cap" && /Large previews aren't part of the Sandbox/.test(large.json.error), "a Large preview picked by hand is refused on the Sandbox", large.json);
 
-  // ---- upgrading lifts the limits ----
-  check((await setPlan("team")).json.current.id === "team", "upgrade to Team");
+  // ---- Sandbox: the month's free hours ----
+  await stopMayfly();
+  const state = JSON.parse(await readFile(stateFile, "utf8"));
+  const month = new Date().toISOString().slice(0, 7);
+  state.usage = { ...(state.usage ?? {}), month, awakeSeconds: 31 * 3600, asleepSeconds: 0, awakeWeighted: 31 * 3600, asleepWeighted: 0, lastSampleAt: new Date().toISOString() };
+  await writeFile(stateFile, JSON.stringify(state));
+  await startMayfly();
+  const spent = await api("GET", "/api/plan", undefined, {});
+  check(spent.json.bill.freeHoursLeft === 0 && Math.round(spent.json.usage.standardHours) === 31, "31 awake hours this month: none of the 30 free ones left", spent.json.bill);
+  await webhook("opened", "acme/web", 6);
+  check(!(await live("acme/web", 6)), "with the free hours used up, a new preview waits for next month");
+  const hoursNote = await waitFor(() => posted.find((c) => c.pr === 6), "the note on PR 6");
+  check(/includes 30 awake hours a month, and this month's are used up/.test(hoursNote.body), "and the pull request says why", hoursNote.body);
+
+  // ---- Pay as you go: no limits, a bill for awake time ----
+  const payg = await setPlan("payg");
+  check(payg.json.current.id === "payg" && Math.abs(payg.json.bill.amount - 155) < 1 && payg.json.bill.projected >= 154, "on Pay as you go, 31 awake hours cost ₹155 so far", payg.json.bill);
   const largeNow = await api("POST", "/api/previews", { repository: "acme/web", branch: "feat/7", prNumber: 7, size: "large" });
-  check(largeNow.status === 200 && largeNow.json.environment.size === "large", "a Large preview starts on Team", largeNow.json);
+  check(largeNow.status === 200 && largeNow.json.environment.size === "large", "a Large preview starts on Pay as you go", largeNow.json);
   await webhook("opened", "acme/api", 10);
   await ready("acme/api", 10);
-  check(true, "the second repository starts on Team");
+  await webhook("opened", "acme/web", 2);
+  await ready("acme/web", 2);
   const usage = (await api("GET", "/api/plan", undefined, {})).json.usage;
   check(usage.previews === 4 && usage.repositories === 2, "usage counts 4 previews in 2 repositories", usage);
 
-  // ---- downgrading never stops what's running ----
-  check((await setPlan("free")).status === 200, "an admin can move back to Free while over its limits");
+  // ---- moving down never stops what's running ----
+  check((await setPlan("sandbox")).status === 200, "an admin can move back to the Sandbox while over its limits");
   const still = (await api("GET", "/api/environments")).json.environments.filter((e) => e.status !== "destroyed").length;
   check(still === 4, "all 4 previews keep running", still);
   await webhook("opened", "acme/web", 11);
-  check(!(await live("acme/web", 11)), "but a new one waits until there's room");
+  check(!(await live("acme/web", 11)), "but a new one waits");
   const pushed = await webhook("synchronize", "acme/web", 1);
   check(pushed.status < 300 && (await live("acme/web", 1)), "a new commit on a running preview still updates it", pushed);
+  check((await setPlan("enterprise")).json.bill.amount === null, "Enterprise shows custom rates, not a bill");
 
-  // ---- the plan survives a restart ----
+  // ---- plans saved before usage billing still load ----
   await stopMayfly();
+  const old = JSON.parse(await readFile(stateFile, "utf8"));
+  old.plan = { id: "free", since: new Date().toISOString(), demo: true };
+  await writeFile(stateFile, JSON.stringify(old));
   await startMayfly();
-  check((await api("GET", "/api/plan", undefined, {})).json.current.id === "free", "the plan is still Free after a restart");
+  check((await api("GET", "/api/plan", undefined, {})).json.current.id === "sandbox", "an old Free plan loads as the Sandbox after a restart");
 
   for (const [repo, pr] of [["acme/web", 1], ["acme/web", 2], ["acme/web", 7], ["acme/api", 10]]) await close(repo, pr);
   console.log(`\n${passed} checks passed`);

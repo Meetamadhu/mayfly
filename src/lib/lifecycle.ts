@@ -27,7 +27,7 @@ import {
   type PreviewPolicy,
 } from "./policy";
 import { exclusive, loadState, saveState } from "./store";
-import { checkNewPreview, currentPlan } from "./plans";
+import { checkNewPreview, currentPlan, monthHours } from "./plans";
 import {
   isLiveStatus,
   type DeploymentRecord,
@@ -732,6 +732,7 @@ async function reserve(event: PullRequestEvent): Promise<LifecycleResult> {
             repository: normalized.repository,
             size: normalized.size ?? null,
             defaultSize: state.previewSettings?.[normalized.repository]?.size ?? null,
+            standardHours: monthHours(state.usage).standardHours,
           },
           isDemo,
         );

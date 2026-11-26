@@ -118,11 +118,17 @@ Set `ALERT_WEBHOOK_URL` to a chat channel's incoming webhook (Slack, Discord, Go
 
 The same problem isn't posted again for six hours. Messages contain the repository, pull request, commit, the first line of the error and a link to the board, never tokens or full logs. A chat webhook that's down or wrong never affects builds. Without `ALERT_WEBHOOK_URL`, alerts go to the log only (lines starting `[alert]`).
 
-## Plans (demo pricing)
+## Plans and usage billing (demo pricing)
 
-The **Pricing** page (`/pricing`) shows three plans, priced in rupees: **Free** (₹0: 3 previews at a time, 1 repository, Small or Standard sizes), **Team** (₹999 a month: 15 previews, 5 repositories, all sizes) and **Business** (₹2,999 a month: no limits). Anyone can see the plans and what's running against the current one; admins change plan through a **demo checkout** that switches straight away. No payment is taken, no card is asked for, and nothing is charged.
+Mayfly is priced on awake time, in rupees, like usage-based hosting: asleep previews cost nothing. The **Pricing** page (`/pricing`) shows three plans:
 
-Limits are checked when a new preview would start. Over a limit, the preview doesn't start and the pull request gets a note saying why, with a link to the plans. A Large size picked by hand on a plan without it is refused; a repository's saved Large size falls back to Standard. Running previews are never stopped by a plan change. A new install is on Team, so installs from before plans existed carry on as they were. The plan is saved with the rest of the state (and in backups).
+- **Sandbox** (free): 30 awake hours a month, 2 previews at a time, 1 repository, Small or Standard sizes.
+- **Pay as you go**: ₹2.50, ₹5 or ₹10 per awake hour for Small, Standard or Large, billed by the second. No limits, no seat fees.
+- **Enterprise**: custom rates and terms.
+
+The page also shows this month's bill so far (from the awake time Mayfly already records, counted at Standard size) and where it's heading, a rates table, and a calculator that compares Pay as you go with previews that never sleep. Admins change plan through a **demo checkout** that switches straight away: no payment is taken, no card is asked for, and nothing is charged.
+
+Limits are checked when a new preview would start. Over a limit (including the Sandbox's monthly hours), the preview doesn't start and the pull request gets a note saying why, with a link to the plans. A Large size picked by hand on the Sandbox is refused; a repository's saved Large size falls back to Standard. Running previews are never stopped by a plan change. A new install is on Pay as you go, so installs from before plans existed have no new limits; plans saved as Free, Team or Business load as Sandbox, Pay as you go and Pay as you go.
 
 ## Previews by person
 
