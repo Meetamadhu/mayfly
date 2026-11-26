@@ -6389,7 +6389,7 @@ html[data-theme="dark"] .ps-warn { border-color: #c2621c; background: #9a4a12; c
 .lp-band-plans { background: var(--paper); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .lp-band-plans .lp-plans > li { background: var(--surface); }
 /* Dark mode: How it works and Plans stay white (the light colour tokens are set again on just those bands, so
-   everything inside draws as in light mode), Use cases is blue, the Android app is mint green. */
+   everything inside draws as in light mode), Use cases is navy, the Android app is mint green. */
 html[data-theme="dark"] .lp-band-how,
 html[data-theme="dark"] .lp-band-plans {
   color-scheme: light;
@@ -6458,16 +6458,15 @@ html[data-theme="dark"] .lp-band-plans {
 html[data-theme="dark"] .lp-band-how { background: #ffffff; border-top-color: transparent; }
 html[data-theme="dark"] .lp-band-plans { background: #ffffff; border-color: transparent; }
 html[data-theme="dark"] .lp-band-how .act-icon[data-tone="failed"] { background: var(--danger-bg); color: var(--danger); }
-html[data-theme="dark"] .lp-band-uses {
-  background: radial-gradient(70% 90% at 100% 0%, rgba(125, 180, 255, 0.22), transparent 60%), linear-gradient(160deg, #1d4ed8, #1e3a8a);
-  color: #eef4ff;
-}
-html[data-theme="dark"] .lp-band-uses .lp-kicker { color: #bfdbfe; }
+/* Dark mode: the header and Use cases in the site's navy (the footer's colour). */
+html[data-theme="dark"] .lp-nav { background: color-mix(in srgb, #0b1322 94%, transparent); border-bottom-color: #1c2a44; }
+html[data-theme="dark"] .lp-band-uses { background: #0b1322; color: #e6edf7; border-top: 1px solid #1c2a44; border-bottom: 1px solid #1c2a44; }
+html[data-theme="dark"] .lp-band-uses .lp-kicker { color: #8ff0cf; }
 html[data-theme="dark"] .lp-band-uses .lp-section > h2 { color: #ffffff; }
-html[data-theme="dark"] .lp-band-uses .lp-uses > li { border-color: rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.08); }
+html[data-theme="dark"] .lp-band-uses .lp-uses > li { border-color: #22314f; background: #111c33; }
 html[data-theme="dark"] .lp-band-uses .lp-uses h3 { color: #ffffff; }
-html[data-theme="dark"] .lp-band-uses .lp-uses p { color: #dbe7ff; }
-html[data-theme="dark"] .lp-band-uses .lp-use-feature { background: rgba(255, 255, 255, 0.16); color: #ffffff; }
+html[data-theme="dark"] .lp-band-uses .lp-uses p { color: #b7c3d8; }
+html[data-theme="dark"] .lp-band-uses .lp-use-feature { background: rgba(61, 223, 180, 0.16); color: #8ff0cf; }
 html[data-theme="dark"] .lp-band-app { background: #cdf2e1; color: #0c1a16; }
 html[data-theme="dark"] .lp-band-app .lp-kicker { color: #0b6b55; }
 html[data-theme="dark"] .lp-band-app .lp-section > h2 { color: #0c1a16; }
