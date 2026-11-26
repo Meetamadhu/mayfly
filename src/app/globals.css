@@ -6388,95 +6388,30 @@ html[data-theme="dark"] .ps-warn { border-color: #c2621c; background: #9a4a12; c
 .lp-band-app .lp-app-people li { background: var(--surface); }
 .lp-band-plans { background: var(--paper); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .lp-band-plans .lp-plans > li { background: var(--surface); }
-/* Dark mode: How it works and Plans stay white (the light colour tokens are set again on just those bands, so
-   everything inside draws as in light mode), Use cases is navy, the Android app is mint green. */
-html[data-theme="dark"] .lp-band-how,
-html[data-theme="dark"] .lp-band-plans {
-  color-scheme: light;
-  --bg: #f4f6f8;
-  --surface: #f8fafc;
-  --paper: #ffffff;
-  --ink: #0f172a;
-  --text: var(--ink);
-  --muted: #5b6b80;
-  --line: #e2e8f0;
-  --border: var(--line);
-  --soft: #eef2f6;
-  --field: #ffffff;
-  --on-ink: #f5faf7;
-  --glow: rgba(255, 255, 255, 0.65);
-  --accent: #0f8f6b;
-  --mint: #0f8f6b;
-  --mint-bg: #d8f3e8;
-  --brand: #0e5f52;
-  --brand-hover: #0a4b41;
-  --brand-line: #0e5f52;
-  --on-brand: #ffffff;
-  --brand-text: #0e5f52;
-  --success: #0f6b4a;
-  --success-bg: #d8f3e8;
-  --warn: #8a5a12;
-  --warn-bg: #f8efd4;
-  --danger: #dc2626;
-  --danger-bg: #fee2e2;
-  --building: #b45309;
-  --building-bg: #fef3c7;
-  --ready: var(--success);
-  --ready-bg: var(--success-bg);
-  --work: var(--building);
-  --work-bg: var(--building-bg);
-  --failed: var(--danger);
-  --failed-bg: var(--danger-bg);
-  --dead: #4a5c55;
-  --dead-bg: #e2ebe6;
-  --awake: #047857;
-  --awake-bg: #d1fae5;
-  --asleep: #4f46e5;
-  --asleep-bg: #eef0ff;
-  --band-awake: #0f6b4a;
-  --band-asleep: #f0e2c0;
-  --band-work: #1d4f91;
-  --band-failed: #9b1c1c;
-  --sidebar: #0f8f6b;
-  --sidebar-ink: #f5faf7;
-  --sidebar-muted: #d4efe4;
-  --radius: 6px;
-  --radius-lg: 14px;
-  --btn-height: 44px;
-  --btn-pad-y: 0.5rem;
-  --btn-pad-x: 0.85rem;
-  --card-head: #dbeafe;
-  --card-head-line: #bfd3f2;
-  --chart-awake: #059669;
-  --chart-asleep: #6366f1;
-  --chart-always: #cbd5e1;
-  --chart-mayfly: #059669;
-  --time: #475569;
-  --time-bg: #eef2f6;
-  color: var(--ink);
-}
-html[data-theme="dark"] .lp-band-how { background: #ffffff; border-top-color: transparent; }
-html[data-theme="dark"] .lp-band-plans { background: #ffffff; border-color: transparent; }
-html[data-theme="dark"] .lp-band-how .act-icon[data-tone="failed"] { background: var(--danger-bg); color: var(--danger); }
-/* Dark mode: the header and Use cases in the site's navy (the footer's colour). */
+/* Dark mode: every section of the home page is a shade of blue, alternating so each one reads as its own band.
+   Header, Use cases and footer: the site's navy (#0b1322). Hero and questions: deep blue. How it works and the
+   Android app: a brighter blue. Plans: midnight blue. Cards on them are a light wash with a faint blue border. */
+html[data-theme="dark"] .lp { background: #081430; }
 html[data-theme="dark"] .lp-nav { background: color-mix(in srgb, #0b1322 94%, transparent); border-bottom-color: #1c2a44; }
-html[data-theme="dark"] .lp-band-uses { background: #0b1322; color: #e6edf7; border-top: 1px solid #1c2a44; border-bottom: 1px solid #1c2a44; }
-html[data-theme="dark"] .lp-band-uses .lp-kicker { color: #8ff0cf; }
-html[data-theme="dark"] .lp-band-uses .lp-section > h2 { color: #ffffff; }
-html[data-theme="dark"] .lp-band-uses .lp-uses > li { border-color: #22314f; background: #111c33; }
-html[data-theme="dark"] .lp-band-uses .lp-uses h3 { color: #ffffff; }
-html[data-theme="dark"] .lp-band-uses .lp-uses p { color: #b7c3d8; }
+html[data-theme="dark"] .lp-band { color: #e6edf7; }
+html[data-theme="dark"] .lp-band .lp-kicker { color: #8ff0cf; }
+html[data-theme="dark"] .lp-band .lp-section > h2 { color: #ffffff; }
+html[data-theme="dark"] .lp-band-how { background: #0e2148; border-top-color: #1f3566; }
+html[data-theme="dark"] .lp-band-uses { background: #0b1322; border-top: 1px solid #1c2a44; border-bottom: 1px solid #1c2a44; }
+html[data-theme="dark"] .lp-band-app { background: #112a5c; }
+html[data-theme="dark"] .lp-band-plans { background: #0a1a3d; border-color: #1f3566; }
+html[data-theme="dark"] .lp-band-how .lp-states li { background: rgba(255, 255, 255, 0.05); border-right-color: rgba(148, 180, 255, 0.2); border-bottom-color: rgba(148, 180, 255, 0.2); border-left-color: rgba(148, 180, 255, 0.2); }
+html[data-theme="dark"] .lp-band-how .lp-life,
+html[data-theme="dark"] .lp-band-uses .lp-uses > li,
+html[data-theme="dark"] .lp-band-app .lp-app-people li,
+html[data-theme="dark"] .lp-band-plans .lp-plans > li { background: rgba(255, 255, 255, 0.05); border-color: rgba(148, 180, 255, 0.2); }
+html[data-theme="dark"] .lp-band .lp-uses h3,
+html[data-theme="dark"] .lp-band .lp-app-people h3 { color: #ffffff; }
+html[data-theme="dark"] .lp-band .lp-uses p,
+html[data-theme="dark"] .lp-band .lp-app-people p,
+html[data-theme="dark"] .lp-band .lp-app-lede { color: #c0cbe0; }
 html[data-theme="dark"] .lp-band-uses .lp-use-feature { background: rgba(61, 223, 180, 0.16); color: #8ff0cf; }
-/* Dark mode: the Android app section in the same navy as Use cases above it; the line between them keeps the two
-   sections apart, and the "Get the Android app" card is lifted a step so it doesn't sink into the navy. */
-html[data-theme="dark"] .lp-band-app { background: #0b1322; color: #e6edf7; }
-html[data-theme="dark"] .lp-band-app .lp-kicker { color: #8ff0cf; }
-html[data-theme="dark"] .lp-band-app .lp-section > h2 { color: #ffffff; }
-html[data-theme="dark"] .lp-band-app .lp-app-lede { color: #b7c3d8; }
-html[data-theme="dark"] .lp-band-app .lp-app-people li { border-color: #22314f; background: #111c33; }
-html[data-theme="dark"] .lp-band-app .lp-app-people h3 { color: #ffffff; }
-html[data-theme="dark"] .lp-band-app .lp-app-people p { color: #b7c3d8; }
-html[data-theme="dark"] .lp-band-app .lp-app-get { background: #16233f; border: 1px solid #2a3b5e; }
+html[data-theme="dark"] .lp-band-app .lp-app-get { background: #0b1322; border: 1px solid #2a3b5e; }
 
 /* ═════════════════════════ Pricing (demo plans) ═════════════════════════ */
 .np-size[data-locked="1"] { cursor: not-allowed; background: var(--soft); }
