@@ -208,7 +208,7 @@ export type LifecycleResult =
   | { ok: true; action: LifecycleAction; environment: Environment }
   | {
       ok: false;
-      code: "cap" | "author_cap" | "not_found" | "invalid" | "conflict" | "deploy_failed";
+      code: "cap" | "author_cap" | "plan_cap" | "not_found" | "invalid" | "conflict" | "deploy_failed";
       error: string;
       environment?: Environment;
     };

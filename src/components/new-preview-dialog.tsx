@@ -39,6 +39,27 @@ export function NewPreviewDialog({ open, repositories, costPerHour, currency, us
   const [budget, setBudget] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The plan's sizes and name, so sizes the plan doesn't include can't be picked. Unknown: every size is allowed.
+  const [plan, setPlan] = useState<{ name: string; sizes: PreviewSize[] } | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void fetch("/api/plan", { cache: "no-store" })
+      .then((res) => res.json() as Promise<{ ok?: boolean; current?: { id: string }; plans?: { id: string; name: string; sizes: PreviewSize[] }[] }>)
+      .then((body) => {
+        const current = body.ok ? body.plans?.find((item) => item.id === body.current?.id) : undefined;
+        if (!cancelled && current) setPlan({ name: current.name, sizes: current.sizes });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (plan && !plan.sizes.includes(size)) setSize("standard");
+  }, [plan, size]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -194,16 +215,27 @@ export function NewPreviewDialog({ open, repositories, costPerHour, currency, us
 
               <fieldset className="np-sizes">
                 <legend>Size</legend>
-                {PREVIEW_SIZES.map((choice) => (
-                  <label key={choice} className="np-size" data-on={size === choice ? "1" : undefined}>
-                    <input type="radio" name="np-size" value={choice} checked={size === choice} onChange={() => setSize(choice)} />
-                    <span className="np-size-text">
-                      <strong>{SIZE_INFO[choice].label}</strong>
-                      <span>{SIZE_INFO[choice].text}</span>
-                    </span>
-                    <span className="np-price">~{formatEstMoney(rate(choice), currency)}/hr</span>
-                  </label>
-                ))}
+                {PREVIEW_SIZES.map((choice) => {
+                  const locked = Boolean(plan && !plan.sizes.includes(choice));
+                  return (
+                    <label key={choice} className="np-size" data-on={size === choice ? "1" : undefined} data-locked={locked ? "1" : undefined}>
+                      <input type="radio" name="np-size" value={choice} checked={size === choice} disabled={locked} onChange={() => setSize(choice)} />
+                      <span className="np-size-text">
+                        <strong>{SIZE_INFO[choice].label}</strong>
+                        <span>
+                          {locked ? (
+                            <>
+                              Not on the {plan?.name} plan. <a href="/pricing">See plans</a>
+                            </>
+                          ) : (
+                            SIZE_INFO[choice].text
+                          )}
+                        </span>
+                      </span>
+                      <span className="np-price">~{formatEstMoney(rate(choice), currency)}/hr</span>
+                    </label>
+                  );
+                })}
               </fieldset>
 
               {error ? (

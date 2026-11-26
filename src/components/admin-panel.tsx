@@ -121,6 +121,23 @@ export function AdminPanel() {
   const [readMs, setReadMs] = useState(() => Date.now());
   const [listTab, setListTab] = useState<ListTab>("all");
   const [refreshing, setRefreshing] = useState(false);
+  const [plan, setPlan] = useState<{ name: string; used: number; limit: number | null } | null>(null);
+
+  // The plan and how many previews it allows, for the Plan button in the toolbar.
+  useEffect(() => {
+    if (refreshing) return;
+    let cancelled = false;
+    void fetch("/api/plan", { cache: "no-store" })
+      .then((res) => res.json() as Promise<{ ok?: boolean; current?: { id: string }; plans?: { id: string; name: string; maxPreviews: number | null }[]; usage?: { previews: number } }>)
+      .then((body) => {
+        const current = body.ok ? body.plans?.find((item) => item.id === body.current?.id) : undefined;
+        if (!cancelled && current) setPlan({ name: current.name, used: body.usage?.previews ?? 0, limit: current.maxPreviews });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshing]);
   const [now, setNow] = useState(() => Date.now());
   const defaultTtlLabel = overview ? formatLifetime(overview.config.ttlHours) : "server default";
 
@@ -409,6 +426,16 @@ export function AdminPanel() {
           </svg>
           {refreshing ? "Refreshing…" : "Refresh"}
         </button>
+        {plan ? (
+          <a className="adm-tool adm-plan" href="/pricing">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7a1 1 0 0 1 .7.3l8 8a1 1 0 0 1 0 1.4l-7.7 7.7a1 1 0 0 1-1.4 0l-8-8a1 1 0 0 1-.3-.7z" />
+              <circle cx="8" cy="8" r="1.6" />
+            </svg>
+            {plan.name} plan
+            <span className="adm-plan-use">{plan.limit === null ? `${plan.used} previews` : `${plan.used} of ${plan.limit} previews`}</span>
+          </a>
+        ) : null}
       </div>
 
       {setupIssues > 0 ? (

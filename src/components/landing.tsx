@@ -225,6 +225,9 @@ export function Landing() {
           </a>
           <div className="lp-nav-actions">
             <ThemeToggle theme={theme} onChange={chooseTheme} />
+            <a className="lp-signin lp-nav-pricing" href="/pricing">
+              Pricing
+            </a>
             {signedIn ? (
               <a className="lp-signin" href="/admin">
                 Admin
@@ -400,6 +403,7 @@ export function Landing() {
               <a href="/board">Previews</a>
               <a href="/activity">Activity</a>
               <a href="/cost">Cost</a>
+              <a href="/pricing">Pricing</a>
             </div>
             <div>
               <h2>Admins</h2>

@@ -1,4 +1,5 @@
 import { asStoredSettings } from "./preview-settings-shape";
+import { asStoredPlan } from "./plans";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import net from "node:net";
@@ -107,7 +108,14 @@ function asState(value: unknown): State {
   const usage = asUsage((value as State).usage);
   const policy = asStoredPolicy((value as State).policy);
   const previewSettings = asStoredSettings((value as State).previewSettings);
-  return { environments, ...(usage ? { usage } : {}), ...(policy ? { policy } : {}), ...(previewSettings ? { previewSettings } : {}) };
+  const plan = asStoredPlan((value as State).plan);
+  return {
+    environments,
+    ...(usage ? { usage } : {}),
+    ...(policy ? { policy } : {}),
+    ...(previewSettings ? { previewSettings } : {}),
+    ...(plan ? { plan } : {}),
+  };
 }
 
 async function getClient(): Promise<MongoClient> {
