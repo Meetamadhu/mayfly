@@ -15,6 +15,7 @@ export function sendLifecycle(res: Response, result: LifecycleResult) {
     not_found: 404,
     cap: 409,
     author_cap: 409,
+    plan_cap: 409,
     conflict: 409,
     deploy_failed: 502,
   }[result.code];

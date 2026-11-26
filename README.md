@@ -118,6 +118,12 @@ Set `ALERT_WEBHOOK_URL` to a chat channel's incoming webhook (Slack, Discord, Go
 
 The same problem isn't posted again for six hours. Messages contain the repository, pull request, commit, the first line of the error and a link to the board, never tokens or full logs. A chat webhook that's down or wrong never affects builds. Without `ALERT_WEBHOOK_URL`, alerts go to the log only (lines starting `[alert]`).
 
+## Plans (demo pricing)
+
+The **Pricing** page (`/pricing`) shows three plans, priced in rupees: **Free** (₹0: 3 previews at a time, 1 repository, Small or Standard sizes), **Team** (₹999 a month: 15 previews, 5 repositories, all sizes) and **Business** (₹2,999 a month: no limits). Anyone can see the plans and what's running against the current one; admins change plan through a **demo checkout** that switches straight away. No payment is taken, no card is asked for, and nothing is charged.
+
+Limits are checked when a new preview would start. Over a limit, the preview doesn't start and the pull request gets a note saying why, with a link to the plans. A Large size picked by hand on a plan without it is refused; a repository's saved Large size falls back to Standard. Running previews are never stopped by a plan change. A new install is on Team, so installs from before plans existed carry on as they were. The plan is saved with the rest of the state (and in backups).
+
 ## Previews by person
 
 Each preview records the GitHub username of whoever opened the pull request, and its card says **Opened by @username**. On the board, the **Opened by** menu shows one person's previews; clicking a name on a card does the same. The address becomes `/board?by=<username>`, so the link can be shared. The search box matches people too, and `@name` searches people only. Previews opened before this was recorded (or from the admin simulator) have no name until their next commit.

@@ -5,12 +5,13 @@ import { MayflyMark } from "@/components/admin-header";
 import { AppOnboarding, SHOW_INTRO_EVENT } from "@/components/app-onboarding";
 import { ThemeToggle } from "@/components/theme-toggle";
 
-export type AppPage = "dashboard" | "activity" | "cost" | "policies" | "settings" | "comments" | "admin";
+export type AppPage = "dashboard" | "activity" | "cost" | "pricing" | "policies" | "settings" | "comments" | "admin";
 
 const NAV: { id: AppPage; href: string; label: string; group: "workspace" | "admin" }[] = [
   { id: "dashboard", href: "/board", label: "Previews", group: "workspace" },
   { id: "activity", href: "/activity", label: "Activity", group: "workspace" },
   { id: "cost", href: "/cost", label: "Cost", group: "workspace" },
+  { id: "pricing", href: "/pricing", label: "Pricing", group: "workspace" },
   { id: "admin", href: "/admin", label: "Admin", group: "admin" },
   { id: "policies", href: "/policies", label: "Lifetime rules", group: "admin" },
   { id: "settings", href: "/preview-settings", label: "Preview settings", group: "admin" },
@@ -23,12 +24,13 @@ const TABS: { id: AppPage; href: string; label: string }[] = [
   { id: "activity", href: "/activity", label: "Activity" },
   { id: "cost", href: "/cost", label: "Cost" },
 ];
-const MORE: AppPage[] = ["admin", "policies", "settings", "comments"];
+const MORE: AppPage[] = ["pricing", "admin", "policies", "settings", "comments"];
 
 const TITLES: Record<AppPage, string> = {
   dashboard: "Previews",
   activity: "Activity",
   cost: "Cost",
+  pricing: "Pricing",
   policies: "Lifetime rules",
   settings: "Preview settings",
   comments: "PR comments",
@@ -69,6 +71,13 @@ function NavIcon({ page }: { page: AppPage }) {
           <ellipse cx="12" cy="6" rx="7" ry="3" />
           <path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6" />
           <path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" />
+        </svg>
+      );
+    case "pricing":
+      return (
+        <svg {...common}>
+          <path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7a1 1 0 0 1 .7.3l8 8a1 1 0 0 1 0 1.4l-7.7 7.7a1 1 0 0 1-1.4 0l-8-8a1 1 0 0 1-.3-.7z" />
+          <circle cx="8" cy="8" r="1.6" />
         </svg>
       );
     case "policies":

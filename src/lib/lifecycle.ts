@@ -27,6 +27,7 @@ import {
   type PreviewPolicy,
 } from "./policy";
 import { exclusive, loadState, saveState } from "./store";
+import { checkNewPreview, currentPlan } from "./plans";
 import {
   isLiveStatus,
   type DeploymentRecord,
@@ -720,6 +721,22 @@ async function reserve(event: PullRequestEvent): Promise<LifecycleResult> {
       };
     }
 
+    // The plan: how many previews and repositories at a time, and which sizes. The built-in demo is exempt.
+    const creatingDemo = isDemo({ repository: normalized.repository, prNumber: normalized.prNumber } as Environment);
+    const allowed = creatingDemo
+      ? null
+      : checkNewPreview(
+          currentPlan(state.plan),
+          state.environments,
+          {
+            repository: normalized.repository,
+            size: normalized.size ?? null,
+            defaultSize: state.previewSettings?.[normalized.repository]?.size ?? null,
+          },
+          isDemo,
+        );
+    if (allowed && !allowed.ok) return { ok: false, code: "plan_cap", error: allowed.error };
+
     const created: Environment = {
       id: randomUUID(),
       repository: normalized.repository,
@@ -743,9 +760,10 @@ async function reserve(event: PullRequestEvent): Promise<LifecycleResult> {
       extensions: 0,
       ...(normalized.author ? { author: normalized.author } : {}),
       ...(normalized.title ? { title: normalized.title } : {}),
-      // A size chosen by hand wins; otherwise the repository's preview settings decide (Standard when unset).
+      // A size chosen by hand wins; otherwise the repository's preview settings decide (Standard when unset, or
+      // when the plan doesn't include the saved size).
       ...(() => {
-        const size = normalized.size ?? state.previewSettings?.[normalized.repository]?.size;
+        const size = allowed?.ok ? allowed.size : (normalized.size ?? state.previewSettings?.[normalized.repository]?.size);
         return size && size !== "standard" ? { size } : {};
       })(),
       ...(typeof normalized.budget === "number" && normalized.budget > 0 ? { budget: normalized.budget } : {}),
@@ -800,6 +818,25 @@ async function explainAuthorLimit(event: PullRequestEvent) {
     `The author of this pull request already has ${others.length} live preview${others.length === 1 ? "" : "s"} (${where}), the most allowed per developer (${limit}).`,
     "",
     "Close or merge one of those pull requests, then push a new commit here to start this preview.",
+    "",
+    lastUpdatedLine(),
+  ].join("\n");
+  try {
+    await publishPullRequestComment(event.repository, event.prNumber, body, null);
+  } catch (error) {
+    console.error("Pull request comment failed", error);
+  }
+}
+
+/** Tell the developer on the PR that the plan's limit stopped this preview, using the one Mayfly comment. */
+async function explainPlanLimit(event: PullRequestEvent, reason: string) {
+  const base = getConfig().previewBaseUrl;
+  const body = [
+    "**Mayfly preview not started**",
+    "",
+    reason,
+    "",
+    `Once there's room, push a new commit here to start this preview. Plans: ${base}/pricing`,
     "",
     lastUpdatedLine(),
   ].join("\n");
@@ -865,6 +902,7 @@ export async function applyPullRequestEvent(
   const reserved = await reserve(event);
   if (!reserved.ok) {
     if (reserved.code === "author_cap") void explainAuthorLimit(normalizeEvent(event));
+    if (reserved.code === "plan_cap") void explainPlanLimit(normalizeEvent(event), reserved.error);
     return reserved;
   }
   if (reserved.action !== "created" && reserved.action !== "updated") return reserved;

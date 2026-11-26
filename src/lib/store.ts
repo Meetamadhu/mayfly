@@ -1,4 +1,5 @@
 import { asStoredSettings } from "./preview-settings-shape";
+import { asStoredPlan } from "./plans";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { asStoredPolicy } from "./policy";
@@ -35,6 +36,8 @@ export interface State {
   policy?: import("./policy").PreviewPolicy;
   /** Settings for each repository's previews: size and (encrypted) environment variables. */
   previewSettings?: import("./preview-settings-shape").PreviewSettings;
+  /** The plan picked on the pricing page (a demo: no payment). Unset means the default plan. */
+  plan?: import("./plans").StoredPlan;
 }
 
 export function dataDir() {
@@ -107,7 +110,14 @@ export function asState(value: unknown): State {
   const usage = asUsage((value as State).usage);
   const policy = asStoredPolicy((value as State).policy);
   const previewSettings = asStoredSettings((value as State).previewSettings);
-  return { environments, ...(usage ? { usage } : {}), ...(policy ? { policy } : {}), ...(previewSettings ? { previewSettings } : {}) };
+  const plan = asStoredPlan((value as State).plan);
+  return {
+    environments,
+    ...(usage ? { usage } : {}),
+    ...(policy ? { policy } : {}),
+    ...(previewSettings ? { previewSettings } : {}),
+    ...(plan ? { plan } : {}),
+  };
 }
 
 export async function readJson<T>(file: string, fallback: T): Promise<T> {
