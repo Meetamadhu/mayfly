@@ -5959,8 +5959,8 @@ html[data-theme="dark"] .ra-label[data-kind="update"] { color: #7dd3fc; }
 .lp-app-get { display: grid; gap: 0.85rem; justify-items: start; padding: 1.5rem; border-radius: 14px; background: #0b1322; color: #e6efea; }
 .lp-app-get h3 { margin: 0; font-size: 1.25rem; }
 .lp-app-get p { margin: 0; color: #a9b6cb; line-height: 1.55; }
-.lp-app-get .lp-btn { background: #3ddbb0; color: #04221a; }
-.lp-app-get .lp-btn:hover { background: #63e6c3; color: #04221a; }
+.lp-app-get .lp-btn { background: #f5892a; color: #2b1300; }
+.lp-app-get .lp-btn:hover { background: #ffa04a; color: #2b1300; }
 .lp-app-get .lp-app-small { font-size: 0.85rem; }
 @media (max-width: 900px) {
   .lp-app { grid-template-columns: minmax(0, 1fr); }
@@ -6348,8 +6348,8 @@ html[data-theme="dark"] .ps-warn { border-color: #c2621c; background: #9a4a12; c
 @media (max-width: 860px) { .lp-plans { grid-template-columns: minmax(0, 1fr); } }
 
 /* ── Landing bands: each section gets its own background, so the page has a rhythm instead of one flat grey.
-   Order: hero on the page colour → How it works on white → Use cases on deep brand teal → the app on a soft
-   "asleep" indigo → Plans on white → questions back on the page colour. ── */
+   Order: hero on the page colour → How it works on white → Use cases on deep brand teal → the app on mint
+   green (with an orange download button) → Plans on white → questions back on the page colour. ── */
 .lp-band { padding: 0 0 4rem; }
 .lp-band-how { margin-top: 3.5rem; background: var(--paper); border-top: 1px solid var(--line); }
 .lp-band-how .lp-states li, .lp-band-how .lp-life { background: var(--surface); }
@@ -6363,10 +6363,10 @@ html[data-theme="dark"] .ps-warn { border-color: #c2621c; background: #9a4a12; c
 .lp-band-uses .lp-uses h3 { color: #f2faf6; }
 .lp-band-uses .lp-uses p { color: #cfe3dc; }
 .lp-band-uses .lp-use-feature { background: rgba(143, 240, 207, 0.16); color: #a6f5da; }
-.lp-band-app { background: #eceefc; }
-.lp-band-app .lp-kicker { color: #4f46e5; }
-.lp-band-app .lp-app-lede { color: #3f4566; }
-.lp-band-app .lp-app-people li { border-color: #d6d9f5; }
+.lp-band-app { background: #d7f5e8; }
+.lp-band-app .lp-kicker { color: #0b6b55; }
+.lp-band-app .lp-app-lede { color: #2c4a40; }
+.lp-band-app .lp-app-people li { border-color: #b5e6d0; }
 .lp-band-plans { background: var(--paper); border-bottom: 1px solid var(--line); }
 .lp-band-plans .lp-plans > li { background: var(--surface); }
 html[data-theme="dark"] .lp-band-how { background: #071022; }
@@ -6374,10 +6374,10 @@ html[data-theme="dark"] .lp-band-how .lp-states li, html[data-theme="dark"] .lp-
 html[data-theme="dark"] .lp-band-uses {
   background: radial-gradient(70% 90% at 100% 0%, rgba(61, 223, 180, 0.12), transparent 60%), linear-gradient(160deg, #0b4840, #062b26);
 }
-html[data-theme="dark"] .lp-band-app { background: #0d1130; }
-html[data-theme="dark"] .lp-band-app .lp-kicker { color: #a5b4fc; }
-html[data-theme="dark"] .lp-band-app .lp-app-lede { color: #b4bad8; }
-html[data-theme="dark"] .lp-band-app .lp-app-people li { border-color: #262c55; background: #131838; }
+html[data-theme="dark"] .lp-band-app { background: #0b2a23; }
+html[data-theme="dark"] .lp-band-app .lp-kicker { color: #6fe8c2; }
+html[data-theme="dark"] .lp-band-app .lp-app-lede { color: #b6d6cb; }
+html[data-theme="dark"] .lp-band-app .lp-app-people li { border-color: #1d4a3e; background: #10342c; }
 html[data-theme="dark"] .lp-band-plans { background: #071022; }
 html[data-theme="dark"] .lp-band-plans .lp-plans > li { background: var(--paper); }
 
