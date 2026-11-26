@@ -1,5 +1,6 @@
 import { asStoredSettings } from "./preview-settings-shape";
 import { asStoredPlan } from "./plans";
+import { asBilling } from "./billing";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { asStoredPolicy } from "./policy";
@@ -38,6 +39,8 @@ export interface State {
   previewSettings?: import("./preview-settings-shape").PreviewSettings;
   /** The plan picked on the pricing page (a demo: no payment). Unset means the default plan. */
   plan?: import("./plans").StoredPlan;
+  /** Prepaid credit for Pay as you go and the Razorpay orders that added it. */
+  billing?: import("./billing").Billing;
 }
 
 export function dataDir() {
@@ -111,12 +114,14 @@ export function asState(value: unknown): State {
   const policy = asStoredPolicy((value as State).policy);
   const previewSettings = asStoredSettings((value as State).previewSettings);
   const plan = asStoredPlan((value as State).plan);
+  const billing = asBilling((value as State).billing);
   return {
     environments,
     ...(usage ? { usage } : {}),
     ...(policy ? { policy } : {}),
     ...(previewSettings ? { previewSettings } : {}),
     ...(plan ? { plan } : {}),
+    ...(billing ? { billing } : {}),
   };
 }
 

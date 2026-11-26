@@ -1,5 +1,6 @@
 import { asStoredSettings } from "./preview-settings-shape";
 import { asStoredPlan } from "./plans";
+import { asBilling } from "./billing";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import net from "node:net";
@@ -109,12 +110,14 @@ function asState(value: unknown): State {
   const policy = asStoredPolicy((value as State).policy);
   const previewSettings = asStoredSettings((value as State).previewSettings);
   const plan = asStoredPlan((value as State).plan);
+  const billing = asBilling((value as State).billing);
   return {
     environments,
     ...(usage ? { usage } : {}),
     ...(policy ? { policy } : {}),
     ...(previewSettings ? { previewSettings } : {}),
     ...(plan ? { plan } : {}),
+    ...(billing ? { billing } : {}),
   };
 }
 

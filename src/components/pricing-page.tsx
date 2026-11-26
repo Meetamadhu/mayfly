@@ -99,6 +99,211 @@ function Amount(props: { id: string; label: string; hint: string; value: number;
   );
 }
 
+type BillingView = {
+  ok: boolean;
+  payments: { enabled: boolean; mode: "test" | "live" | null; keyId?: string; webhook?: boolean; problem?: string | null };
+  plan: PlanId;
+  credit: number;
+  credited: number;
+  spent: number;
+  topUps: number[];
+  min: number;
+  max: number;
+  orders: { id: string; amount: number; mode: "test" | "live"; paidAt?: string; paymentId?: string }[];
+};
+
+type CheckoutResponse = { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string };
+type RazorpayInstance = { open: () => void; on: (event: string, cb: (resp: { error?: { description?: string } }) => void) => void };
+declare global {
+  interface Window {
+    Razorpay?: new (options: Record<string, unknown>) => RazorpayInstance;
+  }
+}
+
+/** Razorpay's Checkout script, loaded only when someone pays. */
+function loadCheckout(): Promise<boolean> {
+  if (window.Razorpay) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => resolve(Boolean(window.Razorpay));
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
+
+/**
+ * Prepaid credit (admins): what's left, and adding more through Razorpay Checkout. The amount and the order come
+ * from Mayfly's server, and the server checks Razorpay's signature before any credit is added.
+ */
+function CreditPanel({ onChanged }: { onChanged: () => void }) {
+  const [billing, setBilling] = useState<BillingView | null>(null);
+  const [amount, setAmount] = useState(1000);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+
+  async function refresh() {
+    const res = await fetch("/api/billing", { credentials: "include", cache: "no-store" });
+    if (res.ok) setBilling((await res.json()) as BillingView);
+  }
+
+  useEffect(() => {
+    void refresh();
+  }, []);
+
+  async function pay() {
+    if (!billing) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/billing/orders", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ amount }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; checkout?: { key: string; orderId: string; amount: number; currency: string; name: string; description: string } };
+      if (!res.ok || !body.ok || !body.checkout) {
+        setMessage({ tone: "error", text: body.error ?? "The payment couldn't start. Try again." });
+        setBusy(false);
+        return;
+      }
+      if (!(await loadCheckout()) || !window.Razorpay) {
+        setMessage({ tone: "error", text: "Razorpay's payment window didn't load. Check the connection, or turn off anything blocking checkout.razorpay.com." });
+        setBusy(false);
+        return;
+      }
+      const c = body.checkout;
+      const rzp = new window.Razorpay({
+        key: c.key,
+        amount: c.amount,
+        currency: c.currency,
+        name: c.name,
+        description: c.description,
+        order_id: c.orderId,
+        theme: { color: "#0e5f52" },
+        modal: {
+          ondismiss: () => {
+            setBusy(false);
+            setMessage({ tone: "error", text: "Payment cancelled. No credit was added." });
+          },
+        },
+        handler: async (response: CheckoutResponse) => {
+          const check = await fetch("/api/billing/verify", {
+            method: "POST",
+            credentials: "include",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(response),
+          });
+          const result = (await check.json().catch(() => ({}))) as BillingView & { error?: string; added?: number };
+          if (check.ok && result.ok) {
+            setBilling(result);
+            setMessage({ tone: "ok", text: `Payment received: ${formatRupees(result.added || amount)} added to your credit.` });
+            onChanged();
+          } else {
+            setMessage({ tone: "error", text: result.error ?? "The payment couldn't be confirmed. If money left your account, it will show here once Razorpay confirms it." });
+          }
+          setBusy(false);
+        },
+      });
+      rzp.on("payment.failed", (resp) => {
+        setMessage({ tone: "error", text: `Payment failed: ${resp.error?.description ?? "try again or use another method"}.` });
+      });
+      rzp.open();
+    } catch {
+      setMessage({ tone: "error", text: "Mayfly couldn't be reached. Check the connection and try again." });
+      setBusy(false);
+    }
+  }
+
+  if (!billing) return null;
+  const { payments } = billing;
+  const low = billing.credit <= 0;
+  const valid = Number.isInteger(amount) && amount >= billing.min && amount <= billing.max;
+
+  return (
+    <section className="board-rail-card pay" aria-labelledby="pay-title">
+      <div className="pay-head">
+        <div>
+          <h2 id="pay-title">Prepaid credit</h2>
+          <p className="help">Pay as you go takes awake time from this credit. When it runs out, new previews wait; running ones carry on.</p>
+        </div>
+        {payments.mode ? <span className="pay-mode" data-mode={payments.mode}>{payments.mode === "test" ? "Test mode: no real money" : "Live payments"}</span> : null}
+      </div>
+
+      {!payments.enabled ? (
+        <div className="pay-setup">
+          <strong>Payments aren&apos;t set up yet</strong>
+          <p>
+            {payments.problem ??
+              "Add Razorpay test keys to the server's .env.local (RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET), then restart Mayfly. Until then, credit isn't needed and Pay as you go stays demo pricing."}
+          </p>
+        </div>
+      ) : (
+        <div className="pay-body">
+          <div className="pay-balance" data-low={low ? "1" : undefined}>
+            <span>Credit left</span>
+            <strong>{billing.credit < 0 ? `-${formatRupees(-billing.credit)}` : formatRupees(billing.credit)}</strong>
+            <small>
+              {formatRupees(billing.credited)} added · {formatRupees(billing.spent)} used
+              {billing.plan !== "payg" ? " · only Pay as you go uses credit" : ""}
+            </small>
+          </div>
+          <div className="pay-add">
+            <span className="pc-label" id="pay-amount-label">
+              Add credit
+            </span>
+            <div className="pay-chips" role="radiogroup" aria-labelledby="pay-amount-label">
+              {billing.topUps.map((value) => (
+                <button key={value} type="button" role="radio" aria-checked={amount === value} className="pc-size" onClick={() => setAmount(value)}>
+                  <strong>{formatRupees(value)}</strong>
+                </button>
+              ))}
+            </div>
+            <label className="pay-own">
+              <span>Or enter an amount</span>
+              <span className="pc-number">
+                <span>₹</span>
+                <input type="number" inputMode="numeric" min={billing.min} max={billing.max} step={1} value={amount} onChange={(e) => setAmount(Math.round(Number(e.target.value) || 0))} />
+              </span>
+            </label>
+            <button type="button" className="np-primary pay-go" disabled={busy || !valid} onClick={() => void pay()}>
+              {busy ? "Waiting for payment…" : `Pay ${valid ? formatRupees(amount) : ""} with Razorpay`}
+            </button>
+            <p className="help pay-small">
+              {valid ? "UPI, cards, net banking and wallets." : `Between ${formatRupees(billing.min)} and ₹${billing.max.toLocaleString("en-IN")}.`}
+              {payments.mode === "test" ? " Test mode: pay with the UPI ID success@razorpay, or Razorpay's test cards. No money moves." : ""}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {message ? (
+        <p className={message.tone === "ok" ? "notice" : "error"} role={message.tone === "ok" ? "status" : "alert"}>
+          {message.text}
+        </p>
+      ) : null}
+
+      {billing.orders.length ? (
+        <div className="pay-history">
+          <h3>Payments</h3>
+          <ul>
+            {billing.orders.map((order) => (
+              <li key={order.id}>
+                <span>{order.paidAt ? day(order.paidAt) : ""}</span>
+                <strong>{formatRupees(order.amount)}</strong>
+                <span className="pay-ref">{order.paymentId ?? order.id}</span>
+                {order.mode === "test" ? <span className="pay-mode" data-mode="test">Test</span> : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function Calculator() {
   const [pullRequests, setPullRequests] = useState(40);
   const [size, setSize] = useState<PreviewSize>("standard");
@@ -187,6 +392,12 @@ export function PricingPage() {
   const [busy, setBusy] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
+
+  async function reload() {
+    const res = await fetch("/api/plan", { cache: "no-store" });
+    const body = (await res.json().catch(() => ({}))) as Overview & { ok?: boolean };
+    if (res.ok && body.ok) setData(body);
+  }
 
   useEffect(() => {
     void (async () => {
@@ -304,6 +515,8 @@ export function PricingPage() {
                 )}
               </section>
             ) : null}
+
+            {signedIn ? <CreditPanel onChanged={() => void reload()} /> : null}
 
             <ul className="pr-grid">
               {data.plans.map((plan) => {

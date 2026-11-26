@@ -28,6 +28,7 @@ import {
 } from "./policy";
 import { exclusive, loadState, saveState } from "./store";
 import { checkNewPreview, currentPlan, monthHours } from "./plans";
+import { chargeAwake, creditLeft, razorpaySettings } from "./billing";
 import {
   isLiveStatus,
   type DeploymentRecord,
@@ -733,6 +734,7 @@ async function reserve(event: PullRequestEvent): Promise<LifecycleResult> {
             size: normalized.size ?? null,
             defaultSize: state.previewSettings?.[normalized.repository]?.size ?? null,
             standardHours: monthHours(state.usage).standardHours,
+            credit: razorpaySettings().enabled ? creditLeft(state.billing) : null,
           },
           isDemo,
         );
@@ -1691,6 +1693,7 @@ export async function reap(): Promise<ReapResult> {
       if (elapsed > 0) {
         const today = dayKey(now);
         const day = usage.days?.[today] ?? { awakeSeconds: 0, asleepSeconds: 0 };
+        let awakeWeighted = 0;
         for (const env of state.environments) {
           if (!isLiveStatus(env.status) || isDemo(env)) continue;
           const sleep = gateById.get(env.id)?.sleep;
@@ -1705,10 +1708,16 @@ export async function reap(): Promise<ReapResult> {
             preview.awakeSeconds += elapsed;
             addTime(usage, "awake", elapsed, weighted);
             addTime(day, "awake", elapsed, weighted);
+            awakeWeighted += weighted;
           }
           env.usage = preview;
         }
         usage.days = { ...usage.days, [today]: day };
+        // Pay as you go with payments set up: awake time comes off the prepaid credit (asleep time is free). Without
+        // payments nothing is charged, so adding keys later doesn't start with a bill for the past.
+        if (awakeWeighted > 0 && currentPlan(state.plan).billed && razorpaySettings().enabled) {
+          state.billing = chargeAwake(state.billing, awakeWeighted);
+        }
       }
       usage.lastSampleAt = iso(now);
     }
