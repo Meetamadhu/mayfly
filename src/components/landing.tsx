@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { MayflyMark } from "@/components/admin-header";
 import { StateGlyph } from "@/components/previews-view";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { PLAN_IDS, PLANS, formatPrice, planLines } from "@/lib/plans";
+import { PLAN_IDS, PLANS, planLines } from "@/lib/plans";
 
 /**
  * The public home page from the design: a top bar, the headline, a picture of the Previews page in a browser
@@ -404,10 +404,10 @@ export function Landing() {
       <div className="lp-band lp-band-plans">
         <section className="lp-section" id="plans" aria-labelledby="lp-plans-title">
           <p className="lp-kicker">Plans</p>
-          <h2 id="lp-plans-title">Pick how many previews run at once.</h2>
+          <h2 id="lp-plans-title">Pay for the hours someone is looking.</h2>
           <p className="lp-app-lede">
-            Every plan sleeps idle previews, so you only pay for awake time on top. This is demo pricing: nothing is
-            charged, and admins change plan on the Pricing page.
+            Idle previews sleep and cost nothing, so you pay only while a preview is awake, billed by the second.
+            This is demo pricing: nothing is charged, and admins change plan on the Pricing page.
           </p>
           <ul className="lp-plans">
             {PLAN_IDS.map((id) => {
@@ -416,7 +416,7 @@ export function Landing() {
                 <li key={plan.id}>
                   <h3>{plan.name}</h3>
                   <p className="lp-plan-price">
-                    <strong>{formatPrice(plan.price)}</strong> <span>a month</span>
+                    <strong>{plan.price}</strong> <span>{plan.per}</span>
                   </p>
                   <p className="lp-plan-blurb">{plan.blurb}</p>
                   <ul>
@@ -428,8 +428,8 @@ export function Landing() {
               );
             })}
           </ul>
-          <a className="lp-btn lp-btn-lg lp-plans-cta" href="/pricing">
-            See plans
+          <a className="lp-btn lp-btn-lg lp-plans-cta" href="/pricing#calculator">
+            Estimate your bill
           </a>
         </section>
       </div>
@@ -453,8 +453,8 @@ export function Landing() {
         <details>
           <summary>What does it cost?</summary>
           <p>
-            A plan sets how many previews run at once (see <a href="#plans">Plans</a>), and on top of that you only pay
-            for the time a preview is awake. The Cost page shows an estimate of what sleeping has saved.
+            Only the time a preview is awake, from ₹5 an hour for a Standard preview, billed by the second. Asleep
+            previews are free, and the Sandbox includes 30 awake hours a month (see <a href="#plans">Plans</a>).
           </p>
         </details>
         <details>
