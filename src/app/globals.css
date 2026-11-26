@@ -6388,30 +6388,30 @@ html[data-theme="dark"] .ps-warn { border-color: #c2621c; background: #9a4a12; c
 .lp-band-app .lp-app-people li { background: var(--surface); }
 .lp-band-plans { background: var(--paper); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .lp-band-plans .lp-plans > li { background: var(--surface); }
-/* Dark mode: every section of the home page is a shade of blue, alternating so each one reads as its own band.
-   Header, Use cases and footer: the site's navy (#0b1322). Hero and questions: deep blue. How it works and the
-   Android app: a brighter blue. Plans: midnight blue. Cards on them are a light wash with a faint blue border. */
-html[data-theme="dark"] .lp { background: #081430; }
+/* Dark mode: the whole home page is the site's navy (#0b1322, the footer's colour). Thin lines between sections
+   keep them apart, and cards are a lighter navy with a faint blue border. */
+html[data-theme="dark"] .lp { background: #0b1322; }
 html[data-theme="dark"] .lp-nav { background: color-mix(in srgb, #0b1322 94%, transparent); border-bottom-color: #1c2a44; }
 html[data-theme="dark"] .lp-band { color: #e6edf7; }
 html[data-theme="dark"] .lp-band .lp-kicker { color: #8ff0cf; }
 html[data-theme="dark"] .lp-band .lp-section > h2 { color: #ffffff; }
-html[data-theme="dark"] .lp-band-how { background: #0e2148; border-top-color: #1f3566; }
+html[data-theme="dark"] .lp-band-how { background: #0b1322; border-top: 1px solid #1c2a44; }
 html[data-theme="dark"] .lp-band-uses { background: #0b1322; border-top: 1px solid #1c2a44; border-bottom: 1px solid #1c2a44; }
-html[data-theme="dark"] .lp-band-app { background: #112a5c; }
-html[data-theme="dark"] .lp-band-plans { background: #0a1a3d; border-color: #1f3566; }
-html[data-theme="dark"] .lp-band-how .lp-states li { background: rgba(255, 255, 255, 0.05); border-right-color: rgba(148, 180, 255, 0.2); border-bottom-color: rgba(148, 180, 255, 0.2); border-left-color: rgba(148, 180, 255, 0.2); }
+html[data-theme="dark"] .lp-band-app { background: #0b1322; }
+html[data-theme="dark"] .lp-band-plans { background: #0b1322; border-color: #1c2a44; }
+html[data-theme="dark"] .lp-band-how .lp-states li { background: #111c33; border-right-color: #22314f; border-bottom-color: #22314f; border-left-color: #22314f; }
 html[data-theme="dark"] .lp-band-how .lp-life,
 html[data-theme="dark"] .lp-band-uses .lp-uses > li,
 html[data-theme="dark"] .lp-band-app .lp-app-people li,
-html[data-theme="dark"] .lp-band-plans .lp-plans > li { background: rgba(255, 255, 255, 0.05); border-color: rgba(148, 180, 255, 0.2); }
+html[data-theme="dark"] .lp-band-plans .lp-plans > li { background: #111c33; border-color: #22314f; }
 html[data-theme="dark"] .lp-band .lp-uses h3,
 html[data-theme="dark"] .lp-band .lp-app-people h3 { color: #ffffff; }
 html[data-theme="dark"] .lp-band .lp-uses p,
 html[data-theme="dark"] .lp-band .lp-app-people p,
 html[data-theme="dark"] .lp-band .lp-app-lede { color: #c0cbe0; }
 html[data-theme="dark"] .lp-band-uses .lp-use-feature { background: rgba(61, 223, 180, 0.16); color: #8ff0cf; }
-html[data-theme="dark"] .lp-band-app .lp-app-get { background: #0b1322; border: 1px solid #2a3b5e; }
+html[data-theme="dark"] .lp-band-app .lp-app-get { background: #16233f; border: 1px solid #2a3b5e; }
+html[data-theme="dark"] .lp-footer { border-top: 1px solid #1c2a44; }
 
 /* ═════════════════════════ Pricing (demo plans) ═════════════════════════ */
 .np-size[data-locked="1"] { cursor: not-allowed; background: var(--soft); }
