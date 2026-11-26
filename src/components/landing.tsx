@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { MayflyMark } from "@/components/admin-header";
 import { StateGlyph } from "@/components/previews-view";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { AppOnboarding, SHOW_INTRO_EVENT } from "@/components/app-onboarding";
 import { PLAN_IDS, PLANS, planLines } from "@/lib/plans";
 
 /**
@@ -259,6 +260,22 @@ export function Landing() {
             <span>mayfly</span>
           </a>
           <div className="lp-nav-actions">
+            <button
+              type="button"
+              className="board-help lp-nav-intro"
+              aria-label="Intro: how Mayfly works"
+              title="How Mayfly works"
+              onClick={() => window.dispatchEvent(new Event(SHOW_INTRO_EVENT))}
+            >
+              <span className="board-help-mark" aria-hidden="true">
+                {/* An open book, the same Intro button as on the dashboard. */}
+                <svg viewBox="0 0 24 24">
+                  <path d="M3 5.5c3-1.2 6-1 9 1 3-2 6-2.2 9-1v13c-3-1.2-6-1-9 1-3-2-6-2.2-9-1z" />
+                  <path d="M12 6.5v13" />
+                </svg>
+              </span>
+              <span className="board-help-label">Intro</span>
+            </button>
             <ThemeToggle theme={theme} onChange={chooseTheme} />
             <a className="lp-signin lp-nav-pricing" href="/pricing">
               Pricing
@@ -511,6 +528,7 @@ export function Landing() {
           <span>Preview environments for pull requests</span>
         </div>
       </footer>
+      <AppOnboarding showOnLoad={false} />
     </main>
   );
 }

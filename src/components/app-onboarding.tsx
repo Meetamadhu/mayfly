@@ -120,7 +120,7 @@ function Art({ kind }: { kind: Slide["art"] }) {
  * Get started; Escape skips. Shown once per visit (and on every launch of the Android app), not on every page.
  * "Show the intro again" (app More sheet) and "Show the intro" (website sidebar) bring it back.
  */
-export function AppOnboarding() {
+export function AppOnboarding({ showOnLoad = true }: { showOnLoad?: boolean } = {}) {
   const [open, setOpen] = useState(false);
   const [index, setIndex] = useState(0);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -141,14 +141,15 @@ export function AppOnboarding() {
       const query = params.toString();
       window.history.replaceState(window.history.state, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`);
     }
-    if ((!seen && !backFromPreview) || launchedFromIcon) setOpen(true);
+    // Pages that explain Mayfly themselves (the home page) only open it from their Intro button.
+    if (showOnLoad && ((!seen && !backFromPreview) || launchedFromIcon)) setOpen(true);
     const show = () => {
       setIndex(0);
       setOpen(true);
     };
     window.addEventListener(SHOW_INTRO_EVENT, show);
     return () => window.removeEventListener(SHOW_INTRO_EVENT, show);
-  }, []);
+  }, [showOnLoad]);
 
   useEffect(() => {
     if (!open) return;

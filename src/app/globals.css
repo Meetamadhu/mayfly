@@ -5637,12 +5637,32 @@ html[data-theme="dark"] .act-icon[data-tone="failed"] { background: #3b1518; col
   .lp-brand-mark { width: 3rem; height: 3rem; }
 
 }
-@media (max-width: 400px) {
+/* Small tablets: Intro shows as its book icon only, and the logo is a little smaller. */
+@media (max-width: 780px) {
+  .lp-nav-intro { padding: 0; width: 2.25rem; justify-content: center; }
+  .lp-nav-intro .board-help-label { display: none; }
+  .lp-nav-intro .board-help-mark { background: none; }
+}
+@media (min-width: 561px) and (max-width: 780px) {
+  .lp-brand { font-size: 2.1rem; }
+  .lp-brand-mark { width: 3.3rem; height: 3.3rem; }
+}
+/* Below 640px the Pricing link leaves the top bar; Plans on the page and the footer still link to it. */
+@media (max-width: 640px) {
+  .lp-nav-pricing { display: none; }
+}
+/* Phones: a smaller logo and tighter gaps leave room for Intro, Sign in and Open dashboard; on the narrowest the
+   logo mark stands alone (its link still says "Mayfly home"). */
+@media (max-width: 460px) {
   .lp-nav-inner { gap: 0.5rem; }
-  .lp-brand { font-size: 1.6rem; gap: 0.35rem; }
-  .lp-brand-mark { width: 2.6rem; height: 2.6rem; }
+  .lp-brand { font-size: 1.4rem; gap: 0.35rem; }
+  .lp-brand-mark { width: 2.3rem; height: 2.3rem; }
   .lp-nav-actions { gap: 0.5rem; }
   .lp-nav-actions .lp-btn { padding: 0 0.7rem; }
+  .lp-nav-intro { width: 2.1rem; min-height: 2.1rem; }
+}
+@media (max-width: 384px) {
+  .lp-brand > span { display: none; }
 }
 .lp-signin { white-space: nowrap; }
 /* Home: the headline on a single line on wide screens; it wraps on phones. */
@@ -6343,6 +6363,7 @@ html[data-theme="dark"] .ps-warn { border-color: #c2621c; background: #9a4a12; c
 .lp-plans ul li { position: relative; padding-left: 1.2rem; line-height: 1.4; }
 .lp-plans ul li::before { content: ""; position: absolute; left: 0.1rem; top: 0.5em; width: 0.45rem; height: 0.45rem; border-radius: 50%; background: var(--mint); }
 .lp-plans-cta { text-decoration: none; }
+.lp-nav-intro { flex: none; }
 /* Links to #plans, #how and the rest land below the sticky top bar, not under it. */
 .lp-section { scroll-margin-top: 6rem; }
 @media (max-width: 860px) { .lp-plans { grid-template-columns: minmax(0, 1fr); } }
@@ -6367,15 +6388,93 @@ html[data-theme="dark"] .ps-warn { border-color: #c2621c; background: #9a4a12; c
 .lp-band-app .lp-app-people li { background: var(--surface); }
 .lp-band-plans { background: var(--paper); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .lp-band-plans .lp-plans > li { background: var(--surface); }
-html[data-theme="dark"] .lp-band-how { background: #071022; }
-html[data-theme="dark"] .lp-band-how .lp-states li, html[data-theme="dark"] .lp-band-how .lp-life { background: var(--paper); }
-html[data-theme="dark"] .lp-band-uses {
-  background: radial-gradient(70% 90% at 100% 0%, rgba(61, 223, 180, 0.12), transparent 60%), linear-gradient(160deg, #0b4840, #062b26);
+/* Dark mode: How it works and Plans stay white (the light colour tokens are set again on just those bands, so
+   everything inside draws as in light mode), Use cases is blue, the Android app is mint green. */
+html[data-theme="dark"] .lp-band-how,
+html[data-theme="dark"] .lp-band-plans {
+  color-scheme: light;
+  --bg: #f4f6f8;
+  --surface: #f8fafc;
+  --paper: #ffffff;
+  --ink: #0f172a;
+  --text: var(--ink);
+  --muted: #5b6b80;
+  --line: #e2e8f0;
+  --border: var(--line);
+  --soft: #eef2f6;
+  --field: #ffffff;
+  --on-ink: #f5faf7;
+  --glow: rgba(255, 255, 255, 0.65);
+  --accent: #0f8f6b;
+  --mint: #0f8f6b;
+  --mint-bg: #d8f3e8;
+  --brand: #0e5f52;
+  --brand-hover: #0a4b41;
+  --brand-line: #0e5f52;
+  --on-brand: #ffffff;
+  --brand-text: #0e5f52;
+  --success: #0f6b4a;
+  --success-bg: #d8f3e8;
+  --warn: #8a5a12;
+  --warn-bg: #f8efd4;
+  --danger: #dc2626;
+  --danger-bg: #fee2e2;
+  --building: #b45309;
+  --building-bg: #fef3c7;
+  --ready: var(--success);
+  --ready-bg: var(--success-bg);
+  --work: var(--building);
+  --work-bg: var(--building-bg);
+  --failed: var(--danger);
+  --failed-bg: var(--danger-bg);
+  --dead: #4a5c55;
+  --dead-bg: #e2ebe6;
+  --awake: #047857;
+  --awake-bg: #d1fae5;
+  --asleep: #4f46e5;
+  --asleep-bg: #eef0ff;
+  --band-awake: #0f6b4a;
+  --band-asleep: #f0e2c0;
+  --band-work: #1d4f91;
+  --band-failed: #9b1c1c;
+  --sidebar: #0f8f6b;
+  --sidebar-ink: #f5faf7;
+  --sidebar-muted: #d4efe4;
+  --radius: 6px;
+  --radius-lg: 14px;
+  --btn-height: 44px;
+  --btn-pad-y: 0.5rem;
+  --btn-pad-x: 0.85rem;
+  --card-head: #dbeafe;
+  --card-head-line: #bfd3f2;
+  --chart-awake: #059669;
+  --chart-asleep: #6366f1;
+  --chart-always: #cbd5e1;
+  --chart-mayfly: #059669;
+  --time: #475569;
+  --time-bg: #eef2f6;
+  color: var(--ink);
 }
-html[data-theme="dark"] .lp-band-app { background: #071022; }
-html[data-theme="dark"] .lp-band-app .lp-app-people li { background: var(--paper); }
-html[data-theme="dark"] .lp-band-plans { background: #071022; }
-html[data-theme="dark"] .lp-band-plans .lp-plans > li { background: var(--paper); }
+html[data-theme="dark"] .lp-band-how { background: #ffffff; border-top-color: transparent; }
+html[data-theme="dark"] .lp-band-plans { background: #ffffff; border-color: transparent; }
+html[data-theme="dark"] .lp-band-how .act-icon[data-tone="failed"] { background: var(--danger-bg); color: var(--danger); }
+html[data-theme="dark"] .lp-band-uses {
+  background: radial-gradient(70% 90% at 100% 0%, rgba(125, 180, 255, 0.22), transparent 60%), linear-gradient(160deg, #1d4ed8, #1e3a8a);
+  color: #eef4ff;
+}
+html[data-theme="dark"] .lp-band-uses .lp-kicker { color: #bfdbfe; }
+html[data-theme="dark"] .lp-band-uses .lp-section > h2 { color: #ffffff; }
+html[data-theme="dark"] .lp-band-uses .lp-uses > li { border-color: rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.08); }
+html[data-theme="dark"] .lp-band-uses .lp-uses h3 { color: #ffffff; }
+html[data-theme="dark"] .lp-band-uses .lp-uses p { color: #dbe7ff; }
+html[data-theme="dark"] .lp-band-uses .lp-use-feature { background: rgba(255, 255, 255, 0.16); color: #ffffff; }
+html[data-theme="dark"] .lp-band-app { background: #cdf2e1; color: #0c1a16; }
+html[data-theme="dark"] .lp-band-app .lp-kicker { color: #0b6b55; }
+html[data-theme="dark"] .lp-band-app .lp-section > h2 { color: #0c1a16; }
+html[data-theme="dark"] .lp-band-app .lp-app-lede { color: #2c4a40; }
+html[data-theme="dark"] .lp-band-app .lp-app-people li { border-color: #a9e2c9; background: rgba(255, 255, 255, 0.72); }
+html[data-theme="dark"] .lp-band-app .lp-app-people h3 { color: #0c1a16; }
+html[data-theme="dark"] .lp-band-app .lp-app-people p { color: #2c4a40; }
 
 /* ═════════════════════════ Pricing (demo plans) ═════════════════════════ */
 .np-size[data-locked="1"] { cursor: not-allowed; background: var(--soft); }
