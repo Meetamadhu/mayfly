@@ -6467,13 +6467,16 @@ html[data-theme="dark"] .lp-band-uses .lp-uses > li { border-color: #22314f; bac
 html[data-theme="dark"] .lp-band-uses .lp-uses h3 { color: #ffffff; }
 html[data-theme="dark"] .lp-band-uses .lp-uses p { color: #b7c3d8; }
 html[data-theme="dark"] .lp-band-uses .lp-use-feature { background: rgba(61, 223, 180, 0.16); color: #8ff0cf; }
-html[data-theme="dark"] .lp-band-app { background: #cdf2e1; color: #0c1a16; }
-html[data-theme="dark"] .lp-band-app .lp-kicker { color: #0b6b55; }
-html[data-theme="dark"] .lp-band-app .lp-section > h2 { color: #0c1a16; }
-html[data-theme="dark"] .lp-band-app .lp-app-lede { color: #2c4a40; }
-html[data-theme="dark"] .lp-band-app .lp-app-people li { border-color: #a9e2c9; background: rgba(255, 255, 255, 0.72); }
-html[data-theme="dark"] .lp-band-app .lp-app-people h3 { color: #0c1a16; }
-html[data-theme="dark"] .lp-band-app .lp-app-people p { color: #2c4a40; }
+/* Dark mode: the Android app section in the same navy as Use cases above it; the line between them keeps the two
+   sections apart, and the "Get the Android app" card is lifted a step so it doesn't sink into the navy. */
+html[data-theme="dark"] .lp-band-app { background: #0b1322; color: #e6edf7; }
+html[data-theme="dark"] .lp-band-app .lp-kicker { color: #8ff0cf; }
+html[data-theme="dark"] .lp-band-app .lp-section > h2 { color: #ffffff; }
+html[data-theme="dark"] .lp-band-app .lp-app-lede { color: #b7c3d8; }
+html[data-theme="dark"] .lp-band-app .lp-app-people li { border-color: #22314f; background: #111c33; }
+html[data-theme="dark"] .lp-band-app .lp-app-people h3 { color: #ffffff; }
+html[data-theme="dark"] .lp-band-app .lp-app-people p { color: #b7c3d8; }
+html[data-theme="dark"] .lp-band-app .lp-app-get { background: #16233f; border: 1px solid #2a3b5e; }
 
 /* ═════════════════════════ Pricing (demo plans) ═════════════════════════ */
 .np-size[data-locked="1"] { cursor: not-allowed; background: var(--soft); }
