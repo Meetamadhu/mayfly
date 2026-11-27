@@ -1,13 +1,16 @@
 /**
- * Backups from the command line, for when Mayfly is stopped.
+ * Backups and migration from the command line, for when Mayfly is stopped (or for pack, which is safe while it runs).
  *
- *   node dist/restore.js list              newest first
- *   node dist/restore.js now               take a backup now
- *   node dist/restore.js show <name>       what a backup contains, without changing anything
+ *   node dist/restore.js list
+ *   node dist/restore.js now
+ *   node dist/restore.js show <name>
  *   node dist/restore.js restore <name> --yes
+ *   node dist/restore.js pack                 write data/migrate/mayfly-migrate-… with a backup + checklist
+ *   node dist/restore.js apply <folder> --yes restore from a packed folder (Mayfly must be stopped)
  *
- * On a server, use deploy/aws/backup.sh, which stops and starts Mayfly around a restore.
+ * On a server, use deploy/aws/backup.sh or deploy/aws/migrate.sh.
  */
+import { applyMigratePack, packMigrate } from "@/lib/migrate";
 import { createBackup, listBackups, readBackup, restoreBackup } from "@/lib/backup";
 
 function kb(bytes: number) {
@@ -45,6 +48,31 @@ async function main() {
     return;
   }
 
+  if (command === "pack") {
+    const result = await packMigrate();
+    console.log(`Packed ${result.environments} preview record(s) into:`);
+    console.log(`  ${result.dir}`);
+    console.log(`Backup: ${result.backup} (${kb(result.bytes)})`);
+    console.log("Copy that folder to the new server, copy .env.local yourself, then:");
+    console.log(`  node dist/restore.js apply ${result.dir} --yes`);
+    return;
+  }
+
+  if (command === "apply") {
+    if (!name) throw new Error('Say which folder: node dist/restore.js apply <path> --yes.');
+    if (flag !== "--yes") {
+      console.log("Nothing changed. Add --yes to restore from that packed folder.");
+      return;
+    }
+    if (await mayflyIsRunning()) {
+      throw new Error("Mayfly is running. Stop it first, or it would overwrite the restored state.");
+    }
+    const result = await applyMigratePack(name);
+    console.log(`\nRestored ${result.restored}.`);
+    console.log(`What was there before is saved as ${result.previous}, so this can be undone the same way.`);
+    return;
+  }
+
   if (command === "show" || command === "restore") {
     if (!name) throw new Error(`Say which backup: node dist/restore.js ${command} <name>. See the names with "list".`);
     const state = await readBackup(name);
@@ -57,7 +85,7 @@ async function main() {
     if (command === "show") return;
 
     if (flag !== "--yes") {
-      console.log('\nNothing changed. Add --yes to replace the current saved state with this backup.');
+      console.log("\nNothing changed. Add --yes to replace the current saved state with this backup.");
       return;
     }
     if (await mayflyIsRunning()) {
@@ -69,7 +97,7 @@ async function main() {
     return;
   }
 
-  throw new Error(`Unknown command "${command}". Use list, now, show <name> or restore <name> --yes.`);
+  throw new Error(`Unknown command "${command}". Use list, now, show, restore, pack or apply.`);
 }
 
 main().then(

@@ -2,6 +2,9 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
 import { NAME_PATTERN, type PreviewSettings, type RepoSettings, type StoredVar } from "./preview-settings-shape";
 import { isPreviewSize, type PreviewSize } from "./sizes";
 import { loadState } from "./store";
+import { parseChecks, type SmokeCheck } from "./smoke";
+import { parseDbSettings, sandboxProblem, secretFromEnv, type DbKind, type DbSettings } from "./sandbox-db";
+import { cleanProductionUrl } from "./visual-diff";
 
 /**
  * Preview settings for each repository: the size of previews opened from GitHub, and environment variables (test
@@ -114,11 +117,59 @@ export function applySettingsUpdate(
     }
     vars.push({ name, value: encryptValue(item.value, key), build, updatedAt: now });
   }
-  return { ok: true, settings: { ...(size !== "standard" ? { size } : {}), vars, updatedAt: now } };
+
+  // Settings the page didn't send stay as they were. Empty or null clears them.
+  let productionUrl = existing?.productionUrl;
+  if (body.productionUrl !== undefined) {
+    if (body.productionUrl === null || (typeof body.productionUrl === "string" && !body.productionUrl.trim())) productionUrl = undefined;
+    else {
+      productionUrl = cleanProductionUrl(body.productionUrl) ?? undefined;
+      if (!productionUrl) return { ok: false, error: "The production address should start with https:// (for example https://example.com)." };
+    }
+  }
+  let smoke = existing?.smoke;
+  if (body.smoke !== undefined) {
+    const parsed = parseChecks(body.smoke);
+    if (!parsed.ok) return parsed;
+    smoke = parsed.checks.length > 0 ? parsed.checks : undefined;
+  }
+  let database = existing?.database;
+  if (body.database !== undefined) {
+    const parsed = parseDbSettings(body.database, nameProblem);
+    if (!parsed.ok) return parsed;
+    database = parsed.db ?? undefined;
+    if (database) {
+      if (seen.has(database.envName.toUpperCase())) {
+        return { ok: false, error: `${database.envName} is also listed as a variable. Remove one of them: the database address would overwrite it.` };
+      }
+      if (!secretFromEnv()) return { ok: false, error: "A sandbox database needs MAYFLY_SECRETS_KEY set on the server (it derives each preview's password)." };
+    }
+  }
+  return {
+    ok: true,
+    settings: {
+      ...(size !== "standard" ? { size } : {}),
+      vars,
+      ...(productionUrl ? { productionUrl } : {}),
+      ...(smoke ? { smoke } : {}),
+      ...(database ? { database } : {}),
+      updatedAt: now,
+    },
+  };
 }
 
 export type VarView = { name: string; build: boolean; updatedAt: string; readable: boolean };
-export type RepoSettingsView = { repository: string; size: PreviewSize; vars: VarView[]; updatedAt: string | null };
+export type RepoSettingsView = {
+  repository: string;
+  size: PreviewSize;
+  vars: VarView[];
+  productionUrl: string | null;
+  smoke: SmokeCheck[];
+  database: DbSettings | null;
+  /** Why the database can't be made on this server yet, or null when it can. */
+  databaseProblem: string | null;
+  updatedAt: string | null;
+};
 
 /** What the settings page sees: names, flags and dates, never values. */
 export function settingsView(repository: string, settings: RepoSettings | undefined, key = rawKey()): RepoSettingsView {
@@ -131,11 +182,21 @@ export function settingsView(repository: string, settings: RepoSettings | undefi
       updatedAt: item.updatedAt,
       readable: decryptValue(item.value, key) !== null,
     })),
+    productionUrl: settings?.productionUrl ?? null,
+    smoke: settings?.smoke ?? [],
+    database: settings?.database ?? null,
+    databaseProblem: settings?.database ? sandboxProblem(settings.database.kind) : null,
     updatedAt: settings?.updatedAt ?? null,
   };
 }
 
-export type RepoEnv = { runtime: Record<string, string>; build: Record<string, string>; unreadable: string[] };
+export type RepoEnv = {
+  runtime: Record<string, string>;
+  build: Record<string, string>;
+  unreadable: string[];
+  /** The kind of sandbox database made for this deploy. */
+  sandbox?: DbKind;
+};
 
 /** The plain values for one repository's previews. Values that can't be read are left out and named. */
 export function envFromSettings(settings: RepoSettings | undefined, key = rawKey()): RepoEnv {
@@ -154,6 +215,12 @@ export function envFromSettings(settings: RepoSettings | undefined, key = rawKey
 
 export function settingsFor(all: PreviewSettings | undefined, repository: string) {
   return all?.[repository.trim().toLowerCase()];
+}
+
+/** The repository's sandbox database settings, if it has any. */
+export async function repoDatabase(repository: string): Promise<DbSettings | undefined> {
+  const state = await loadState();
+  return settingsFor(state.previewSettings, repository)?.database;
 }
 
 /** Loads the saved settings and returns one repository's plain values, for the deployer and the builder. */

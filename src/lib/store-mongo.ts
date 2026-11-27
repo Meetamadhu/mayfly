@@ -1,6 +1,10 @@
 import { asStoredSettings } from "./preview-settings-shape";
 import { asStoredPlan } from "./plans";
 import { asBilling } from "./billing";
+import { asBudget } from "./budget";
+import { asSchedules } from "./schedule";
+import { asReportState } from "./weekly-report";
+import { asRepoUsage } from "./usage-shape";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import net from "node:net";
@@ -66,7 +70,8 @@ function asUsageDay(value: unknown): import("./types").UsageDay | null {
   if (typeof raw.awakeSeconds !== "number" || !Number.isFinite(raw.awakeSeconds) || raw.awakeSeconds < 0) {
     return null;
   }
-  return { asleepSeconds: raw.asleepSeconds, awakeSeconds: raw.awakeSeconds, ...weightedOf(raw) };
+  const repos = asRepoUsage(raw.repos);
+  return { asleepSeconds: raw.asleepSeconds, awakeSeconds: raw.awakeSeconds, ...weightedOf(raw), ...(repos ? { repos } : {}) };
 }
 
 function asUsageDays(value: unknown): Record<string, import("./types").UsageDay> | undefined {
@@ -111,6 +116,9 @@ function asState(value: unknown): State {
   const previewSettings = asStoredSettings((value as State).previewSettings);
   const plan = asStoredPlan((value as State).plan);
   const billing = asBilling((value as State).billing);
+  const budget = asBudget((value as State).budget);
+  const schedules = asSchedules((value as State).schedules);
+  const reports = asReportState((value as State).reports);
   return {
     environments,
     ...(usage ? { usage } : {}),
@@ -118,6 +126,9 @@ function asState(value: unknown): State {
     ...(previewSettings ? { previewSettings } : {}),
     ...(plan ? { plan } : {}),
     ...(billing ? { billing } : {}),
+    ...(budget ? { budget } : {}),
+    ...(schedules ? { schedules } : {}),
+    ...(reports ? { reports } : {}),
   };
 }
 

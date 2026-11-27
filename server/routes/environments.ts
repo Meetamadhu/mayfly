@@ -3,6 +3,7 @@ import { checkAdmin } from "@/lib/admin";
 import {
   destroyEnvironment,
   extendEnvironment,
+  getAppLog,
   getEnvironment,
   getOverview,
   keepAwakeEnvironment,
@@ -60,6 +61,21 @@ environmentsRouter.get(
       return;
     }
     sendJson(res, { ok: true, environment: isAdmin(req) ? environment : publicEnvironment(environment) });
+  }),
+);
+
+/** GET /api/environments/:id/logs: what the preview's app printed. Admins only, since it can hold anything the app logs. */
+environmentsRouter.get(
+  "/api/environments/:id/logs",
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const id = parseId(req.params.id);
+    if (!id) {
+      sendJson(res, { ok: false, code: "invalid", error: "Invalid environment id." }, 400);
+      return;
+    }
+    const result = await getAppLog(id);
+    sendJson(res, result, result.ok ? 200 : result.code === "not_found" ? 404 : 409);
   }),
 );
 

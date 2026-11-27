@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mayfly - business overview</title>
+<link rel="icon" href="logo.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="clean">
+<main>
+<section class="frame" id="s1" aria-label="Slide 1">
+  <article class="slide dark title">
+
+    <div class="brand"><svg class="logo " viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Mayfly logo">
+<rect class="lg-bg" width="512" height="512" rx="115" fill="#0b1421"/>
+<path class="lg-ring" pathLength="1" d="M310 101H195A90 90 0 0 0 105 191V322A90 90 0 0 0 195 412H324A90 90 0 0 0 414 322V205" fill="none" stroke="#e6efea" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+<g class="lg-m" fill="none" stroke="#e6efea" stroke-width="35" stroke-linecap="round" stroke-linejoin="round"><path d="M179 296V230M179 264Q179 222 220 222Q258 222 258 264V296M258 264Q258 222 298 222Q338 222 338 264V296"/></g>
+<g fill="#3ddfb4"><circle class="lg-d lg-d1" cx="347" cy="160" r="22"/><circle class="lg-d lg-d2" cx="386" cy="130" r="14"/><circle class="lg-d lg-d3" cx="414" cy="104" r="10"/><circle class="lg-d lg-d4" cx="437" cy="84" r="7"/></g>
+</svg><span>Mayfly</span></div>
+    <h1><span class="w" style="--w:0">A</span> <span class="w" style="--w:1">live</span> <span class="w" style="--w:2">preview</span> <span class="w" style="--w:3">for</span> <span class="w" style="--w:4">every</span> <span class="w" style="--w:5">pull</span> <span class="w" style="--w:6">request.</span><br><span class="w" style="--w:6">It</span> <span class="w" style="--w:7">sleeps</span> <span class="w" style="--w:8">when</span> <span class="w" style="--w:9">nobody</span> <span class="w" style="--w:10">is</span> <span class="w" style="--w:11">looking.</span></h1>
+    <p class="lede">Reviewers click one link and see the change running. Idle previews cost almost nothing, and they are removed when the pull request closes.</p>
+    <div class="bar"></div><p class="tag">Business overview</p>
+    <div class="drift" aria-hidden="true"><i style="--x:8%;--s:0.06in;--d:7s;--t:0.0s"></i><i style="--x:45%;--s:0.09in;--d:12s;--t:-1.3s"></i><i style="--x:82%;--s:0.12in;--d:8s;--t:-2.6s"></i><i style="--x:35%;--s:0.15in;--d:13s;--t:-3.9s"></i><i style="--x:72%;--s:0.08in;--d:9s;--t:-5.2s"></i><i style="--x:25%;--s:0.11in;--d:14s;--t:-6.5s"></i><i style="--x:62%;--s:0.14in;--d:10s;--t:-7.8s"></i><i style="--x:15%;--s:0.07in;--d:15s;--t:-9.1s"></i><i style="--x:52%;--s:0.10in;--d:11s;--t:-10.4s"></i><i style="--x:89%;--s:0.13in;--d:7s;--t:-11.7s"></i><i style="--x:42%;--s:0.06in;--d:12s;--t:-13.0s"></i><i style="--x:79%;--s:0.09in;--d:8s;--t:-14.3s"></i><i style="--x:32%;--s:0.12in;--d:13s;--t:-15.6s"></i><i style="--x:69%;--s:0.15in;--d:9s;--t:-16.9s"></i></div>
+    <div class="hero-logo"><svg class="logo " viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Mayfly logo">
+<rect class="lg-bg" width="512" height="512" rx="115" fill="#0b1421"/>
+<path class="lg-ring" pathLength="1" d="M310 101H195A90 90 0 0 0 105 191V322A90 90 0 0 0 195 412H324A90 90 0 0 0 414 322V205" fill="none" stroke="#e6efea" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+<g class="lg-m" fill="none" stroke="#e6efea" stroke-width="35" stroke-linecap="round" stroke-linejoin="round"><path d="M179 296V230M179 264Q179 222 220 222Q258 222 258 264V296M258 264Q258 222 298 222Q338 222 338 264V296"/></g>
+<g fill="#3ddfb4"><circle class="lg-d lg-d1" cx="347" cy="160" r="22"/><circle class="lg-d lg-d2" cx="386" cy="130" r="14"/><circle class="lg-d lg-d3" cx="414" cy="104" r="10"/><circle class="lg-d lg-d4" cx="437" cy="84" r="7"/></g>
+</svg></div>
+    <footer class="foot"><span>Mayfly</span><span>1</span></footer>
+    <aside class="notes" hidden>Open with the one-line promise: every pull request gets its own running preview; it sleeps when idle and is deleted when the PR closes. Mayfly is a working product you can run today.</aside>
+  </article>
+</section>
+
+<section class="frame" id="s2" aria-label="Slide 2">
+  <article class="slide light">
+
+    <header class="head"><p class="kicker">The problem</p><h2><span class="w" style="--w:0">Reviewing</span> <span class="w" style="--w:1">code</span> <span class="w" style="--w:2">is</span> <span class="w" style="--w:3">easier</span> <span class="w" style="--w:4">when</span> <span class="w" style="--w:5">you</span> <span class="w" style="--w:6">can</span> <span class="w" style="--w:7">see</span> <span class="w" style="--w:8">it</span> <span class="w" style="--w:9">run.</span> <span class="w" style="--w:10">Preview</span> <span class="w" style="--w:11">environments</span> <span class="w" style="--w:12">are</span> <span class="w" style="--w:13">not.</span></h2></header>
+    <div class="grid g3 problem-grid">
+      <div class="card "><h3>Reviewers can't see the change</h3><p>A diff shows code, not behaviour. Designers, product managers and QA wait for a shared staging server, then ask which branch is on it.</p></div>
+      <div class="card amber"><h3>Always-on previews cost money</h3><p>One environment per pull request means servers running day and night for pages that are opened a few times, then forgotten.</p></div>
+      <div class="card red"><h3>Nobody cleans up</h3><p>Old previews pile up after merges. They use memory and disk, and may keep serving code that was never meant to stay public.</p></div>
+    </div>
+    <footer class="foot"><span>Mayfly</span><span>2</span></footer>
+    <aside class="notes" hidden>Three pains: reviewers can't see behaviour, per-PR environments are expensive if always on, and stale previews pile up.</aside>
+  </article>
+</section>
+
+<section class="frame" id="s3" aria-label="Slide 3">
+  <article class="slide light">
+
+    <header class="head"><p class="kicker">The difference</p><h2><span class="w" style="--w:0">Shared</span> <span class="w" style="--w:1">staging</span> <span class="w" style="--w:2">versus</span> <span class="w" style="--w:3">a</span> <span class="w" style="--w:4">preview</span> <span class="w" style="--w:5">per</span> <span class="w" style="--w:6">pull</span> <span class="w" style="--w:7">request.</span></h2></header>
+    <div class="panel"><svg class="diagram" viewBox="0 0 1193 490" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Left: two reviewers share one staging environment with one front end and back end. Right: each reviewer gets their own preview of a pull request; one is awake, one is asleep, and merged previews are removed.">
+  <defs>
+    <marker id="ah-pe" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#8ec5d8"/></marker>
+    <filter id="gl-pe" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="ga-pe" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="bar-pe" x1="0" x2="1"><stop offset="0" stop-color="#1fbf8f"/><stop offset="1" stop-color="#37e0a8"/></linearGradient>
+  </defs>
+  <path d="M596 36V454" stroke="#27475a" stroke-width="2" stroke-dasharray="6 9"/>
+  <text x="60" y="64" class="h">Shared staging</text><text x="60" y="94" class="sub">One environment for everyone</text>
+  <text x="656" y="64" class="h">Mayfly</text><text x="656" y="94" class="sub">A preview for every pull request</text>
+
+  <g class="rise" style="--i:0">
+    <circle cx="110" cy="235" r="30" fill="#fff"/>
+    <circle cx="110" cy="228" r="10" fill="#0f9d76"/>
+    <path d="M93 253 Q93 239 110 239 Q127 239 127 253Z" fill="#0f9d76"/>
+    <text x="110" y="293" class="lbl" text-anchor="middle">Reviewer A</text>
+  </g>
+  <g class="rise" style="--i:1">
+    <circle cx="568" cy="235" r="30" fill="#fff"/>
+    <circle cx="568" cy="228" r="10" fill="#0f9d76"/>
+    <path d="M551 253 Q551 239 568 239 Q585 239 585 253Z" fill="#0f9d76"/>
+    <text x="568" y="293" class="lbl" text-anchor="middle">Reviewer B</text>
+  </g>
+  <g class="rise" style="--i:1">
+    <rect x="250" y="168" width="188" height="134" rx="14" fill="#10222d" stroke="#8ec5d8" stroke-width="2.2"/>
+    <path d="M250 192H438" stroke="#8ec5d8" stroke-opacity=".45"/>
+    <circle cx="268" cy="180" r="3.6" fill="#8ec5d8"/><circle cx="282" cy="180" r="3.6" fill="#8ec5d8" fill-opacity=".7"/><circle cx="296" cy="180" r="3.6" fill="#8ec5d8" fill-opacity=".4"/>
+    <rect x="270" y="210" width="103" height="8" rx="4" fill="#27475a"/><rect x="270" y="228" width="71" height="8" rx="4" fill="#27475a"/><rect x="270" y="246" width="117" height="8" rx="4" fill="#27475a"/>
+    <g transform="translate(386 252)"><path d="M0 0V26L7 20L12 31L17.5 28.5L12.5 18H21Z" fill="#8ec5d8" stroke="#fff" stroke-width="1.2"/></g>
+  </g>
+  <text x="344" y="150" text-anchor="middle" style="fill:#ffb84d;font-size:17px;font-weight:700">Which branch is on it?</text>
+  <path class="flow" d="M146 235H246" fill="none" stroke="#8ec5d8" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="3 8" stroke-opacity="1" marker-end="url(#ah-pe)"/><circle r="5.5" fill="#37e0a8" class="mdot"><animateMotion dur="2.2s" begin="0s" repeatCount="indefinite" path="M146 235H246"/></circle>
+  <path class="flow" d="M532 235H442" fill="none" stroke="#8ec5d8" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="3 8" stroke-opacity="1" marker-end="url(#ah-pe)"/><circle r="5.5" fill="#37e0a8" class="mdot"><animateMotion dur="2.2s" begin="1s" repeatCount="indefinite" path="M532 235H442"/></circle>
+  <path class="flow" d="M344 306V336" fill="none" stroke="#8ec5d8" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="3 8" stroke-opacity="1" marker-end="url(#ah-pe)"/>
+  <g class="rise" style="--i:2"><rect x="282" y="342" width="128" height="26" rx="7" fill="#10222d" stroke="#3f8a86" stroke-width="2"/><circle cx="298" cy="355" r="4.5" fill="#37e0a8"/><rect x="314" y="351" width="58" height="8" rx="4" fill="#27475a"/><rect x="282" y="376" width="128" height="26" rx="7" fill="#10222d" stroke="#3f8a86" stroke-width="2"/><circle cx="298" cy="389" r="4.5" fill="#37e0a8"/><rect x="314" y="385" width="58" height="8" rx="4" fill="#27475a"/><rect x="282" y="410" width="128" height="26" rx="7" fill="#10222d" stroke="#3f8a86" stroke-width="2"/><circle cx="298" cy="423" r="4.5" fill="#37e0a8"/><rect x="314" y="419" width="58" height="8" rx="4" fill="#27475a"/></g>
+  <g class="rise" style="--i:2"><path d="M434 372v54a36 11 0 0 0 72 0v-54" fill="#10222d" stroke="#3f8a86" stroke-width="2.2"/><ellipse cx="470" cy="372" rx="36" ry="11" fill="#173545" stroke="#3f8a86" stroke-width="2.2"/><path d="M434 396a36 11 0 0 0 72 0" fill="none" stroke="#27475a" stroke-width="2"/></g>
+  <path class="flow" d="M414 392H430" fill="none" stroke="#8ec5d8" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="3 8" stroke-opacity="1"/>
+  <text x="344" y="474" text-anchor="middle" class="sub">Front end and back end, shared</text>
+
+  <g class="rise" style="--i:0">
+    <circle cx="700" cy="165" r="30" fill="#fff"/>
+    <circle cx="700" cy="158" r="10" fill="#0f9d76"/>
+    <path d="M683 183 Q683 169 700 169 Q717 169 717 183Z" fill="#0f9d76"/>
+    <text x="700" y="223" class="lbl" text-anchor="middle">Reviewer A</text>
+  </g>
+  <g class="rise" style="--i:1">
+    <circle cx="700" cy="365" r="30" fill="#fff"/>
+    <circle cx="700" cy="358" r="10" fill="#0f9d76"/>
+    <path d="M683 383 Q683 369 700 369 Q717 369 717 383Z" fill="#0f9d76"/>
+    <text x="700" y="423" class="lbl" text-anchor="middle">Reviewer B</text>
+  </g>
+  <g class="rise pulse" style="--i:1">
+    <rect x="836" y="108" width="190" height="130" rx="14" fill="#10222d" stroke="#37e0a8" stroke-width="2.2" filter="url(#gl-pe)"/>
+    <path d="M836 132H1026" stroke="#37e0a8" stroke-opacity=".45"/>
+    <circle cx="854" cy="120" r="3.6" fill="#37e0a8"/><circle cx="868" cy="120" r="3.6" fill="#37e0a8" fill-opacity=".7"/><circle cx="882" cy="120" r="3.6" fill="#37e0a8" fill-opacity=".4"/>
+    <rect x="856" y="150" width="105" height="8" rx="4" fill="#27475a"/><rect x="856" y="168" width="72" height="8" rx="4" fill="#27475a"/><rect x="856" y="186" width="118" height="8" rx="4" fill="#27475a"/>
+    <g transform="translate(974 188)"><path d="M0 0V26L7 20L12 31L17.5 28.5L12.5 18H21Z" fill="#8ec5d8" stroke="#fff" stroke-width="1.2"/></g>
+  </g>
+  <g class="rise" style="--i:2" opacity=".6">
+    <rect x="836" y="300" width="190" height="130" rx="14" fill="#10222d" stroke="#ffb84d" stroke-width="2.2"/>
+    <path d="M836 324H1026" stroke="#ffb84d" stroke-opacity=".45"/>
+    <circle cx="854" cy="312" r="3.6" fill="#ffb84d"/><circle cx="868" cy="312" r="3.6" fill="#ffb84d" fill-opacity=".7"/><circle cx="882" cy="312" r="3.6" fill="#ffb84d" fill-opacity=".4"/>
+    <rect x="856" y="342" width="105" height="8" rx="4" fill="#27475a"/><rect x="856" y="360" width="72" height="8" rx="4" fill="#27475a"/><rect x="856" y="378" width="118" height="8" rx="4" fill="#27475a"/>
+    
+  </g>
+  <path class="flow" d="M736 165H832" fill="none" stroke="#8ec5d8" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="3 8" stroke-opacity="1" marker-end="url(#ah-pe)"/><circle r="5.5" fill="#37e0a8" class="mdot"><animateMotion dur="2.2s" begin="0s" repeatCount="indefinite" path="M736 165H832"/></circle>
+  <path class="flow" d="M736 365H832" fill="none" stroke="#ffb84d" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="3 8" stroke-opacity="1" marker-end="url(#ah-pe)"/><circle r="5.5" fill="#ffb84d" class="mdot"><animateMotion dur="2.2s" begin="0.8s" repeatCount="indefinite" path="M736 365H832"/></circle>
+  <g class="rise" style="--i:3"><rect x="890.5" y="251" width="81" height="34" rx="17" fill="#37e0a8" fill-opacity=".16" stroke="#37e0a8" stroke-width="1.6"/><text x="931" y="274" text-anchor="middle" style="fill:#37e0a8;font-size:17px;font-weight:700">awake</text></g>
+  <g class="rise" style="--i:3"><rect x="815.5" y="443" width="231" height="34" rx="17" fill="#ffb84d" fill-opacity=".16" stroke="#ffb84d" stroke-width="1.6"/><path transform="translate(830 460)" d="M0 -9A9 9 0 1 0 9 5A7.5 7.5 0 0 1 0 -9Z" fill="#ffb84d"/><text x="939" y="466" text-anchor="middle" style="fill:#ffb84d;font-size:17px;font-weight:700">asleep, costs nothing</text></g>
+  <g class="rise" style="--i:3" opacity=".6">
+    <rect x="1066" y="128" width="104" height="84" rx="14" fill="#10222d" stroke="#27475a" stroke-width="2.2" stroke-dasharray="7 7"/>
+    <path d="M1066 152H1170" stroke="#27475a" stroke-opacity=".45"/>
+    <circle cx="1084" cy="140" r="3.6" fill="#27475a"/><circle cx="1098" cy="140" r="3.6" fill="#27475a" fill-opacity=".7"/><circle cx="1112" cy="140" r="3.6" fill="#27475a" fill-opacity=".4"/>
+    
+    
+  </g>
+  <path class="flow" d="M1030 170H1062" fill="none" stroke="#8ec5d8" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="3 8" stroke-opacity="0.6" marker-end="url(#ah-pe)"/>
+  <text x="1118" y="236" text-anchor="middle" class="sub">removed on merge</text>
+</svg></div>
+    <footer class="foot"><span>Mayfly</span><span>3</span></footer>
+    <aside class="notes" hidden>Left: one shared staging environment, so reviewers queue and ask which branch is on it. Right: every pull request gets its own link; one is awake, one is asleep, and merged previews are removed. Original diagram.</aside>
+  </article>
+</section>
+
+<section class="frame" id="s4" aria-label="Slide 4">
+  <article class="slide light">
+
+    <header class="head"><p class="kicker">The idea in one picture</p><h2><span class="w" style="--w:0">One</span> <span class="w" style="--w:1">pull</span> <span class="w" style="--w:2">request.</span> <span class="w" style="--w:3">Four</span> <span class="w" style="--w:4">things</span> <span class="w" style="--w:5">happen</span> <span class="w" style="--w:6">by</span> <span class="w" style="--w:7">themselves.</span></h2></header>
+    <div class="panel magenta"><svg class="diagram ex" viewBox="0 0 1193 490" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A pull request leads to four steps: build starts, the link lands on the PR, the preview sleeps when idle, and it is removed on close.">
+  <defs>
+    <linearGradient id="ex-pill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2fd3a1"/><stop offset="1" stop-color="#0a6a54"/></linearGradient>
+    <linearGradient id="ex-core" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c4a52"/><stop offset="1" stop-color="#07151c"/></linearGradient>
+    <linearGradient id="ex-gloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".42"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <linearGradient id="ex-sh" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <linearGradient id="ex-br" x1="0" x2="1"><stop offset="0" stop-color="#8ff3d2"/><stop offset="1" stop-color="#1fbf8f"/></linearGradient>
+    <linearGradient id="ex-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset=".5" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient>
+    <mask id="ex-fade" maskContentUnits="objectBoundingBox"><rect x="-0.1" y="-0.1" width="1.2" height="1.2" fill="url(#ex-g)"/></mask>
+    <filter id="ex-shadow" x="-30%" y="-40%" width="160%" height="200%"><feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#02100c" flood-opacity=".6"/></filter>
+    <clipPath id="ex-c0"><rect x="800" y="35" width="340" height="62" rx="31"/></clipPath><clipPath id="ex-c1"><rect x="800" y="152" width="340" height="62" rx="31"/></clipPath><clipPath id="ex-c2"><rect x="800" y="269" width="340" height="62" rx="31"/></clipPath><clipPath id="ex-c3"><rect x="800" y="386" width="340" height="62" rx="31"/></clipPath>
+  </defs>
+  <g transform="translate(44 34)"><g class="ex-card" style="--i:0"><g class="ex-float" style="--i:0" mask="url(#ex-fade)"><rect width="156" height="206" rx="16" fill="rgba(255,255,255,.2)" stroke="rgba(255,255,255,.4)"/>
+     <text x="16" y="34" class="ex-ct">PR #12</text>
+     <rect x="16" y="46" width="94" height="9" rx="4.5" fill="rgba(255,255,255,.75)"/><rect x="16" y="70" width="124" height="8" rx="4" fill="rgba(255,255,255,.55)"/><rect x="16" y="86" width="100" height="8" rx="4" fill="rgba(255,255,255,.55)"/><rect x="16" y="102" width="116" height="8" rx="4" fill="rgba(255,255,255,.55)"/><rect x="16" y="128" width="56" height="22" rx="11" fill="#37e0a8"/><text x="44" y="144" text-anchor="middle" style="fill:#0b1421;font-size:13px;font-weight:800">Open</text></g></g></g><g transform="translate(214 78)"><g class="ex-card" style="--i:1"><g class="ex-float" style="--i:1" mask="url(#ex-fade)"><rect width="156" height="206" rx="16" fill="rgba(255,255,255,.2)" stroke="rgba(255,255,255,.4)"/>
+     <rect x="14" y="16" width="128" height="86" rx="10" fill="rgba(11,20,33,.55)"/>
+     <circle cx="28" cy="29" r="3.4" fill="#ff8aa0"/><circle cx="40" cy="29" r="3.4" fill="#ffd27a"/><circle cx="52" cy="29" r="3.4" fill="#37e0a8"/>
+     <rect x="28" y="46" width="74" height="8" rx="4" fill="rgba(255,255,255,.55)"/><rect x="28" y="62" width="96" height="8" rx="4" fill="rgba(255,255,255,.55)"/><rect x="28" y="78" width="56" height="8" rx="4" fill="rgba(255,255,255,.55)"/>
+     <circle cx="26" cy="126" r="6" fill="#37e0a8"/><text x="40" y="131" class="ex-ct">Live preview</text></g></g></g><g transform="translate(44 250)"><g class="ex-card" style="--i:2"><g class="ex-float" style="--i:2" mask="url(#ex-fade)"><rect width="156" height="206" rx="16" fill="rgba(255,255,255,.2)" stroke="rgba(255,255,255,.4)"/>
+     <path transform="translate(54 70)" d="M0 -26A26 26 0 1 0 26 14A21 21 0 0 1 0 -26Z" fill="#ffb84d"/>
+     <text class="zz-ex" x="96" y="48" style="fill:#fff;font-size:20px;font-weight:700">z</text>
+     <text class="zz-ex zz-ex2" x="112" y="32" style="fill:#fff;font-size:15px;font-weight:700">z</text>
+     <text x="16" y="146" class="ex-ct">Asleep</text><rect x="16" y="160" width="90" height="8" rx="4" fill="rgba(255,255,255,.55)"/></g></g></g><g transform="translate(214 294)"><g class="ex-card" style="--i:3"><g class="ex-float" style="--i:3" mask="url(#ex-fade)"><rect width="156" height="206" rx="16" fill="rgba(255,255,255,.2)" stroke="rgba(255,255,255,.4)"/>
+     <circle cx="78" cy="62" r="30" fill="rgba(255,255,255,.22)"/><path d="M63 62l11 11 21-23" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+     <text x="16" y="132" class="ex-ct">Merged</text><rect x="16" y="146" width="76" height="22" rx="11" fill="#ff8f8f"/><text x="54" y="162" text-anchor="middle" style="fill:#0b1421;font-size:13px;font-weight:800">Removed</text></g></g></g>
+  <path class="ex-branch" style="--i:0" pathLength="1" d="M670 245 C740 245 730 66 798 66" fill="none" stroke="url(#ex-br)" stroke-width="6" stroke-linecap="round"/><path class="ex-branch" style="--i:1" pathLength="1" d="M670 245 C740 245 730 183 798 183" fill="none" stroke="url(#ex-br)" stroke-width="6" stroke-linecap="round"/><path class="ex-branch" style="--i:2" pathLength="1" d="M670 245 C740 245 730 300 798 300" fill="none" stroke="url(#ex-br)" stroke-width="6" stroke-linecap="round"/><path class="ex-branch" style="--i:3" pathLength="1" d="M670 245 C740 245 730 417 798 417" fill="none" stroke="url(#ex-br)" stroke-width="6" stroke-linecap="round"/>
+  <g class="ex-core"><g filter="url(#ex-shadow)"><rect x="440" y="199" width="230" height="92" rx="46" fill="url(#ex-core)" stroke="rgba(255,255,255,.28)" stroke-width="1.4"/></g>
+    <rect x="454" y="205" width="202" height="38" rx="23" fill="url(#ex-gloss)" opacity=".5"/>
+    <text x="555" y="257" text-anchor="middle" class="ex-c">Pull request</text></g>
+  <g class="ex-pill" style="--i:0">
+      <rect x="800" y="35" width="340" height="62" rx="31" fill="url(#ex-pill)" stroke="rgba(255,255,255,.35)" stroke-width="1.4"/>
+      <rect x="810" y="40" width="320" height="25" rx="15.5" fill="url(#ex-gloss)"/>
+      <g clip-path="url(#ex-c0)"><rect class="ex-shine" style="--i:0" x="710" y="35" width="70" height="62" fill="url(#ex-sh)" transform="skewX(-18)"/></g>
+      <circle cx="838" cy="66" r="15" fill="rgba(255,255,255,.2)"/>
+      <text x="838" y="72" text-anchor="middle" class="ex-n">1</text>
+      <text x="868" y="75" class="ex-p">Build starts</text>
+    </g><g class="ex-pill" style="--i:1">
+      <rect x="800" y="152" width="340" height="62" rx="31" fill="url(#ex-pill)" stroke="rgba(255,255,255,.35)" stroke-width="1.4"/>
+      <rect x="810" y="157" width="320" height="25" rx="15.5" fill="url(#ex-gloss)"/>
+      <g clip-path="url(#ex-c1)"><rect class="ex-shine" style="--i:1" x="710" y="152" width="70" height="62" fill="url(#ex-sh)" transform="skewX(-18)"/></g>
+      <circle cx="838" cy="183" r="15" fill="rgba(255,255,255,.2)"/>
+      <text x="838" y="189" text-anchor="middle" class="ex-n">2</text>
+      <text x="868" y="192" class="ex-p">Link lands on the PR</text>
+    </g><g class="ex-pill" style="--i:2">
+      <rect x="800" y="269" width="340" height="62" rx="31" fill="url(#ex-pill)" stroke="rgba(255,255,255,.35)" stroke-width="1.4"/>
+      <rect x="810" y="274" width="320" height="25" rx="15.5" fill="url(#ex-gloss)"/>
+      <g clip-path="url(#ex-c2)"><rect class="ex-shine" style="--i:2" x="710" y="269" width="70" height="62" fill="url(#ex-sh)" transform="skewX(-18)"/></g>
+      <circle cx="838" cy="300" r="15" fill="rgba(255,255,255,.2)"/>
+      <text x="838" y="306" text-anchor="middle" class="ex-n">3</text>
+      <text x="868" y="309" class="ex-p">Sleeps when idle</text>
+    </g><g class="ex-pill" style="--i:3">
+      <rect x="800" y="386" width="340" height="62" rx="31" fill="url(#ex-pill)" stroke="rgba(255,255,255,.35)" stroke-width="1.4"/>
+      <rect x="810" y="391" width="320" height="25" rx="15.5" fill="url(#ex-gloss)"/>
+      <g clip-path="url(#ex-c3)"><rect class="ex-shine" style="--i:3" x="710" y="386" width="70" height="62" fill="url(#ex-sh)" transform="skewX(-18)"/></g>
+      <circle cx="838" cy="417" r="15" fill="rgba(255,255,255,.2)"/>
+      <text x="838" y="423" text-anchor="middle" class="ex-n">4</text>
+      <text x="868" y="426" class="ex-p">Removed on close</text>
+    </g>
+</svg></div>
+    <footer class="foot"><span>Mayfly</span><span>4</span></footer>
+    <aside class="notes" hidden>The whole product in one frame: a pull request opens, a build starts, the link lands on the PR, the preview sleeps when idle, and it is removed when the PR closes. Original artwork in an animated explainer style.</aside>
+  </article>
+</section>
+
+<section class="frame" id="s5" aria-label="Slide 5">
+  <article class="slide light">
+
+    <header class="head"><p class="kicker">The solution</p><h2><span class="w" style="--w:0">One</span> <span class="w" style="--w:1">link</span> <span class="w" style="--w:2">per</span> <span class="w" style="--w:3">pull</span> <span class="w" style="--w:4">request,</span> <span class="w" style="--w:5">managed</span> <span class="w" style="--w:6">from</span> <span class="w" style="--w:7">open</span> <span class="w" style="--w:8">to</span> <span class="w" style="--w:9">delete.</span></h2></header>
+    <ol class="steps">
+      <li class="card step " style="--i:0"><span class="num">1</span><h3>PR opens</h3><p>A GitHub webhook tells Mayfly. It builds the PR's own Dockerfile at the exact commit.</p></li>
+      <li class="card step " style="--i:1"><span class="num">2</span><h3>Link appears</h3><p>A comment and a check on the PR carry the preview link.</p></li>
+      <li class="card step amber" style="--i:2"><span class="num">3</span><h3>Idle: sleeps</h3><p>No visits for a set time and the app stops. The link stays valid.</p></li>
+      <li class="card step " style="--i:3"><span class="num">4</span><h3>Visit: wakes</h3><p>A &quot;Waking up&quot; page shows at once, then the preview loads itself.</p></li>
+      <li class="card step " style="--i:4"><span class="num">5</span><h3>PR closes: gone</h3><p>Merge or close removes the container and image. A lifetime limit removes the rest.</p></li>
+    </ol>
+    <p class="foot-note">Works with a repository Dockerfile, or Mayfly writes one for common stacks (Next.js, Vite, Node, Flask and others). The app must listen on its port and not need root.</p>
+    <footer class="foot"><span>Mayfly</span><span>5</span></footer>
+    <aside class="notes" hidden>Walk the five steps left to right. Steps 3 and 4 are the differentiator: the link never dies, but compute is only used while someone is looking.</aside>
+  </article>
+</section>
+
+<section class="frame" id="s6" aria-label="Slide 6">
+  <article class="slide light">
+
+    <header class="head"><p class="kicker">Under the hood</p><h2><span class="w" style="--w:0">Three</span> <span class="w" style="--w:1">pull</span> <span class="w" style="--w:2">requests,</span> <span class="w" style="--w:3">three</span> <span class="w" style="--w:4">previews,</span> <span class="w" style="--w:5">each</span> <span class="w" style="--w:6">in</span> <span class="w" style="--w:7">its</span> <span class="w" style="--w:8">own</span> <span class="w" style="--w:9">state.</span></h2></header>
+    <div class="panel"><svg class="diagram" viewBox="0 0 1193 490" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three pull requests each flow through a build into their own preview: one awake, one asleep, one building. Closing or merging a pull request removes its preview.">
+  <defs>
+    <marker id="ah-pl" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#8ec5d8"/></marker>
+    <filter id="gl-pl" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="ga-pl" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="bar-pl" x1="0" x2="1"><stop offset="0" stop-color="#1fbf8f"/><stop offset="1" stop-color="#37e0a8"/></linearGradient>
+  </defs>
+  <text x="165" y="48" text-anchor="middle" class="cap">Pull request</text><text x="400" y="48" text-anchor="middle" class="cap">Build</text><text x="685" y="48" text-anchor="middle" class="cap">Preview</text><text x="1050" y="48" text-anchor="middle" class="cap">Close or merge</text><g class="rise" style="--i:0"><title>GitHub</title><path transform="translate(50 33) scale(1.5)" fill="#fff" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></g>
+  <g class="rise" style="--i:0">
+      <rect x="60" y="88" width="190" height="84" rx="14" fill="#10222d" stroke="#3f8a86" stroke-width="2"/>
+      <circle cx="86" cy="116" r="6" fill="#8ec5d8"/><path d="M86 122V152" stroke="#8ec5d8" stroke-width="2.4"/><circle cx="86" cy="154" r="6" fill="#8ec5d8"/>
+      <text x="106" y="124" class="lbl">PR #1</text><text x="106" y="152" style="fill:#9fb6bd;font-size:14px">feature/new-heading</text>
+      <rect x="326" y="88" width="148" height="84" rx="14" fill="#10222d" stroke="#3f8a86" stroke-width="2"/>
+      <text x="400" y="128" text-anchor="middle" class="lbl">Build</text><text x="400" y="154" text-anchor="middle" style="fill:#9fb6bd;font-size:14px">Dockerfile</text>
+      <rect x="560" y="88" width="250" height="84" rx="14" fill="#10222d" stroke="#37e0a8" stroke-width="2.4" filter="url(#gl-pl)"/>
+      <rect x="582" y="110" width="62" height="40" rx="7" fill="#173545" stroke="#37e0a8" stroke-opacity=".7"/><path d="M582 122H644" stroke="#37e0a8" stroke-opacity=".5"/>
+      <text x="662" y="126" class="lbl">Preview</text>
+      <g transform="translate(674 150)"><circle cx="0" cy="0" r="6" fill="#37e0a8" class="pulse"/></g>
+      <text x="694" y="156" style="fill:#37e0a8;font-size:17px;font-weight:700">Awake</text>
+    </g>
+    <path class="flow" d="M254 130H322" fill="none" stroke="#8ec5d8" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="3 8" stroke-opacity="1" marker-end="url(#ah-pl)"/><circle r="5.5" fill="#37e0a8" class="mdot"><animateMotion dur="1.8s" begin="0s" repeatCount="indefinite" path="M254 130H322"/></circle>
+    <path class="flow" d="M478 130H556" fill="none" stroke="#37e0a8" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="3 8" stroke-opacity="1" marker-end="url(#ah-pl)"/><circle r="5.5" fill="#37e0a8" class="mdot"><animateMotion dur="1.8s" begin="0.5s" repeatCount="indefinite" path="M478 130H556"/></circle>
+    <path class="flow" d="M814 130C900 130 900 255 976 255" fill="none" stroke="#8ec5d8" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="3 8" stroke-opacity="0.45" marker-end="url(#ah-pl)"/><g class="rise" style="--i:1">
+      <rect x="60" y="213" width="190" height="84" rx="14" fill="#10222d" stroke="#3f8a86" stroke-width="2"/>
+      <circle cx="86" cy="241" r="6" fill="#8ec5d8"/><path d="M86 247V277" stroke="#8ec5d8" stroke-width="2.4"/><circle cx="86" cy="279" r="6" fill="#8ec5d8"/>
+      <text x="106" y="249" class="lbl">PR #12</text><text x="106" y="277" style="fill:#9fb6bd;font-size:14px">feature/webhook-demo</text>
+      <rect x="326" y="213" width="148" height="84" rx="14" fill="#10222d" stroke="#3f8a86" stroke-width="2"/>
+      <text x="400" y="253" text-anchor="middle" class="lbl">Build</text><text x="400" y="279" text-anchor="middle" style="fill:#9fb6bd;font-size:14px">Dockerfile</text>
+      <rect x="560" y="213" width="250" height="84" rx="14" fill="#10222d" stroke="#ffb84d" stroke-width="2.4"/>
+      <rect x="582" y="235" width="62" height="40" rx="7" fill="#173545" stroke="#ffb84d" stroke-opacity=".7"/><path d="M582 247H644" stroke="#ffb84d" stroke-opacity=".5"/>
+      <text x="662" y="251" class="lbl">Preview</text>
+      <g transform="translate(674 275)"><path transform="translate(0 0)" d="M0 -9A9 9 0 1 0 9 5A7.5 7.5 0 0 1 0 -9Z" fill="#ffb84d"/></g>
+      <text x="694" y="281" style="fill:#ffb84d;font-size:17px;font-weight:700">Asleep</text>
+    </g>
+    <path class="flow" d="M254 255H322" fill="none" stroke="#8ec5d8" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="3 8" stroke-opacity="1" marker-end="url(#ah-pl)"/><circle r="5.5" fill="#37e0a8" class="mdot"><animateMotion dur="1.8s" begin="0.7s" repeatCount="indefinite" path="M254 255H322"/></circle>
+    <path class="flow" d="M478 255H556" fill="none" stroke="#ffb84d" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="3 8" stroke-opacity="1" marker-end="url(#ah-pl)"/><circle r="5.5" fill="#ffb84d" class="mdot"><animateMotion dur="1.8s" begin="1.2s" repeatCount="indefinite" path="M478 255H556"/></circle>
+    <path class="flow" d="M814 255C900 255 900 255 976 255" fill="none" stroke="#8ec5d8" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="3 8" stroke-opacity="0.45" marker-end="url(#ah-pl)"/><g class="rise" style="--i:2">
+      <rect x="60" y="338" width="190" height="84" rx="14" fill="#10222d" stroke="#3f8a86" stroke-width="2"/>
+      <circle cx="86" cy="366" r="6" fill="#8ec5d8"/><path d="M86 372V402" stroke="#8ec5d8" stroke-width="2.4"/><circle cx="86" cy="404" r="6" fill="#8ec5d8"/>
+      <text x="106" y="374" class="lbl">PR #13</text><text x="106" y="402" style="fill:#9fb6bd;font-size:14px">feature/github-live</text>
+      <rect x="326" y="338" width="148" height="84" rx="14" fill="#10222d" stroke="#3f8a86" stroke-width="2"/>
+      <text x="400" y="378" text-anchor="middle" class="lbl">Build</text><text x="400" y="404" text-anchor="middle" style="fill:#9fb6bd;font-size:14px">Dockerfile</text>
+      <rect x="560" y="338" width="250" height="84" rx="14" fill="#10222d" stroke="#4db2ff" stroke-width="2.4"/>
+      <rect x="582" y="360" width="62" height="40" rx="7" fill="#173545" stroke="#4db2ff" stroke-opacity=".7"/><path d="M582 372H644" stroke="#4db2ff" stroke-opacity=".5"/>
+      <text x="662" y="376" class="lbl">Preview</text>
+      <g transform="translate(674 400)"><circle cx="0" cy="0" r="9" fill="none" stroke="#4db2ff" stroke-width="3" stroke-dasharray="14 10" class="spin"/></g>
+      <text x="694" y="406" style="fill:#4db2ff;font-size:17px;font-weight:700">Building</text>
+    </g>
+    <path class="flow" d="M254 380H322" fill="none" stroke="#8ec5d8" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="3 8" stroke-opacity="1" marker-end="url(#ah-pl)"/><circle r="5.5" fill="#37e0a8" class="mdot"><animateMotion dur="1.8s" begin="1.4s" repeatCount="indefinite" path="M254 380H322"/></circle>
+    <path class="flow" d="M478 380H556" fill="none" stroke="#4db2ff" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="3 8" stroke-opacity="1" marker-end="url(#ah-pl)"/><circle r="5.5" fill="#4db2ff" class="mdot"><animateMotion dur="1.8s" begin="1.9s" repeatCount="indefinite" path="M478 380H556"/></circle>
+    <path class="flow" d="M814 380C900 380 900 255 976 255" fill="none" stroke="#8ec5d8" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="3 8" stroke-opacity="0.45" marker-end="url(#ah-pl)"/>
+  <g class="rise" style="--i:3">
+    <rect x="980" y="180" width="150" height="150" rx="18" fill="#10222d" stroke="#ff6b6b" stroke-opacity=".8" stroke-width="2.2"/>
+    <path d="M1030 226h50l-5 62a8 8 0 0 1-8 7h-24a8 8 0 0 1-8-7z" fill="none" stroke="#ff6b6b" stroke-width="3" stroke-linejoin="round"/><path d="M1024 226h62M1045 226v-9h20v9" fill="none" stroke="#ff6b6b" stroke-width="3" stroke-linecap="round"/>
+    <text x="1055" y="318" text-anchor="middle" class="lbl">Removed</text>
+  </g>
+  <text x="596" y="468" text-anchor="middle" class="sub">A new commit rebuilds and swaps the preview. Closing the pull request removes it.</text>
+</svg></div>
+    <footer class="foot"><span>Mayfly</span><span>6</span></footer>
+    <aside class="notes" hidden>Each pull request flows through a build into its own preview. One is awake, one is asleep, one is still building. Closing or merging the pull request removes the preview. The PR names are the real sample pull requests from our demo.</aside>
+  </article>
+</section>
+
+<section class="frame" id="s7" aria-label="Slide 7">
+  <article class="slide light">
+
+    <header class="head"><p class="kicker">Why it is cheap</p><h2><span class="w" style="--w:0">You</span> <span class="w" style="--w:1">pay</span> <span class="w" style="--w:2">for</span> <span class="w" style="--w:3">the</span> <span class="w" style="--w:4">minutes</span> <span class="w" style="--w:5">a</span> <span class="w" style="--w:6">preview</span> <span class="w" style="--w:7">is</span> <span class="w" style="--w:8">actually</span> <span class="w" style="--w:9">being</span> <span class="w" style="--w:10">used.</span></h2></header>
+    <div class="cheap">
+      <div class="stat">
+        <p class="big">7 up, 0 awake</p>
+        <p>What our own demo instance showed on 19 November: seven previews available to open, none of them consuming compute.</p>
+        <p class="small">A single instance and a handful of previews. Not a benchmark.</p>
+      </div>
+      <ul class="levers">
+        <li><h3>Sleep when idle</h3><p>The app stops after a set time with no visits (20 seconds in the sample setup). The next visit wakes it.</p></li>
+        <li><h3>Lifetime limit</h3><p>Every preview expires on a schedule (7 days in the sample setup), by repository rule or admin extension.</p></li>
+        <li><h3>Limits per developer and in total</h3><p>Cap live previews overall and per person, so one busy branch cannot fill the server.</p></li>
+        <li><h3>Budget and cost view</h3><p>Awake hours by preview, day and month, a monthly budget that can pause new previews, CSV export and optional weekly email.</p></li>
+      </ul>
+    </div>
+    <footer class="foot"><span>Mayfly</span><span>7</span></footer>
+    <aside class="notes" hidden>The 7 up / 0 awake figure is a real observation from the demo instance on the Codespace. It is not a customer result; say so.</aside>
+  </article>
+</section>
+
+<section class="frame" id="s8" aria-label="Slide 8">
+  <article class="slide light">
+
+    <header class="head"><p class="kicker">The saving</p><h2><span class="w" style="--w:0">Awake</span> <span class="w" style="--w:1">only</span> <span class="w" style="--w:2">while</span> <span class="w" style="--w:3">someone</span> <span class="w" style="--w:4">is</span> <span class="w" style="--w:5">looking.</span></h2></header>
+    <div class="panel"><svg class="diagram" viewBox="0 0 1193 490" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustration of one day. An always-on preview runs the whole day. A Mayfly preview is awake only for short stretches around three visits and asleep otherwise.">
+  <defs>
+    <marker id="ah-tl" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#8ec5d8"/></marker>
+    <filter id="gl-tl" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="ga-tl" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="bar-tl" x1="0" x2="1"><stop offset="0" stop-color="#1fbf8f"/><stop offset="1" stop-color="#37e0a8"/></linearGradient>
+  </defs>
+  <text x="60" y="62" class="h">One day, three visits</text><text x="60" y="92" class="sub">Illustration, not measured data</text>
+  <g class="rise" style="--i:0">
+    <text x="60" y="164" class="lbl">Always-on preview</text><text x="60" y="190" class="sub">runs all day</text>
+  </g>
+  <path d="M649 124l-9 -16h18z" fill="#fff"/><path d="M712 124l-9 -16h18z" fill="#fff"/><path d="M852 124l-9 -16h18z" fill="#fff"/>
+  <rect x="330" y="140" width="800" height="48" rx="14" fill="url(#bar-tl)" class="grow"/>
+  <text x="350" y="171" style="fill:#052e22;font-size:18px;font-weight:700" class="grow-text">running 24 hours</text>
+
+  <g class="rise" style="--i:1">
+    <text x="60" y="308" class="lbl">Mayfly preview</text><text x="60" y="334" class="sub">sleeps between visits</text>
+  </g>
+  <path d="M330 311H1130" stroke="#ffb84d" stroke-width="3" stroke-dasharray="3 9" stroke-linecap="round" class="flow" stroke-opacity=".8"/>
+  <rect x="637" y="288" width="26" height="46" rx="8" fill="#37e0a8" class="pulse" style="animation-delay:0s" filter="url(#gl-tl)"/><rect x="700" y="288" width="26" height="46" rx="8" fill="#37e0a8" class="pulse" style="animation-delay:0.5s" filter="url(#gl-tl)"/><rect x="840" y="288" width="26" height="46" rx="8" fill="#37e0a8" class="pulse" style="animation-delay:1s" filter="url(#gl-tl)"/>
+  <text x="713" y="268" text-anchor="middle" style="fill:#37e0a8;font-size:17px;font-weight:700">awake while someone looks</text>
+  <text x="1030" y="352" text-anchor="middle" style="fill:#ffb84d;font-size:17px;font-weight:700">asleep: no compute</text>
+  <path d="M330 396H1130" stroke="#27475a" stroke-width="2"/><path d="M330 396V408" stroke="#27475a" stroke-width="2"/><text x="330" y="436" text-anchor="middle" class="sub">00:00</text><path d="M530 396V408" stroke="#27475a" stroke-width="2"/><text x="530" y="436" text-anchor="middle" class="sub">06:00</text><path d="M730 396V408" stroke="#27475a" stroke-width="2"/><text x="730" y="436" text-anchor="middle" class="sub">12:00</text><path d="M930 396V408" stroke="#27475a" stroke-width="2"/><text x="930" y="436" text-anchor="middle" class="sub">18:00</text><path d="M1130 396V408" stroke="#27475a" stroke-width="2"/><text x="1130" y="436" text-anchor="middle" class="sub">24:00</text>
+  <text x="1130" y="96" text-anchor="end" class="sub">▼ a visit</text>
+</svg></div>
+    <footer class="foot"><span>Mayfly</span><span>8</span></footer>
+    <aside class="notes" hidden>An illustration of one day with three visits. The always-on preview runs the whole day; the Mayfly preview is awake only around the visits. This is a drawing to explain the idea, not measured data. Replace it with real numbers from a pilot.</aside>
+  </article>
+</section>
+
+<section class="frame" id="s9" aria-label="Slide 9">
+  <article class="slide light">
+
+    <header class="head"><p class="kicker">What is built</p><h2><span class="w" style="--w:0">A</span> <span class="w" style="--w:1">working</span> <span class="w" style="--w:2">product,</span> <span class="w" style="--w:3">not</span> <span class="w" style="--w:4">a</span> <span class="w" style="--w:5">mock-up.</span></h2></header>
+    <div class="grid g3 g-six">
+      <div class="card "><h3>Board and admin</h3><p>Live board with awake or asleep state, filters, a setup checklist for first preview, command palette, and admin actions: wake, sleep, extend, destroy.</p></div>
+      <div class="card "><h3>Review on the preview</h3><p>Mark a spot on a preview and comment on it. A review page with a comments panel, plus a PR comment and check with the link.</p></div>
+      <div class="card "><h3>Settings per repository</h3><p>Size, encrypted variables, optional sandbox database, smoke-check pages, and a screenshot compare against production.</p></div>
+      <div class="card "><h3>Cost and schedules</h3><p>Budget with pause at the limit, cost by repository or team, awake-hours schedules for demos, and a one-off wake before a review.</p></div>
+      <div class="card "><h3>Operations</h3><p>Health &amp; ops page, audit CSV, migrate pack and restore, chat alerts, and CPU and memory per preview.</p></div>
+      <div class="card "><h3>Installable app</h3><p>Installs from the browser on phone and desktop, with iOS Add-to-Home-Screen guidance. An Android APK build is included.</p></div>
+    </div>
+    <footer class="foot"><span>Mayfly</span><span>9</span></footer>
+    <aside class="notes" hidden>Everything here is implemented and covered by test scripts. Offer a live demo.</aside>
+  </article>
+</section>
+
+<section class="frame" id="s10" aria-label="Slide 10">
+  <article class="slide light">
+
+    <header class="head"><p class="kicker">Safe by design</p><h2><span class="w" style="--w:0">Pull-request</span> <span class="w" style="--w:1">code</span> <span class="w" style="--w:2">is</span> <span class="w" style="--w:3">untrusted,</span> <span class="w" style="--w:4">so</span> <span class="w" style="--w:5">previews</span> <span class="w" style="--w:6">are</span> <span class="w" style="--w:7">locked</span> <span class="w" style="--w:8">down.</span></h2></header>
+    <div class="grid g3 g-six">
+      <div class="card dk"><h3>Locked-down containers</h3><p>Non-root user, read-only filesystem, all capabilities dropped, no new privileges, limited memory, CPU and processes.</p></div>
+      <div class="card "><h3>Docker behind a filter</h3><p>Mayfly never holds the Docker socket. A proxy allows only containers, images and builds, and refuses exec, volumes and networks.</p></div>
+      <div class="card dk"><h3>Signed webhooks</h3><p>A missing or wrong GitHub signature is rejected and creates nothing.</p></div>
+      <div class="card "><h3>Admin access</h3><p>Every change needs the admin token. Sign-in cookies hold an expiry and a signature, never the token.</p></div>
+      <div class="card dk"><h3>Encrypted variables</h3><p>Preview variables are encrypted with AES-256-GCM and never sent back to the browser.</p></div>
+      <div class="card "><h3>Optional preview password</h3><p>A team password for preview links, with lock-out after repeated wrong guesses. Admins are never asked.</p></div>
+    </div>
+    <p class="foot-note italic">Honest limit: the Docker filter works by endpoint, so it cannot stop a deliberately privileged container. For a public server, run Docker rootless or build on a separate host.</p>
+    <footer class="foot"><span>Mayfly</span><span>10</span></footer>
+    <aside class="notes" hidden>Be upfront about the limit; it is in our own README. The recommended production setup is rootless Docker or Sysbox, or a separate build host.</aside>
+  </article>
+</section>
+
+<section class="frame" id="s11" aria-label="Slide 11">
+  <article class="slide light">
+
+    <header class="head"><p class="kicker">Where we are</p><h2><span class="w" style="--w:0">Working</span> <span class="w" style="--w:1">product</span> <span class="w" style="--w:2">today.</span> <span class="w" style="--w:3">Here</span> <span class="w" style="--w:4">is</span> <span class="w" style="--w:5">what</span> <span class="w" style="--w:6">it</span> <span class="w" style="--w:7">still</span> <span class="w" style="--w:8">needs.</span></h2></header>
+    <div class="grid g2 status">
+      <section class="card"><h3 class="ok">Working now</h3><ul class="bullets">
+        <li>Real pull-request builds (Dockerfile or auto-written for common stacks)</li>
+        <li>Sleep, wake, expiry and clean-up on close or merge</li>
+        <li>GitHub comments, checks, signed webhooks and failure help</li>
+        <li>Board, admin, cost, schedules, review, settings and Health &amp; ops</li>
+        <li>Several hosts by sharding repositories (each owns its Docker)</li>
+        <li>One-script AWS setup and automated tests on GitHub</li>
+      </ul></section>
+      <section class="card"><h3 class="warn">Before it is a business</h3><ul class="bullets">
+        <li>No shared preview pool across machines (shard repos instead)</li>
+        <li>Runtime logs stay in memory for the life of the preview, not on disk</li>
+        <li>Public board is read-only but open; no private-board mode</li>
+        <li>Single admin token; no team accounts or roles yet</li>
+        <li>No customer pilots or usage data yet</li>
+        <li>Dockerfiles that need BuildKit-only features do not build</li>
+      </ul></section>
+    </div>
+    <footer class="foot"><span>Mayfly</span><span>11</span></footer>
+    <aside class="notes" hidden>This slide builds trust. Shared pool and full user accounts are left for later; private board is the next product gap if pilots ask.</aside>
+  </article>
+</section>
+
+<section class="frame" id="s12" aria-label="Slide 12">
+  <article class="slide light">
+
+    <header class="head"><p class="kicker">Business model</p><h2><span class="w" style="--w:0">Hypotheses</span> <span class="w" style="--w:1">to</span> <span class="w" style="--w:2">test</span> <span class="w" style="--w:3">with</span> <span class="w" style="--w:4">pilots.</span> <span class="w" style="--w:5">None</span> <span class="w" style="--w:6">of</span> <span class="w" style="--w:7">this</span> <span class="w" style="--w:8">is</span> <span class="w" style="--w:9">validated</span> <span class="w" style="--w:10">yet.</span></h2></header>
+    <div class="grid g3 model">
+      <div class="card "><h3>Who it is for</h3><p>Small and mid-size engineering teams on GitHub that review work across developers, designers and QA — with a Dockerfile, or a common stack Mayfly can write one for.</p></div>
+      <div class="card amber"><h3>How it could be sold</h3><p>Self-hosted and free to run. A managed, hosted plan for teams that do not want to run servers. Support and compliance features for larger customers.</p></div>
+      <div class="card "><h3>What we would measure</h3><p>Preview infrastructure cost saved against always-on previews, review turnaround time, and share of pull requests that get a preview.</p></div>
+    </div>
+    <p class="banner">Pricing, market size and competitor comparison are intentionally left out. They need customer conversations first. Fill them in after the first pilots.</p>
+    <footer class="foot"><span>Mayfly</span><span>12</span></footer>
+    <aside class="notes" hidden>This slide is a plan, not evidence. If you present to investors or customers, add pricing and market data you can defend.</aside>
+  </article>
+</section>
+
+<section class="frame" id="s13" aria-label="Slide 13">
+  <article class="slide light">
+
+    <header class="head"><p class="kicker">What comes next</p><h2><span class="w" style="--w:0">Close</span> <span class="w" style="--w:1">the</span> <span class="w" style="--w:2">gaps,</span> <span class="w" style="--w:3">then</span> <span class="w" style="--w:4">prove</span> <span class="w" style="--w:5">it</span> <span class="w" style="--w:6">with</span> <span class="w" style="--w:7">real</span> <span class="w" style="--w:8">teams.</span></h2></header>
+    <ul class="roadmap">
+      <li><span class="pill now">Now</span><p>Pilot with two or three teams on the AWS test setup. Collect cost and review-time numbers.</p></li>
+      <li><span class="pill next">Next</span><p>Optional private board, and durable preview logs if pilots need them after a restart.</p></li>
+      <li><span class="pill later">Later</span><p>Shared multi-server pool, full user accounts, and a managed hosted option.</p></li>
+    </ul>
+    <footer class="foot"><span>Mayfly</span><span>13</span></footer>
+    <aside class="notes" hidden>Keep the roadmap short and tied to the gaps on the status slide. Multi-server pool and user accounts stay in Later.</aside>
+  </article>
+</section>
+
+<section class="frame" id="s14" aria-label="Slide 14">
+  <article class="slide dark close">
+
+    <svg class="logo mini" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Mayfly logo">
+<rect class="lg-bg" width="512" height="512" rx="115" fill="#0b1421"/>
+<path class="lg-ring" pathLength="1" d="M310 101H195A90 90 0 0 0 105 191V322A90 90 0 0 0 195 412H324A90 90 0 0 0 414 322V205" fill="none" stroke="#e6efea" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+<g class="lg-m" fill="none" stroke="#e6efea" stroke-width="35" stroke-linecap="round" stroke-linejoin="round"><path d="M179 296V230M179 264Q179 222 220 222Q258 222 258 264V296M258 264Q258 222 298 222Q338 222 338 264V296"/></g>
+<g fill="#3ddfb4"><circle class="lg-d lg-d1" cx="347" cy="160" r="22"/><circle class="lg-d lg-d2" cx="386" cy="130" r="14"/><circle class="lg-d lg-d3" cx="414" cy="104" r="10"/><circle class="lg-d lg-d4" cx="437" cy="84" r="7"/></g>
+</svg>
+    <h1>See it run</h1>
+    <p class="lede">Open a pull request. Get a link. Let it sleep. Merge, and it is gone.</p>
+    <div class="ask"><p class="ask-h">The ask</p><p>Two or three teams for a pilot, and feedback on what blocks adoption.</p></div>
+    <div class="bar"></div><p class="tag repo"><svg class="gh" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="GitHub"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span>github.com/Meetamadhu/mayfly</span></p>
+    <div class="panel side"><svg class="diagram cl" viewBox="0 0 590 590" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The life of a preview: open a pull request, get a link, let it sleep, merge and it is gone.">
+  <defs><linearGradient id="cl-gloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".12"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
+  <path class="flow" d="M78 124V466" fill="none" stroke="#8ec5d8" stroke-width="3" stroke-linecap="round" stroke-dasharray="3 9" stroke-opacity=".7"/>
+  <circle r="6" fill="#37e0a8" class="mdot"><animateMotion dur="3.2s" repeatCount="indefinite" path="M78 124V466"/></circle>
+  <g class="cl-row" style="--i:0">
+      <rect x="140" y="40" width="400" height="96" rx="48" fill="#10222d" stroke="#8ec5d8" stroke-opacity=".7" stroke-width="2"/>
+      <rect x="154" y="46" width="372" height="40" rx="24" fill="url(#cl-gloss)"/>
+      <text x="184" y="84" class="cl-t">Open a pull request</text>
+      <text x="184" y="114" class="cl-s">Mayfly builds it at once</text>
+      <g transform="translate(78 88)"><circle r="38" fill="#10222d" stroke="#8ec5d8" stroke-width="2.6"/><path transform="translate(-17 -17) scale(2.125)" fill="#fff" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></g>
+    </g><g class="cl-row" style="--i:1">
+      <rect x="140" y="178" width="400" height="96" rx="48" fill="#10222d" stroke="#37e0a8" stroke-opacity=".7" stroke-width="2"/>
+      <rect x="154" y="184" width="372" height="40" rx="24" fill="url(#cl-gloss)"/>
+      <text x="184" y="222" class="cl-t">Get a link</text>
+      <text x="184" y="252" class="cl-s">Posted on the PR as a comment</text>
+      <g transform="translate(78 226)"><circle r="38" fill="#10222d" stroke="#37e0a8" stroke-width="2.6"/><g transform="rotate(-45)" fill="none" stroke="#37e0a8" stroke-width="3.2"><rect x="-21" y="-7" width="23" height="14" rx="7"/><rect x="-2" y="-7" width="23" height="14" rx="7"/></g></g>
+    </g><g class="cl-row" style="--i:2">
+      <rect x="140" y="316" width="400" height="96" rx="48" fill="#10222d" stroke="#ffb84d" stroke-opacity=".7" stroke-width="2"/>
+      <rect x="154" y="322" width="372" height="40" rx="24" fill="url(#cl-gloss)"/>
+      <text x="184" y="360" class="cl-t">Let it sleep</text>
+      <text x="184" y="390" class="cl-s">No visits, no compute</text>
+      <g transform="translate(78 364)"><circle r="38" fill="#10222d" stroke="#ffb84d" stroke-width="2.6"/><path d="M0 -15A15 15 0 1 0 15 9A12.5 12.5 0 0 1 0 -15Z" fill="#ffb84d"/></g>
+    </g><g class="cl-row" style="--i:3">
+      <rect x="140" y="454" width="400" height="96" rx="48" fill="#10222d" stroke="#ff6b6b" stroke-opacity=".7" stroke-width="2"/>
+      <rect x="154" y="460" width="372" height="40" rx="24" fill="url(#cl-gloss)"/>
+      <text x="184" y="498" class="cl-t">Merge, and it is gone</text>
+      <text x="184" y="528" class="cl-s">Container and image removed</text>
+      <g transform="translate(78 502)"><circle r="38" fill="#10222d" stroke="#ff6b6b" stroke-width="2.6"/><path d="M-13 -9H13M-5 -9V-14H5V-9M-10 -9L-8 15H8L10 -9" fill="none" stroke="#ff6b6b" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></g>
+    </g>
+</svg></div>
+    <footer class="foot"><span>Mayfly</span><span>14</span></footer>
+    <aside class="notes" hidden>End with a demo and a concrete ask.</aside>
+  </article>
+</section>
+</main>
+<script>
+/* Replays a slide's animations each time it scrolls into view. */
+if ("IntersectionObserver" in window) {
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      e.target.classList.toggle("inview", e.isIntersecting);
+      e.target.querySelectorAll(".logo").forEach(function (l) { l.classList.toggle("play", e.isIntersecting); });
+    });
+  }, { threshold: 0.55 });
+  document.querySelectorAll(".slide").forEach(function (el) { io.observe(el); });
+}
+</script>
+</body>
+</html>

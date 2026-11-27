@@ -5,6 +5,7 @@ import type { PreviewResources } from "@/lib/resources";
 import type { Environment, EnvironmentStatus, UsageDay, UsageMonth } from "@/lib/types";
 import { formatBytes, loadTone } from "@/lib/use-resources";
 import { isProblemLine, summarizeFailure } from "@/lib/build-log";
+import { explainFailure } from "@/lib/failure-help";
 import { formatAgoRounded, timelineOldestFirst } from "@/lib/timeline";
 
 /** Building blocks shared by the Dashboard, Activity, Cost & savings and Admin pages. */
@@ -318,10 +319,23 @@ export function EnvironmentCard({
 /** On a failed card, always visible: what failed, and the line most likely to say why. */
 export function FailureSummary({ error, signedIn }: { error: string; signedIn: boolean }) {
   const { headline, hint } = summarizeFailure(error);
+  const help = explainFailure(error);
   return (
     <div className="fail-summary">
       <strong>{headline}</strong>
       {hint ? <code>{hint}</code> : null}
+      {help ? (
+        // Plain words for everyone, including people who can't open the build log.
+        <div className="fail-help">
+          <p className="fail-help-title">{help.title}</p>
+          <p className="fail-help-label">What to try</p>
+          <ol>
+            {help.steps.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+        </div>
+      ) : null}
       {signedIn ? null : (
         // Visitors only get the first line: build output can include internal paths or values.
         <span className="fail-summary-note">
@@ -372,6 +386,98 @@ export function BuildLog({ error }: { error: string }) {
             {"\n"}
           </span>
         ))}
+      </pre>
+    </div>
+  );
+}
+
+type AppLogState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "ready"; lines: string[]; at: number }
+  | { status: "error"; message: string };
+
+/**
+ * For admins, on a running preview: what the app printed (its console output), read from the preview's gate on
+ * demand. A page that is blank or an error that only shows once the app runs is usually explained in these lines.
+ */
+export function AppLog({ envId }: { envId: string }) {
+  const [log, setLog] = useState<AppLogState>({ status: "idle" });
+  const [copied, setCopied] = useState(false);
+  const boxRef = useRef<HTMLPreElement>(null);
+
+  async function load() {
+    setLog({ status: "loading" });
+    try {
+      const response = await fetch(`/api/environments/${encodeURIComponent(envId)}/logs`, { credentials: "include", cache: "no-store" });
+      const body = (await response.json().catch(() => ({}))) as { ok?: boolean; lines?: string[]; error?: string };
+      if (response.ok && body.ok && Array.isArray(body.lines)) setLog({ status: "ready", lines: body.lines, at: Date.now() });
+      else setLog({ status: "error", message: body.error ?? "Couldn't read the app's output. Please try again." });
+    } catch {
+      setLog({ status: "error", message: "Couldn't read the app's output. Please try again." });
+    }
+  }
+
+  useEffect(() => {
+    // The newest lines are at the end, so start there.
+    const box = boxRef.current;
+    if (box) box.scrollTop = box.scrollHeight;
+  }, [log]);
+
+  async function copy() {
+    if (log.status !== "ready") return;
+    try {
+      await navigator.clipboard.writeText(log.lines.join("\n"));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  if (log.status === "idle" || log.status === "loading") {
+    return (
+      <button type="button" className="pd-btn pd-btn-line" disabled={log.status === "loading"} onClick={() => void load()}>
+        {log.status === "loading" ? "Reading…" : "Show what the app printed"}
+      </button>
+    );
+  }
+  if (log.status === "error") {
+    return (
+      <div>
+        <p className="pd-hint" role="alert">
+          {log.message}
+        </p>
+        <button type="button" className="pd-btn pd-btn-line" onClick={() => void load()}>
+          Try again
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="build-log">
+      <div className="build-log-head">
+        <span>{log.lines.length === 0 ? "Nothing printed yet" : `Last ${log.lines.length} ${log.lines.length === 1 ? "line" : "lines"} the app printed`}</span>
+        <span className="build-log-actions">
+          <button type="button" className="build-log-copy" onClick={() => void load()}>
+            Refresh
+          </button>
+          {log.lines.length > 0 ? (
+            <button type="button" className="build-log-copy" onClick={() => void copy()}>
+              {copied ? "Copied" : "Copy"}
+            </button>
+          ) : null}
+        </span>
+      </div>
+      <pre className="build-log-box" ref={boxRef} tabIndex={0} aria-label="App output">
+        {log.lines.length === 0
+          ? "The app hasn't printed anything since it last started."
+          : log.lines.map((line, index) => (
+              <span key={index} className={isProblemLine(line) ? "build-log-problem" : undefined}>
+                {line}
+                {"\n"}
+              </span>
+            ))}
       </pre>
     </div>
   );

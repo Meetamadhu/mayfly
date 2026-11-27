@@ -12,7 +12,29 @@ import { PREVIEW_SIZES, SIZE_INFO, type PreviewSize } from "@/lib/sizes";
  */
 
 type VarView = { name: string; build: boolean; updatedAt: string; readable: boolean };
-type RepoView = { repository: string; size: PreviewSize; vars: VarView[]; updatedAt: string | null; livePreviews: number };
+type CheckView = { path: string; expectStatus: number; contains?: string };
+type DbView = { kind: "postgres" | "mongo"; envName: string; seed: "empty" | "template" | "script"; template?: string; script?: string };
+type RepoView = {
+  repository: string;
+  size: PreviewSize;
+  vars: VarView[];
+  productionUrl: string | null;
+  smoke: CheckView[];
+  database: DbView | null;
+  databaseProblem: string | null;
+  updatedAt: string | null;
+  livePreviews: number;
+};
+
+type CheckRow = { key: number; path: string; status: string; contains: string };
+type DbForm = { kind: "none" | "postgres" | "mongo"; envName: string; seed: "empty" | "template" | "script"; template: string; script: string };
+
+const DEFAULT_DB_NAME = { postgres: "DATABASE_URL", mongo: "MONGODB_URI" } as const;
+
+function dbFormFor(view: RepoView | undefined): DbForm {
+  const db = view?.database;
+  return { kind: db?.kind ?? "none", envName: db?.envName ?? "", seed: db?.seed ?? "empty", template: db?.template ?? "", script: db?.script ?? "" };
+}
 type Overview = {
   keyConfigured: boolean;
   githubConnected: boolean;
@@ -31,6 +53,12 @@ function rowsFor(view: RepoView | undefined): Row[] {
   return (view?.vars ?? []).map((item) => newRow({ name: item.name, saved: item, build: item.build }));
 }
 
+const newCheck = (over: Partial<CheckRow> = {}): CheckRow => ({ key: (rowKey += 1), path: "/", status: "200", contains: "", ...over });
+
+function checksFor(view: RepoView | undefined): CheckRow[] {
+  return (view?.smoke ?? []).map((item) => newCheck({ path: item.path, status: String(item.expectStatus), contains: item.contains ?? "" }));
+}
+
 function day(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
@@ -43,6 +71,9 @@ export function PreviewSettingsPage() {
   const [typed, setTyped] = useState("");
   const [size, setSize] = useState<PreviewSize>("standard");
   const [rows, setRows] = useState<Row[]>([]);
+  const [productionUrl, setProductionUrl] = useState("");
+  const [checks, setChecks] = useState<CheckRow[]>([]);
+  const [db, setDb] = useState<DbForm>(dbFormFor(undefined));
   const [paste, setPaste] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +89,9 @@ export function PreviewSettingsPage() {
     setTyped(next);
     setSize(view?.size ?? "standard");
     setRows(rowsFor(view));
+    setProductionUrl(view?.productionUrl ?? "");
+    setChecks(checksFor(view));
+    setDb(dbFormFor(view));
     setPaste(null);
     setConfirmClear(false);
     setDirty(false);
@@ -82,6 +116,21 @@ export function PreviewSettingsPage() {
     setRows((list) => list.map((row) => (row.key === key ? { ...row, ...change } : row)));
     setDirty(true);
     setNotice(null);
+  }
+
+  function touch() {
+    setDirty(true);
+    setNotice(null);
+  }
+
+  function editCheck(key: number, change: Partial<CheckRow>) {
+    setChecks((list) => list.map((row) => (row.key === key ? { ...row, ...change } : row)));
+    touch();
+  }
+
+  function editDb(change: Partial<DbForm>) {
+    setDb((form) => ({ ...form, ...change }));
+    touch();
   }
 
   function choose(next: string) {
@@ -134,6 +183,19 @@ export function PreviewSettingsPage() {
       }
       vars.push(keeps ? { name, build: row.build } : { name, value: row.value, build: row.build });
     }
+    const smoke = checks
+      .filter((row) => row.path.trim() || row.contains.trim())
+      .map((row) => ({ path: row.path.trim(), expectStatus: row.status.trim() || "200", ...(row.contains.trim() ? { contains: row.contains } : {}) }));
+    const database =
+      db.kind === "none"
+        ? null
+        : {
+            kind: db.kind,
+            envName: db.envName.trim(),
+            seed: db.seed,
+            ...(db.seed === "template" ? { template: db.template.trim() } : {}),
+            ...(db.seed === "script" ? { script: db.script } : {}),
+          };
     setBusy(true);
     try {
       const [owner, name] = repository.split("/");
@@ -141,7 +203,7 @@ export function PreviewSettingsPage() {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ size, vars }),
+        body: JSON.stringify({ size, vars, productionUrl: productionUrl.trim() || null, smoke, database }),
       });
       const body = (await response.json().catch(() => ({}))) as Overview & { ok?: boolean; error?: string };
       if (!response.ok || !body.ok) throw new Error(body.error || "The settings weren't saved. Try again.");
@@ -398,6 +460,146 @@ export function PreviewSettingsPage() {
                     <strong>Needed while building</strong> is for values the app bakes in when it builds, like <code>NEXT_PUBLIC_</code> ones. They
                     can end up inside the built app, so only tick it for values that aren&apos;t secret.
                   </p>
+                </fieldset>
+
+                <fieldset className="ps-vars ps-section">
+                  <legend>Database for each preview</legend>
+                  <p className="help">
+                    Give every preview its own empty or seeded database, so a pull request never touches real data. Its address goes to the app in
+                    the variable below.
+                  </p>
+                  <div className="ps-seg" role="radiogroup" aria-label="Database">
+                    {(["none", "postgres", "mongo"] as const).map((kind) => (
+                      <label key={kind} className="ps-check" data-on={db.kind === kind ? "1" : undefined}>
+                        <input type="radio" name="ps-db" checked={db.kind === kind} onChange={() => editDb({ kind })} />
+                        {kind === "none" ? "None" : kind === "postgres" ? "Postgres" : "MongoDB"}
+                      </label>
+                    ))}
+                  </div>
+                  {db.kind !== "none" ? (
+                    <>
+                      {current?.databaseProblem ? (
+                        <p className="ps-banner ps-banner-key" role="status">
+                          {current.databaseProblem}
+                        </p>
+                      ) : null}
+                      <label className="ps-cell">
+                        <span>Variable the app reads</span>
+                        <input
+                          className="mono"
+                          value={db.envName}
+                          placeholder={DEFAULT_DB_NAME[db.kind]}
+                          spellCheck={false}
+                          autoComplete="off"
+                          maxLength={100}
+                          onChange={(event) => editDb({ envName: event.target.value.replace(/\s/g, "") })}
+                        />
+                      </label>
+                      <label className="ps-cell">
+                        <span>Starts with</span>
+                        <select value={db.seed} onChange={(event) => editDb({ seed: event.target.value as DbForm["seed"] })}>
+                          <option value="empty">Nothing (an empty database)</option>
+                          <option value="template">A copy of a template database</option>
+                          <option value="script">{db.kind === "postgres" ? "The result of a SQL script" : "Documents from a JSON file"}</option>
+                        </select>
+                      </label>
+                      {db.seed === "template" ? (
+                        <label className="ps-cell">
+                          <span>Template database name</span>
+                          <input className="mono" value={db.template} placeholder="shop_seed" spellCheck={false} autoComplete="off" onChange={(event) => editDb({ template: event.target.value })} />
+                        </label>
+                      ) : null}
+                      {db.seed === "script" ? (
+                        <label className="ps-cell">
+                          <span>{db.kind === "postgres" ? "SQL, run once on each new database" : 'JSON like { "users": [ { "name": "Ann" } ] }'}</span>
+                          <textarea rows={8} className="mono" spellCheck={false} value={db.script} onChange={(event) => editDb({ script: event.target.value })} />
+                        </label>
+                      ) : null}
+                      <p className="help ps-build-help">
+                        Each preview gets its own database and its own login that can reach only that database. They&apos;re removed when the pull
+                        request closes. Seed with test data only: it is saved with these settings, and the preview&apos;s code can read it.
+                      </p>
+                    </>
+                  ) : null}
+                </fieldset>
+
+                <fieldset className="ps-vars ps-section">
+                  <legend>Checks on each preview</legend>
+                  <p className="help">
+                    Once a preview is ready, Mayfly opens these pages and posts the result on the pull request as a check. By default it checks that
+                    the home page answers 200.
+                  </p>
+                  {checks.length ? (
+                    <ul className="ps-rows">
+                      {checks.map((row) => (
+                        <li key={row.key} className="ps-row">
+                          <label className="ps-cell">
+                            <span>Page</span>
+                            <input className="mono" value={row.path} placeholder="/health" spellCheck={false} autoComplete="off" maxLength={200} onChange={(event) => editCheck(row.key, { path: event.target.value.replace(/\s/g, "") })} />
+                          </label>
+                          <label className="ps-cell">
+                            <span>Should answer</span>
+                            <input className="mono" value={row.status} inputMode="numeric" maxLength={3} onChange={(event) => editCheck(row.key, { status: event.target.value.replace(/\D/g, "") })} />
+                          </label>
+                          <label className="ps-cell ps-cell-value">
+                            <span>and contain (optional)</span>
+                            <input value={row.contains} placeholder="Welcome" maxLength={100} onChange={(event) => editCheck(row.key, { contains: event.target.value })} />
+                          </label>
+                          <div className="ps-row-tools">
+                            <button
+                              type="button"
+                              className="ps-link ps-remove"
+                              onClick={() => {
+                                setChecks((list) => list.filter((item) => item.key !== row.key));
+                                touch();
+                              }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="ps-empty">Using the default: the home page should answer 200.</p>
+                  )}
+                  <div className="ps-add">
+                    <button
+                      type="button"
+                      className="np-secondary"
+                      disabled={checks.length >= 10}
+                      onClick={() => {
+                        setChecks((list) => [...list, newCheck({ path: list.length ? "" : "/" })]);
+                        touch();
+                      }}
+                    >
+                      + Add a page to check
+                    </button>
+                  </div>
+                </fieldset>
+
+                <fieldset className="ps-vars ps-section">
+                  <legend>Compare with production</legend>
+                  <p className="help">
+                    Add your live site&apos;s address and Mayfly screenshots it next to each preview, and shows how much of the page changed. Needs
+                    Chrome or Edge on the server.
+                  </p>
+                  <label className="ps-cell">
+                    <span>Production address</span>
+                    <input
+                      className="mono"
+                      type="url"
+                      value={productionUrl}
+                      placeholder="https://www.example.com"
+                      spellCheck={false}
+                      autoComplete="off"
+                      maxLength={300}
+                      onChange={(event) => {
+                        setProductionUrl(event.target.value);
+                        touch();
+                      }}
+                    />
+                  </label>
                 </fieldset>
 
                 {error ? (

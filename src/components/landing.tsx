@@ -36,6 +36,40 @@ const MOMENTS: { at: number; when: string; what: string }[] = [
   { at: 100, when: "Tue 16:15", what: "Merged, and the preview is gone" },
 ];
 
+/** Footer social links: icons only. GitHub is the project; LinkedIn and X show when their public URLs are set. */
+const SOCIAL: { id: "github" | "linkedin" | "x"; label: string; href: string }[] = [
+  { id: "github", label: "GitHub", href: process.env.NEXT_PUBLIC_SOCIAL_GITHUB?.trim() || "https://github.com/Meetamadhu/mayfly" },
+  ...(process.env.NEXT_PUBLIC_SOCIAL_LINKEDIN?.trim()
+    ? [{ id: "linkedin" as const, label: "LinkedIn", href: process.env.NEXT_PUBLIC_SOCIAL_LINKEDIN.trim() }]
+    : []),
+  ...(process.env.NEXT_PUBLIC_SOCIAL_X?.trim()
+    ? [{ id: "x" as const, label: "X", href: process.env.NEXT_PUBLIC_SOCIAL_X.trim() }]
+    : []),
+];
+
+function SocialIcon({ id }: { id: "github" | "linkedin" | "x" }) {
+  const common = { width: 18, height: 18, viewBox: "0 0 24 24", "aria-hidden": true as const };
+  if (id === "github") {
+    return (
+      <svg {...common} fill="currentColor">
+        <path d="M12 .5C5.73.5.75 5.48.75 11.76c0 4.97 3.22 9.18 7.69 10.66.56.1.77-.24.77-.54 0-.27-.01-1.15-.02-2.09-3.13.68-3.79-1.33-3.79-1.33-.51-1.3-1.25-1.65-1.25-1.65-1.02-.7.08-.68.08-.68 1.13.08 1.72 1.16 1.72 1.16 1 .1.72 2.64 2.72 1.9.08-.74.39-1.25.71-1.54-2.5-.28-5.12-1.25-5.12-5.56 0-1.23.44-2.23 1.16-3.02-.12-.28-.5-1.43.11-2.98 0 0 .95-.3 3.1 1.15a10.7 10.7 0 0 1 2.82-.38c.96 0 1.92.13 2.82.38 2.15-1.45 3.1-1.15 3.1-1.15.61 1.55.23 2.7.11 2.98.72.79 1.16 1.79 1.16 3.02 0 4.32-2.63 5.27-5.14 5.55.4.35.76 1.03.76 2.08 0 1.5-.01 2.71-.01 3.08 0 .3.2.65.77.54A11.02 11.02 0 0 0 23.25 11.76C23.25 5.48 18.27.5 12 .5z" />
+      </svg>
+    );
+  }
+  if (id === "linkedin") {
+    return (
+      <svg {...common} fill="currentColor">
+        <path d="M4.98 3.5C4.98 4.88 3.86 6 2.5 6S.02 4.88.02 3.5 1.14 1 2.5 1s2.48 1.12 2.48 2.5zM.24 8.25h4.52V23H.24V8.25zM8.34 8.25h4.33v2.01h.06c.6-1.14 2.08-2.34 4.28-2.34 4.58 0 5.42 3.01 5.42 6.93V23h-4.52v-6.84c0-1.63-.03-3.73-2.27-3.73-2.28 0-2.63 1.78-2.63 3.61V23H8.34V8.25z" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...common} fill="currentColor">
+      <path d="M18.24 2.25h3.27l-7.14 8.16 8.4 11.34h-6.58l-5.15-6.73-5.9 6.73H1.88l7.64-8.72L1.5 2.25h6.75l4.66 6.16 5.33-6.16zm-1.15 17.55h1.81L7.08 4.05H5.14l11.95 15.75z" />
+    </svg>
+  );
+}
+
 /** Sample rows for the picture of the Previews page. */
 const SAMPLE: { repo: "W" | "A"; tone: string; title: string; pr: number; who: string; branch: string; state: "awake" | "asleep" | "building"; visit: string; note?: string; cost: string }[] = [
   { repo: "W", tone: "blue", title: "Add billing export", pr: 42, who: "priya", branch: "feat/export", state: "awake", visit: "12 min ago", cost: "$0.42" },
@@ -381,7 +415,7 @@ export function Landing() {
             ))}
           </ul>
           <p className="lp-who-note">
-            Best fit: small and mid-size teams that work on GitHub and keep a Dockerfile in the repository.
+            Best fit: small and mid-size teams that work on GitHub. A Dockerfile in the repository is used as it is, and Mayfly writes one for common web apps that don&apos;t have one.
           </p>
         </section>
       </div>
@@ -535,6 +569,13 @@ export function Landing() {
         </div>
         <div className="lp-footer-bottom">
           <span>© {new Date().getFullYear()} Mayfly</span>
+          <nav className="lp-footer-social" aria-label="Social">
+            {SOCIAL.map((item) => (
+              <a key={item.id} href={item.href} target="_blank" rel="noopener noreferrer" aria-label={item.label} title={item.label}>
+                <SocialIcon id={item.id} />
+              </a>
+            ))}
+          </nav>
           <span>Preview environments for pull requests</span>
         </div>
       </footer>

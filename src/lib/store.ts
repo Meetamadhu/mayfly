@@ -1,6 +1,10 @@
 import { asStoredSettings } from "./preview-settings-shape";
 import { asStoredPlan } from "./plans";
 import { asBilling } from "./billing";
+import { asBudget } from "./budget";
+import { asRepoUsage } from "./usage-shape";
+import { asSchedules } from "./schedule";
+import { asReportState } from "./weekly-report";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { asStoredPolicy } from "./policy";
@@ -41,6 +45,12 @@ export interface State {
   plan?: import("./plans").StoredPlan;
   /** Prepaid credit for Pay as you go and the Razorpay orders that added it. */
   billing?: import("./billing").Billing;
+  /** The monthly spending limit, and which alerts have been sent for it. */
+  budget?: import("./budget").BudgetSettings;
+  /** Awake hours per repository. */
+  schedules?: import("./schedule").ScheduleSettings;
+  /** Which weekly summary was sent last. */
+  reports?: import("./weekly-report").ReportState;
 }
 
 export function dataDir() {
@@ -70,8 +80,10 @@ function asUsageDay(value: unknown): import("./types").UsageDay | null {
   if (typeof raw.awakeSeconds !== "number" || !Number.isFinite(raw.awakeSeconds) || raw.awakeSeconds < 0) {
     return null;
   }
-  return { asleepSeconds: raw.asleepSeconds, awakeSeconds: raw.awakeSeconds, ...weightedOf(raw) };
+  const repos = asRepoUsage(raw.repos);
+  return { asleepSeconds: raw.asleepSeconds, awakeSeconds: raw.awakeSeconds, ...weightedOf(raw), ...(repos ? { repos } : {}) };
 }
+
 
 function asUsageDays(value: unknown): Record<string, import("./types").UsageDay> | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
@@ -115,6 +127,9 @@ export function asState(value: unknown): State {
   const previewSettings = asStoredSettings((value as State).previewSettings);
   const plan = asStoredPlan((value as State).plan);
   const billing = asBilling((value as State).billing);
+  const budget = asBudget((value as State).budget);
+  const schedules = asSchedules((value as State).schedules);
+  const reports = asReportState((value as State).reports);
   return {
     environments,
     ...(usage ? { usage } : {}),
@@ -122,6 +137,9 @@ export function asState(value: unknown): State {
     ...(previewSettings ? { previewSettings } : {}),
     ...(plan ? { plan } : {}),
     ...(billing ? { billing } : {}),
+    ...(budget ? { budget } : {}),
+    ...(schedules ? { schedules } : {}),
+    ...(reports ? { reports } : {}),
   };
 }
 

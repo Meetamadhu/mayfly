@@ -3,8 +3,10 @@ import { existsSync } from "node:fs";
 import { statfs } from "node:fs/promises";
 import { Watch, diskAlertPercent, sendAlert } from "./alerts";
 import { getConfig, previewRuntime } from "./config";
+import { instanceName, instanceRepos } from "./instance";
 import { memoryAlertPercent, serverResources } from "./resources";
 import { dataDir, loadState } from "./store";
+import { isLiveStatus } from "./types";
 
 /**
  * Health: is Mayfly able to do its job right now? Used by GET /api/health (for an uptime monitor) and by the
@@ -17,12 +19,26 @@ export interface HealthReport {
   ok: boolean;
   checkedAt: string;
   startedAt: string;
+  /** Which Mayfly this is, when more than one host is running. */
+  instance: string;
+  /** Repositories this host builds, or null when it isn't building pull requests' own code. */
+  repositories: string[] | null;
   checks: {
     storage: CheckResult;
     disk: CheckResult & { freePercent: number | null };
     docker: CheckResult;
     reaper: CheckResult;
   };
+}
+
+/** Counts for the admin ops page. Taken with the health check so one request is enough. */
+export interface OpsMetrics {
+  live: number;
+  awake: number;
+  asleep: number;
+  building: number;
+  failed: number;
+  destroyed: number;
 }
 
 type HealthMemory = {
@@ -130,10 +146,37 @@ export async function checkHealth(options: { fresh?: boolean; now?: number } = {
     ok: storage.ok && disk.ok && docker.ok && reaper.ok,
     checkedAt: new Date(now).toISOString(),
     startedAt: new Date(mem.startedAt).toISOString(),
+    instance: instanceName(),
+    repositories: instanceRepos(),
     checks: { storage, disk, docker, reaper },
   };
   mem.cached = { at: now, report };
   return report;
+}
+
+/** Preview counts for the ops page. Not cached with health, so a restore shows up straight away. */
+export async function opsMetrics(): Promise<OpsMetrics> {
+  const state = await loadState();
+  let live = 0;
+  let awake = 0;
+  let asleep = 0;
+  let building = 0;
+  let failed = 0;
+  let destroyed = 0;
+  for (const env of state.environments) {
+    if (env.status === "destroyed") {
+      destroyed += 1;
+      continue;
+    }
+    if (!isLiveStatus(env.status)) continue;
+    live += 1;
+    if (env.status === "ready") {
+      if (env.sleep === "asleep") asleep += 1;
+      else awake += 1;
+    } else if (env.status === "provisioning" || env.status === "updating") building += 1;
+    else if (env.status === "failed") failed += 1;
+  }
+  return { live, awake, asleep, building, failed, destroyed };
 }
 
 /** Called by the reaper loop after each round: alert on the way down and on the way back up. */

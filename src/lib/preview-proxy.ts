@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import { ADMIN_COOKIE, checkAdmin } from "./admin";
 import { hasPreviewAccess, passwordPage, PREVIEW_ACCESS_COOKIE, safeNext } from "./preview-access";
 import { findProxyTarget, recordActivity } from "./lifecycle";
+import { PAUSED_MESSAGE, previewsPaused } from "./budget";
 
 // Never forwarded in either direction. host is rewritten, x-mayfly-admin is a Mayfly secret.
 const HOP_BY_HOP = new Set([
@@ -233,7 +234,14 @@ const THEME_SCRIPT = `
       })();`;
 
 /** A 404 page for an address with no live preview. Repository and number come from the URL, so they are escaped. */
-function noPreview(res: Response, repository: string, pr: string, line: string, admin = false) {
+function noPreview(
+  res: Response,
+  repository: string,
+  pr: string,
+  line: string,
+  admin = false,
+  page: { status: number; title: string; word: string } = { status: 404, title: "No live preview", word: "No preview" },
+) {
   const back = backLink(admin);
   const shown = (value: string) => escapeHtml(value.length > 100 ? `${value.slice(0, 100)}…` : value);
   const body = `<!doctype html>
@@ -241,7 +249,7 @@ function noPreview(res: Response, repository: string, pr: string, line: string, 
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>No live preview</title>
+    <title>${escapeHtml(page.title)}</title>
     <style>${NOT_FOUND_STYLE}
     </style>
     <script>${THEME_SCRIPT}
@@ -260,10 +268,10 @@ function noPreview(res: Response, repository: string, pr: string, line: string, 
           <circle cx="12" cy="12" r="9" />
           <path d="M9 9l6 6M15 9l-6 6" />
         </svg>
-        <p class="word">No preview</p>
+        <p class="word">${escapeHtml(page.word)}</p>
       </header>
       <div class="body">
-        <h1>No live preview</h1>
+        <h1>${escapeHtml(page.title)}</h1>
         <p class="chips">
           <span class="chip">${shown(repository)}</span>
           <span class="chip">PR #${shown(pr)}</span>
@@ -275,11 +283,12 @@ function noPreview(res: Response, repository: string, pr: string, line: string, 
   </body>
 </html>`;
   res
-    .status(404)
+    .status(page.status)
     .set({
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
       "x-content-type-options": "nosniff",
+      ...(page.status === 503 ? { "retry-after": "3600" } : {}),
     })
     .send(body);
 }
@@ -365,6 +374,11 @@ export async function proxyPreview(req: Request, res: Response): Promise<void> {
   const target = await findProxyTarget(repository, Number(pr));
   if (!target) {
     noPreview(res, repository, pr, "This pull request was closed, expired or removed, so its preview is gone.", viewerIsAdmin(req));
+    return;
+  }
+  // The monthly budget has been reached: a visit must not wake the preview (and run up more cost).
+  if (previewsPaused() && !target.demo) {
+    noPreview(res, repository, pr, PAUSED_MESSAGE, viewerIsAdmin(req), { status: 503, title: "Previews are paused", word: "Paused" });
     return;
   }
 

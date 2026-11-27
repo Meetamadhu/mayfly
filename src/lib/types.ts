@@ -7,7 +7,6 @@ export type EnvironmentStatus =
   | "failed";
 
 export type DestroyReason = "closed" | "merged" | "idle" | "expired" | "manual" | "stuck" | "failed" | "budget";
-
 export type LifecycleAction =
   | "created"
   | "updated"
@@ -86,6 +85,14 @@ export interface Environment {
   extensions?: number;
   /** The expiry time an expiry warning was already posted for, so it is posted once per expiry. */
   warnedFor?: string | null;
+  /** A one-off wake an admin scheduled: the preview is started at `at` and kept awake for `minutes`. */
+  scheduledWake?: { at: string; minutes: number; startedAt?: string | null } | null;
+  /** The newest run of the repository's smoke checks on this preview. */
+  checks?: import("./smoke").CheckRun | null;
+  /** The newest comparison of this preview against the repository's production site. */
+  visual?: import("./visual-diff").VisualResult | null;
+  /** Until when the awake hours or a pre-wake ask this preview to stay awake. Set by the schedule, not by people. */
+  scheduleHoldUntil?: string | null;
 }
 
 /** Per-preview estimated awake/asleep accumulators. */
@@ -107,6 +114,8 @@ export interface DeploymentRecord {
   port?: number;
   /** The image this preview runs. Set only for built pull requests. */
   image?: string;
+  /** Set when a sandbox database was made for this preview (its kind), so it's removed with the preview. */
+  sandbox?: "postgres" | "mongo";
 }
 
 export interface PullRequestEvent {
@@ -167,6 +176,16 @@ export interface UsageDay {
   awakeSeconds: number;
   asleepSeconds: number;
   /** The same time weighted by each preview's size, for money. Absent on totals saved before sizes existed. */
+  awakeWeighted?: number;
+  asleepWeighted?: number;
+  /** The same day split by repository (lower case owner/name), for the cost reports. Absent on older days. */
+  repos?: Record<string, RepoUsage>;
+}
+
+/** One repository's awake/asleep time on one UTC day. */
+export interface RepoUsage {
+  awakeSeconds: number;
+  asleepSeconds: number;
   awakeWeighted?: number;
   asleepWeighted?: number;
 }

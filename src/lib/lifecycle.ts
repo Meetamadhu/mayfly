@@ -1,4 +1,21 @@
 import { previewsProtected } from "./preview-access";
+import {
+  budgetAlertFor,
+  budgetAlertText,
+  budgetStatus,
+  defaultBudget,
+  monthSpend,
+  PAUSED_MESSAGE,
+  previewsPaused,
+  setCurrentBudgetStatus,
+  type BudgetAlert,
+  type BudgetStatus,
+} from "./budget";
+import { asRepoUsage } from "./usage-shape";
+import { effectiveHold, parseWake, scheduleDecision } from "./schedule";
+import { dropSandbox } from "./sandbox-db";
+import { checkRows, isChecking, runPostDeploy, type PostDeployDeps, type Which } from "./post-deploy";
+import { settingsFor } from "./preview-settings";
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { imageTag, isBuilding } from "./builder";
@@ -16,6 +33,7 @@ import {
 } from "./config";
 import { removedBecause, withoutVisitNearWake } from "./timeline";
 import { getDeployer, previewUrl, publicPreviewUrl, type Deployment } from "./deployer";
+import { readGateLog } from "./gate-logs";
 import { pruneEnvironments } from "./prune";
 import { sendAlert } from "./alerts";
 import { postPullRequestNote, publishCommitStatus, publishPullRequestComment } from "./http";
@@ -26,7 +44,7 @@ import {
   setCurrentPolicy,
   type PreviewPolicy,
 } from "./policy";
-import { exclusive, loadState, saveState } from "./store";
+import { dataDir, exclusive, loadState, saveState } from "./store";
 import { checkNewPreview, currentPlan, monthHours } from "./plans";
 import { chargeAwake, creditLeft, razorpaySettings } from "./billing";
 import {
@@ -167,6 +185,7 @@ function readyComment(env: Environment, refreshed: boolean) {
     `| **Commit** | \`${env.sha.slice(0, 8)}\` on \`${cell(env.branch)}\`${build} |`,
     `| **Lifetime** | ${cell(lifetimeLine(env))} |`,
     `| **Sleep** | Sleeps after ${sleepWords(sleepSecondsForRepo(env.repository))} without visits and wakes on the next one. |`,
+    ...checkRows(env, `${getConfig().previewBaseUrl}/admin`),
     ...feedbackRow(env),
     "",
     `Removed when the pull request is closed or merged. ${lastUpdatedLine(at)}`,
@@ -270,6 +289,7 @@ async function statusQuietly(
     state: "error" | "failure" | "pending" | "success";
     description: string;
     targetUrl?: string | null;
+    context?: string;
   },
 ) {
   try {
@@ -277,7 +297,7 @@ async function statusQuietly(
       state: input.state,
       description: input.description,
       targetUrl: input.targetUrl,
-      context: "Mayfly — Preview",
+      context: input.context ?? "Mayfly — Preview",
     });
   } catch (error) {
     console.error("Pull request status failed", error);
@@ -412,7 +432,7 @@ async function readGate(env: Environment, deployments: DeploymentRecord[]): Prom
 export async function findProxyTarget(
   repository: string,
   prNumber: number,
-): Promise<{ envId: string; port: number } | null> {
+): Promise<{ envId: string; port: number; demo: boolean } | null> {
   const normalized = repository.trim().toLowerCase();
   const [state, deployments] = await Promise.all([
     exclusive(async () => loadState()),
@@ -429,7 +449,7 @@ export async function findProxyTarget(
   const deployment = deployments.find((item) => item.deploymentId === env.deploymentId);
   const port = deployment?.port;
   if (!port || !Number.isInteger(port) || port < 1 || port > 65535) return null;
-  return { envId: env.id, port };
+  return { envId: env.id, port, demo: isDemo(env) };
 }
 
 export async function getOverview(): Promise<Overview> {
@@ -645,9 +665,49 @@ async function runDeploy(
       targetUrl: applied.environment.url,
     });
     if (applied.commentBody) await commentQuietly(applied.environment, applied.commentBody);
+    // A new gate doesn't know about awake hours or a keep-awake that were set before this build.
+    const hold = effectiveHold(applied.environment);
+    if (hold) void tellGateKeepAwake(applied.environment, hold);
+    // Smoke checks and the comparison with production run in the background, after the preview is announced.
+    if (!isDemo(applied.environment)) void runPostDeploy(applied.environment.id, postDeployDeps());
   }
 
   return { ok: true, action, environment: applied.environment as Environment };
+}
+
+function postDeployDeps(): PostDeployDeps {
+  return {
+    load: (id) => getEnvironment(id),
+    save: (id, sha, change) =>
+      exclusive(async () => {
+        const state = await loadState();
+        const env = state.environments.find((item) => item.id === id);
+        if (!env || env.sha !== sha || env.status !== "ready") return null;
+        change(env);
+        await saveState(state);
+        return clone(env);
+      }),
+    settings: async (repository) => settingsFor((await exclusive(async () => loadState())).previewSettings, repository),
+    localUrl: async (env) => {
+      const port = await gatePortFor(env);
+      return port ? `http://127.0.0.1:${port}` : null;
+    },
+    status: (env, input) => statusQuietly(env, { ...input, targetUrl: env.url }),
+    refreshComment: refreshReadyComment,
+    dataDir: dataDir(),
+  };
+}
+
+/** Run a preview's checks and comparison again (an admin asked). Returns at once; the results land on the preview. */
+export async function recheckEnvironment(id: string, which: Which): Promise<LifecycleResult> {
+  const env = await getEnvironment(id);
+  if (!env) return { ok: false, code: "not_found", error: "That preview doesn't exist any more." };
+  if (env.status !== "ready") {
+    return { ok: false, code: "conflict", error: "Only a running preview can be checked.", environment: env };
+  }
+  if (isChecking(id)) return { ok: false, code: "conflict", error: "This preview is being checked already.", environment: env };
+  void runPostDeploy(id, postDeployDeps(), which);
+  return { ok: true, action: "unchanged", environment: env };
 }
 
 async function reserve(event: PullRequestEvent): Promise<LifecycleResult> {
@@ -657,6 +717,11 @@ async function reserve(event: PullRequestEvent): Promise<LifecycleResult> {
     const existing = findLive(state.environments, normalized.repository, normalized.prNumber);
     const now = iso();
     const expiresAt = iso(Date.now() + ttlMsFor(normalized));
+
+    // The monthly budget was reached and previews are paused: nothing new builds until it's raised or resumed.
+    if (previewsPaused() && !isDemo({ repository: normalized.repository, prNumber: normalized.prNumber } as Environment)) {
+      return { ok: false, code: "plan_cap", error: PAUSED_MESSAGE };
+    }
 
     if (existing) {
       if (existing.status === "provisioning" || existing.status === "destroying") {
@@ -916,7 +981,23 @@ export async function applyPullRequestEvent(
   return reserved;
 }
 
+/**
+ * Remove the preview's sandbox database, if its repository is set up to have one. The deployer drops the one it
+ * recorded; this covers a database made for a deploy that then failed, which has no record.
+ */
+async function dropSandboxFor(envId: string) {
+  try {
+    const state = await exclusive(async () => loadState());
+    const env = state.environments.find((item) => item.id === envId);
+    const database = env ? settingsFor(state.previewSettings, env.repository)?.database : undefined;
+    if (env && database && !isDemo(env)) await dropSandbox(database.kind, env.repository, env.prNumber);
+  } catch (error) {
+    console.error("A sandbox database couldn't be removed", error instanceof Error ? error.message : error);
+  }
+}
+
 async function finishDestroy(envId: string, deploymentId: string | null): Promise<Environment> {
+  await dropSandboxFor(envId);
   if (deploymentId) {
     try {
       await getDeployer().destroy({ deploymentId });
@@ -1057,11 +1138,13 @@ function pruneUsageDays(days: Record<string, UsageDay> | undefined, nowMs: numbe
     const asleep = value.asleepSeconds;
     if (typeof awake !== "number" || !Number.isFinite(awake) || awake < 0) continue;
     if (typeof asleep !== "number" || !Number.isFinite(asleep) || asleep < 0) continue;
+    const repos = asRepoUsage(value.repos);
     kept[key] = {
       awakeSeconds: awake,
       asleepSeconds: asleep,
       ...(typeof value.awakeWeighted === "number" ? { awakeWeighted: value.awakeWeighted } : {}),
       ...(typeof value.asleepWeighted === "number" ? { asleepWeighted: value.asleepWeighted } : {}),
+      ...(repos ? { repos } : {}),
     };
   }
   return kept;
@@ -1168,6 +1251,30 @@ async function gatePortFor(env: Environment): Promise<number | null> {
   return port && Number.isInteger(port) ? port : null;
 }
 
+export type AppLogResult =
+  | { ok: true; lines: string[]; state: string }
+  | { ok: false; code: "not_found" | "unavailable"; error: string };
+
+/**
+ * What a preview's app printed, for admins. Only Docker previews have one: it is kept by the preview's gate, from
+ * the last time the app started, and goes when the preview is removed. It does not wake a sleeping preview.
+ */
+export async function getAppLog(id: string): Promise<AppLogResult> {
+  const env = await getEnvironment(id);
+  if (!env) return { ok: false, code: "not_found", error: "No environment with that id." };
+  if (previewRuntime() !== "docker" || getConfig().deployer === "fake") {
+    return { ok: false, code: "unavailable", error: "This Mayfly doesn't run previews in Docker, so there's no app output to show." };
+  }
+  if (!isLiveStatus(env.status)) {
+    return { ok: false, code: "unavailable", error: "This preview isn't running, so its app output is gone. For a failed build, open the build log." };
+  }
+  const port = await gatePortFor(env);
+  if (!port) return { ok: false, code: "unavailable", error: "This preview has no running app yet." };
+  const log = await readGateLog(port);
+  if (!log) return { ok: false, code: "unavailable", error: "Couldn't reach this preview to read its output." };
+  return { ok: true, lines: log.lines, state: log.state };
+}
+
 /** Tell the gate on this machine to suppress idle sleep until `until` (ISO), or clear with null. */
 async function tellGateKeepAwake(env: Environment, until: string | null): Promise<boolean> {
   const port = await gatePortFor(env);
@@ -1252,7 +1359,7 @@ export async function keepAwakeEnvironment(id: string, hours: number): Promise<L
   });
   if (!reserved.ok) return reserved;
 
-  const told = await tellGateKeepAwake(reserved.environment, reserved.environment.keepAwakeUntil ?? null);
+  const told = await tellGateKeepAwake(reserved.environment, effectiveHold(reserved.environment));
   if (!told) {
     return {
       ok: false,
@@ -1286,8 +1393,78 @@ export async function keepAwakeOffEnvironment(id: string): Promise<LifecycleResu
   });
   if (!reserved.ok) return reserved;
 
-  await tellGateKeepAwake(reserved.environment, null);
+  // Awake hours or a pre-wake that still apply keep holding it.
+  await tellGateKeepAwake(reserved.environment, effectiveHold(reserved.environment));
   return { ok: true, action: "keep_awake_off", environment: reserved.environment };
+}
+
+let wasPausedForSchedule = false;
+
+/**
+ * Apply the awake hours and pre-wakes. Each tick works out, for every running preview, how long the schedule
+ * wants it held awake; when that changes the gate is told (which also starts a sleeping preview).
+ */
+export async function applyScheduling(now = Date.now()): Promise<{ told: number }> {
+  // Paused by the budget: nothing is woken. Holds are worked out again once previews are running.
+  if (previewsPaused()) {
+    wasPausedForSchedule = true;
+    return { told: 0 };
+  }
+  const afterPause = wasPausedForSchedule;
+  wasPausedForSchedule = false;
+  const toTell = await exclusive(async () => {
+    const state = await loadState();
+    const windows = state.schedules?.windows ?? [];
+    const changes: { env: Environment; until: string | null }[] = [];
+    let dirty = false;
+    for (const env of state.environments) {
+      if (env.status !== "ready" && env.status !== "updating") continue;
+      if (isDemo(env)) continue;
+      const decision = scheduleDecision(env, windows, now);
+      const hold = decision.holdUntil === null ? null : iso(decision.holdUntil);
+      let changed = false;
+      if (decision.startWake && env.scheduledWake) {
+        env.scheduledWake = { ...env.scheduledWake, startedAt: iso(now) };
+        pushEnvironmentEvent(env, { at: iso(now), type: "scheduled_wake", detail: iso(Date.parse(env.scheduledWake.at) + env.scheduledWake.minutes * 60_000) });
+        changed = true;
+      }
+      if (decision.clearWake) {
+        env.scheduledWake = null;
+        changed = true;
+      }
+      const holdChanged = hold !== (env.scheduleHoldUntil ?? null);
+      if (holdChanged) {
+        env.scheduleHoldUntil = hold;
+        changed = true;
+      }
+      // After a pause the budget put everything to sleep and cleared the gates, so tell them again.
+      if (holdChanged || (afterPause && hold !== null)) changes.push({ env: clone(env), until: effectiveHold(env, now) });
+      dirty ||= changed;
+    }
+    if (dirty) await saveState(state);
+    return changes;
+  });
+  let told = 0;
+  for (const change of toTell) if (await tellGateKeepAwake(change.env, change.until)) told += 1;
+  return { told };
+}
+
+/** Schedule a pre-wake for one preview, or cancel it with null. */
+export async function setScheduledWake(id: string, input: unknown): Promise<LifecycleResult> {
+  const parsed = input === null ? null : parseWake(input);
+  if (parsed && !parsed.ok) return { ok: false, code: "invalid", error: parsed.error };
+  return exclusive(async () => {
+    const state = await loadState();
+    const env = state.environments.find((item) => item.id === id);
+    if (!env) return { ok: false as const, code: "not_found" as const, error: "That preview doesn't exist any more." };
+    if (!isLiveStatus(env.status) || env.status === "destroying") {
+      return { ok: false as const, code: "conflict" as const, error: "This preview isn't running, so it can't be scheduled.", environment: clone(env) };
+    }
+    env.scheduledWake = parsed ? parsed.wake : null;
+    env.updatedAt = iso();
+    await saveState(state);
+    return { ok: true as const, action: "unchanged" as const, environment: clone(env) };
+  });
 }
 
 /** Ask the gate on this machine to stop the app. The public /p/ proxy is not used. */
@@ -1440,8 +1617,8 @@ export async function restorePreviews() {
         deploymentId: env.deploymentId,
         size: env.size,
       });
-      const until = env.keepAwakeUntil;
-      if (until && Date.parse(until) > Date.now()) {
+      const until = effectiveHold(env);
+      if (until) {
         const told = await tellGateKeepAwake(env, until);
         if (!told) console.error(`Keep-awake was not restored for ${env.repository}#${env.prNumber}`);
       }
@@ -1651,6 +1828,17 @@ export async function savePolicy(input: unknown): Promise<PolicySaveResult> {
   return { ok: true, view: await getPolicyView(), gates };
 }
 
+/** While previews are paused by the budget, any that are awake go to sleep (the demo is exempt). */
+async function sleepForBudget(envs: Environment[], deployments: DeploymentRecord[], gates: Map<string, GateStatus>) {
+  for (const env of envs) {
+    if (isDemo(env) || gates.get(env.id)?.sleep !== "awake") continue;
+    const port = deployments.find((item) => item.deploymentId === env.deploymentId)?.port;
+    if (!port || !Number.isInteger(port)) continue;
+    await tellGateKeepAwake(env, null);
+    await fetch(`http://127.0.0.1:${port}/__preview_sleep`, { method: "POST", cache: "no-store", signal: AbortSignal.timeout(3000) }).catch(() => {});
+  }
+}
+
 export async function reap(): Promise<ReapResult> {
   const config = getConfig();
   const now = Date.now();
@@ -1668,6 +1856,7 @@ export async function reap(): Promise<ReapResult> {
   );
 
   const warnings: Environment[] = [];
+  const budgetNotices: { alert: BudgetAlert; status: BudgetStatus }[] = [];
   const due = await exclusive(async () => {
     const state = await loadState();
     setCurrentPolicy(state.policy);
@@ -1700,14 +1889,20 @@ export async function reap(): Promise<ReapResult> {
           if (sleep !== "asleep" && sleep !== "awake") continue;
           const preview = env.usage ?? { awakeSeconds: 0, asleepSeconds: 0 };
           const weighted = elapsed * sizeWeight(env.size);
+          // The same time, split by repository, for the cost report.
+          day.repos ??= {};
+          const repoKey = env.repository.trim().toLowerCase();
+          const repoDay = (day.repos[repoKey] ??= { awakeSeconds: 0, asleepSeconds: 0 });
           if (sleep === "asleep") {
             preview.asleepSeconds += elapsed;
             addTime(usage, "asleep", elapsed, weighted);
             addTime(day, "asleep", elapsed, weighted);
+            addTime(repoDay, "asleep", elapsed, weighted);
           } else {
             preview.awakeSeconds += elapsed;
             addTime(usage, "awake", elapsed, weighted);
             addTime(day, "awake", elapsed, weighted);
+            addTime(repoDay, "awake", elapsed, weighted);
             awakeWeighted += weighted;
           }
           env.usage = preview;
@@ -1722,6 +1917,16 @@ export async function reap(): Promise<ReapResult> {
       usage.lastSampleAt = iso(now);
     }
     state.usage = usage;
+
+    // The monthly budget: where spend stands, one alert per threshold, and whether previews are paused.
+    const budget = state.budget ?? defaultBudget();
+    const budgetNow = budgetStatus(budget, monthSpend(usage, previewCostPerHour(), month), month);
+    const budgetAlert = budgetAlertFor(budget, budgetNow);
+    if (JSON.stringify(budgetAlert.notified) !== JSON.stringify(budget.notified)) {
+      state.budget = { ...budget, notified: budgetAlert.notified };
+    }
+    setCurrentBudgetStatus(budgetNow);
+    if (budgetAlert.alert) budgetNotices.push({ alert: budgetAlert.alert, status: budgetNow });
 
     // Record slept/woke from the gate's own timestamps (not the sample time). Both can land in one tick.
     for (const env of state.environments) {
@@ -1831,6 +2036,11 @@ export async function reap(): Promise<ReapResult> {
   });
 
   for (const env of warnings) await postExpiryWarning(env);
+  for (const notice of budgetNotices) {
+    const text = budgetAlertText(notice.alert, notice.status, previewCurrency());
+    void sendAlert(`budget:${notice.status.month}:${notice.alert}`, text.title, text.lines);
+  }
+  if (previewsPaused()) await sleepForBudget(sampled, deployments, gateById);
   await syncGateIdle(sampled, deployments, gateById);
 
   const destroyed: Environment[] = [];

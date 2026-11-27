@@ -3,6 +3,7 @@
 import { SIZE_INFO, hourlyRate } from "@/lib/sizes";
 import { useEffect, useRef, useState } from "react";
 import {
+  AppLog,
   BuildLog,
   FailureSummary,
   estimatedCost,
@@ -11,6 +12,7 @@ import {
   previewHref,
 } from "@/components/board-parts";
 import { StateGlyph, repoAvatar } from "@/components/previews-view";
+import { PreviewChecks, PreviewVisual, PreviewWake } from "@/components/preview-quality";
 import { detailState, endsText, lastBuildMs, statusCard, type DetailState } from "@/lib/preview-details";
 import { numbered, reviewPath } from "@/lib/review";
 import { formatEventTime, timelineLabel, timelineNewestFirst, timelineTone } from "@/lib/timeline";
@@ -346,6 +348,24 @@ function PanelBody(props: Props & { env: Environment }) {
             ) : null}
           </dl>
         </section>
+
+        {signedIn && !demo && (state === "awake" || state === "kept" || state === "asleep") ? (
+          <section aria-labelledby="pd-applog-title">
+            <h3 className="pd-heading" id="pd-applog-title">
+              App output
+            </h3>
+            <p className="pd-hint">What the app has printed to its console, if it ever fails or shows a blank page.</p>
+            <AppLog key={env.id} envId={env.id} />
+          </section>
+        ) : null}
+
+        {signedIn && !demo && live ? (
+          <>
+            <PreviewChecks env={env} busy={busy} />
+            <PreviewVisual env={env} busy={busy} />
+            <PreviewWake env={env} busy={busy} />
+          </>
+        ) : null}
 
         {signedIn && !demo && (live || (env.feedback?.length ?? 0) > 0) ? <FeedbackSection env={env} now={now} live={live} /> : null}
 

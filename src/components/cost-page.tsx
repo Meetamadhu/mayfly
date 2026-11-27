@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { cardState, estimatedCost, formatEstMoney, statePillLabel } from "@/components/board-parts";
 import { BarChart, ChartLegend, type ChartSeries } from "@/components/charts";
+import { CostControl } from "@/components/cost-control";
 import { StateGlyph, repoAvatar } from "@/components/previews-view";
 import {
   COST_PERIODS,
@@ -132,6 +133,9 @@ export function CostPage() {
       </header>
 
       {loadError ? <p className="error" role="alert">{loadError}</p> : null}
+      {error ? <p className="error" role="alert">{error}</p> : null}
+
+      {signedIn ? <CostControl period={period} currency={currency} /> : null}
 
       <section className="cost-cards" aria-label="Totals">
         <div className="cost-hero">

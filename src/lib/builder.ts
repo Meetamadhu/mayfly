@@ -2,6 +2,7 @@ import { execFile, spawn } from "node:child_process";
 import { lstat, mkdtemp, readdir, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { NO_DOCKERFILE_MESSAGE, autoDockerfileEnabled, writeAutoDockerfile } from "./auto-dockerfile";
 import { BUILD_LIMIT_MS, buildLimits } from "./config";
 
 export interface BuildRequest {
@@ -180,7 +181,7 @@ export function buildArgs(buildEnv: Record<string, string> = {}) {
   return Object.keys(buildEnv).flatMap((name) => ["--build-arg", name]);
 }
 
-function dockerBuild(tag: string, envId: string, dir: string, buildEnv: Record<string, string> = {}) {
+function dockerBuild(tag: string, envId: string, dir: string, buildEnv: Record<string, string> = {}, note?: string) {
   const limits = buildLimits();
   return new Promise<void>((resolve, reject) => {
     const tail: string[] = [];
@@ -195,7 +196,7 @@ function dockerBuild(tag: string, envId: string, dir: string, buildEnv: Record<s
     };
     const finish = (prefix: string) => {
       if (partial.trim()) tail.push(partial);
-      return new Error(hideValues([prefix, ...tail.slice(-LOG_LINES)].join("\n"), buildEnv));
+      return new Error(hideValues([prefix, ...(note ? [note] : []), ...tail.slice(-LOG_LINES)].join("\n"), buildEnv));
     };
 
     const child = spawn(
@@ -300,8 +301,15 @@ export function buildImage(request: BuildRequest): Promise<string> {
       if ((await directorySize(source)) > maxBytes) {
         throw new Error(`The repository is bigger than Mayfly's ${limits.maxRepoMb} MB limit.`);
       }
-      if (!(await hasDockerfile(source))) throw new Error("There's no Dockerfile at the top of the repository, so Mayfly doesn't know how to build it. Add one and push again.");
-      await dockerBuild(tag, request.envId, source, request.buildEnv);
+      let note: string | undefined;
+      if (!(await hasDockerfile(source))) {
+        // No Dockerfile: write one if the app is a kind Mayfly recognises, otherwise say what to add.
+        const written = autoDockerfileEnabled() ? await writeAutoDockerfile(source) : null;
+        if (!written) throw new Error(autoDockerfileEnabled() ? NO_DOCKERFILE_MESSAGE : "There's no Dockerfile at the top of the repository. Add one that listens on port 3000, and push again.");
+        note = `The repository has no Dockerfile, so Mayfly wrote one for a ${written.label}.`;
+        console.log(`${tag}: ${note}`);
+      }
+      await dockerBuild(tag, request.envId, source, request.buildEnv, note);
 
       const size = Number((await run("docker", ["image", "inspect", "--format", "{{.Size}}", tag]).catch(() => "0")).trim());
       if (size > limits.maxImageMb * MB) {

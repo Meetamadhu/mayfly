@@ -8,6 +8,7 @@ import { Lifespan, OpenedBy, cardState, previewHref, statePillLabel } from "@/co
 import { StateGlyph, repoAvatar } from "@/components/previews-view";
 import { RecentActivitySheet } from "@/components/recent-activity-sheet";
 import { READ_KEY, isUnread, readSince, recentItems } from "@/lib/recent-activity";
+import { isLocalAddress as isLocalPreviewBase } from "@/lib/setup-guide";
 import type { Environment, EnvironmentStatus, Overview } from "@/lib/types";
 import { timelineLabel, timelineNewestFirst } from "@/lib/timeline";
 
@@ -75,15 +76,6 @@ function formatAwakeUntil(iso: string) {
   const ms = Date.parse(iso);
   if (Number.isNaN(ms)) return iso;
   return new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-}
-
-function isLocalPreviewBase(url: string) {
-  try {
-    const host = new URL(url).hostname.toLowerCase();
-    return host === "localhost" || host === "127.0.0.1" || host === "::1" || host.endsWith(".localhost");
-  } catch {
-    return /localhost|127\.0\.0\.1/i.test(url);
-  }
 }
 
 type ListTab = "all" | "awake" | "asleep" | "failed";
