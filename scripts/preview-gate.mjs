@@ -297,18 +297,22 @@ function boot() {
           });
       child = spawned;
       let dockerLog = "";
-      const lines = lineSplitter();
+      // One splitter per stream so a partial stdout line is not glued onto the next stderr chunk (or the reverse).
+      const splitters = [];
       if (useDocker) {
         pushLog(`--- starting ${new Date().toISOString()} ---`);
         for (const stream of [spawned.stdout, spawned.stderr]) {
-          stream?.on("data", (chunk) => {
+          if (!stream) continue;
+          const lines = lineSplitter();
+          splitters.push(lines);
+          stream.on("data", (chunk) => {
             dockerLog = (dockerLog + chunk.toString()).slice(-20_000);
             lines.write(chunk);
           });
         }
       }
       spawned.on("exit", (code) => {
-        lines.flush();
+        for (const lines of splitters) lines.flush();
         // stopApp forgets the child before it stops it, so a child that is still current ended on its own.
         const onItsOwn = child === spawned;
         if (useDocker) pushLog(onItsOwn ? `--- the app stopped${code ? ` with exit code ${code}` : ""} ---` : "--- the app went to sleep ---");
