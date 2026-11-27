@@ -48,13 +48,14 @@ const SAMPLE: { repo: "W" | "A"; tone: string; title: string; pr: number; who: s
 
 const ACTION = { awake: "Open", asleep: "Wake", building: "Logs" } as const;
 
-/** Who the Android app is for. Everything also works in a browser. */
-const APP_PEOPLE: { title: string; text: string }[] = [
-  { title: "Reviewers, product managers and clients", text: "Open a pull request’s preview on your phone and see the change running, no laptop needed." },
-  { title: "Designers", text: "Check how a change really looks on a phone screen, mobile layouts included." },
-  { title: "QA and testers", text: "Try previews on a real device and see which are awake, asleep or failed." },
-  { title: "Team leads and admins", text: "Keep a preview awake for a demo, remove old ones and catch up on recent activity." },
-  { title: "Managers", text: "See on the Cost page how much sleeping previews are saving." },
+/** The people who use Mayfly, and what each of them does with it. */
+const WHO: { title: string; text: string }[] = [
+  { title: "Developers", text: "Open a pull request and get a live preview without setting anything up. The website does everything the Android app does." },
+  { title: "Reviewers, product managers and clients", text: "Open one link and see the real change running, on a laptop or a phone, instead of reading a diff or looking at screenshots." },
+  { title: "Designers", text: "Check how a change really looks, mobile layouts included, and pin a comment on the exact spot that looks wrong." },
+  { title: "QA and testers", text: "Test each pull request on its own preview, not on one shared staging server where changes get mixed together." },
+  { title: "Team leads and admins", text: "Keep a preview awake for a demo, remove old ones, start a preview of any branch and catch up on recent activity." },
+  { title: "Managers", text: "See on the Cost page how much sleeping previews save, and set limits so spend stays predictable." },
 ];
 /** Situations Mayfly is used in, each with the part of Mayfly that does it. */
 const USE_CASES: { title: string; text: string; feature: string }[] = [
@@ -277,9 +278,6 @@ export function Landing() {
               <span className="board-help-label">Intro</span>
             </button>
             <ThemeToggle theme={theme} onChange={chooseTheme} />
-            <a className="lp-signin lp-nav-pricing" href="/pricing">
-              Pricing
-            </a>
             {signedIn ? (
               <a className="lp-signin" href="/admin">
                 Admin
@@ -370,6 +368,24 @@ export function Landing() {
         </section>
       </div>
 
+      <div className="lp-band lp-band-who">
+        <section className="lp-section" id="who" aria-labelledby="lp-who-title">
+          <p className="lp-kicker">Who it is for</p>
+          <h2 id="lp-who-title">Everyone who needs to see the change.</h2>
+          <ul className="lp-who">
+            {WHO.map((person) => (
+              <li key={person.title}>
+                <h3>{person.title}</h3>
+                <p>{person.text}</p>
+              </li>
+            ))}
+          </ul>
+          <p className="lp-who-note">
+            Best fit: small and mid-size teams that work on GitHub and keep a Dockerfile in the repository.
+          </p>
+        </section>
+      </div>
+
       <div className="lp-band lp-band-uses">
         <section className="lp-section" id="use-cases" aria-labelledby="lp-uses-title">
           <p className="lp-kicker">Use cases</p>
@@ -391,18 +407,11 @@ export function Landing() {
           <p className="lp-kicker">Android app</p>
           <h2 id="lp-app-title">Mayfly on your phone.</h2>
           <p className="lp-app-lede">
-            For people who check or approve work on the go. Developers can keep using the website, which does everything
-            the app does.
+            For the reviewers, designers, testers and managers who check or approve work on the go: open a preview, see
+            which are awake or asleep, and keep one up for a demo. Developers can keep using the website, which does
+            everything the app does.
           </p>
           <div className="lp-app">
-            <ul className="lp-app-people">
-              {APP_PEOPLE.map((person) => (
-                <li key={person.title}>
-                  <h3>{person.title}</h3>
-                  <p>{person.text}</p>
-                </li>
-              ))}
-            </ul>
             <aside className="lp-app-get" aria-labelledby="lp-app-get-title">
               <h3 id="lp-app-get-title">Get the Android app</h3>
               <p>Opens full screen, like any other app, and keeps itself up to date: every improvement to Mayfly shows up the next time you open it.</p>
@@ -503,6 +512,7 @@ export function Landing() {
             <div>
               <h2>Product</h2>
               <a href="#how">How it works</a>
+              <a href="#who">Who it is for</a>
               <a href="#use-cases">Use cases</a>
               <a href="#app">Android app</a>
               <a href="#plans">Plans</a>
