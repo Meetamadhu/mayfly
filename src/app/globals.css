@@ -16,11 +16,12 @@
   --accent: #0f8f6b;
   --mint: #0f8f6b;
   --mint-bg: #d8f3e8;
-  /* Brand: dark teal for primary actions and selected states; mint for small accents. */
-  --brand: #0e5f52;
-  --brand-hover: #0a4b41;
-  --brand-line: #0e5f52;
-  --on-brand: #ffffff;
+  /* Brand: mint for primary actions and selected states (dark text on it, about 11:1), with a deeper green edge
+     so the button stands off a white page. Text in the brand colour uses --brand-text. */
+  --brand: #3ddbb0;
+  --brand-hover: #2fc79d;
+  --brand-line: #1aa57f;
+  --on-brand: #04130f;
   --brand-text: #0e5f52;
   --success: #0f6b4a;
   --success-bg: #d8f3e8;
@@ -77,11 +78,11 @@ html:not([data-theme="dark"]) .board-topbar {
   --glow: rgba(61, 214, 165, 0.06);
   --accent: #3cc79c;
   --mint: #3cc79c;
-  /* Brand: dark teal fills with soft mint text, edged a little lighter so they stand off the navy. */
-  --brand: #0f5c50;
-  --brand-hover: #136d5f;
-  --brand-line: #1f7f6c;
-  --on-brand: #d8f8ec;
+  /* Brand: the same mint fill as light mode, with near-black text on it (about 11:1; about 12:1 against the navy). */
+  --brand: #3ddbb0;
+  --brand-hover: #5fe6c2;
+  --brand-line: #3ddbb0;
+  --on-brand: #04130f;
   --brand-text: #5fd3ae;
   --mint-bg: #14352c;
   --success: #3dd6a5;
@@ -6379,7 +6380,7 @@ html[data-theme="dark"] .ps-warn { border-color: #c2621c; background: #9a4a12; c
 @media (max-width: 960px) { .lp-who { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 620px) { .lp-who { grid-template-columns: minmax(0, 1fr); } }
 .lp-band-uses {
-  background: radial-gradient(70% 90% at 100% 0%, rgba(61, 223, 180, 0.16), transparent 60%), linear-gradient(160deg, #0e5f52, #0a453c);
+  background: radial-gradient(70% 90% at 100% 0%, rgba(61, 223, 180, 0.12), transparent 60%), linear-gradient(160deg, #13203a, #0b1322);
   color: #eef8f4;
 }
 .lp-band-uses .lp-kicker { color: #8ff0cf; }
@@ -6631,8 +6632,8 @@ html[data-theme="dark"] .adm-btn-main,
 html[data-theme="dark"] .np-primary,
 html[data-theme="dark"] .onb-next,
 html[data-theme="dark"] .prc-body .prc-cta a {
-  background: #19a98a;
-  border-color: #19a98a;
+  background: #3ddbb0;
+  border-color: #3ddbb0;
   color: #04130f;
 }
 html[data-theme="dark"] .lp-btn:hover,
@@ -6643,13 +6644,13 @@ html[data-theme="dark"] .np-primary:hover:not(:disabled),
 html[data-theme="dark"] .onb-next:hover,
 html[data-theme="dark"] .onb-next:focus,
 html[data-theme="dark"] .prc-body .prc-cta a:hover {
-  background: #24bd9b;
-  border-color: #24bd9b;
+  background: #5fe6c2;
+  border-color: #5fe6c2;
   color: #04130f;
 }
 html[data-theme="dark"] .pv-btn-primary,
-html[data-theme="dark"] .pv-btn-primary:hover { border-color: #19a98a !important; background: #19a98a !important; color: #04130f !important; }
-html[data-theme="dark"] .pv-btn-primary:hover { background: #24bd9b !important; }
+html[data-theme="dark"] .pv-btn-primary:hover { border-color: #3ddbb0 !important; background: #3ddbb0 !important; color: #04130f !important; }
+html[data-theme="dark"] .pv-btn-primary:hover { background: #5fe6c2 !important; }
 /* The orange download button keeps its colour. */
 html[data-theme="dark"] .lp-app-get .lp-btn { background: #f5892a; border-color: #f5892a; color: #2b1300; }
 html[data-theme="dark"] .lp-app-get .lp-btn:hover { background: #ffa04a; border-color: #ffa04a; color: #2b1300; }
@@ -6704,3 +6705,39 @@ html[data-theme="dark"] .lp-app-get .lp-btn:hover { background: #ffa04a; border-
 }
 .lp-who h3 { margin: 0; }
 @media (max-width: 760px) { .lp-who > li { grid-template-columns: minmax(0, 1fr); } }
+/* ══ Light mode: the home page header is the brand navy (#0b1322, the footer's colour), so the logo, with its white
+   frame and mint dots, matches the dark theme.  The variables are reset inside the header only, which turns its
+   text, borders, Intro button and theme switch light-on-navy; the main button uses the brighter green, as in dark mode. */
+html:not([data-theme="dark"]) .lp-nav {
+  --ink: #ffffff;
+  --text: #e6edf7;
+  --muted: #c0cbe0;
+  --line: #22314f;
+  --border: #2a3b5e;
+  --paper: #0b1322;
+  --soft: #16233f;
+  --mint: #3ddbb0;
+  background: #0b1322;
+  border-bottom: 1px solid #1c2a44;
+}
+html:not([data-theme="dark"]) .lp-nav .lp-btn { background: #3ddbb0; border-color: #3ddbb0; color: #04130f; }
+html:not([data-theme="dark"]) .lp-nav .lp-btn:hover { background: #5fe6c2; border-color: #5fe6c2; color: #04130f; }
+html:not([data-theme="dark"]) .lp-nav .theme-toggle button[aria-pressed="true"] { background: #3ddbb0; color: #04130f; }
+html:not([data-theme="dark"]) .lp-nav .theme-toggle button:hover:not([aria-pressed="true"]) { background: #16233f; color: #ffffff; }
+/* Sign in: a filled button, the same pale blue-grey with navy text in light and dark mode (about 15:1), so it reads
+   clearly on the navy header and stays distinct from the green "Open dashboard". */
+.lp-nav .lp-signin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 1rem;
+  border: 1px solid #c9d6ea;
+  border-radius: 8px;
+  background: #e2eaf6;
+  color: #0b1322;
+  font-weight: 600;
+}
+.lp-nav .lp-signin:hover { background: #ffffff; border-color: #ffffff; color: #0b1322; }
+.lp-nav .lp-signin:focus-visible { outline: 2px solid #3ddbb0; outline-offset: 2px; }
+@media (max-width: 480px) { .lp-nav .lp-signin { padding: 0 0.7rem; } }
