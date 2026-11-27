@@ -25,6 +25,10 @@ import {
 } from "@/components/previews-view";
 import { NewPreviewDialog } from "@/components/new-preview-dialog";
 import { PreviewDetails } from "@/components/preview-details";
+import { EmptyPreviews } from "@/components/empty-previews";
+import { SetupGuide } from "@/components/setup-guide";
+import { NEW_PREVIEW_EVENT } from "@/components/app-shell";
+import { buildSetupSteps, setupComplete } from "@/lib/setup-guide";
 import { usualBuildMs } from "@/lib/preview-details";
 import type { Environment } from "@/lib/types";
 import { usePreviewActions, usePreviewPanel } from "@/lib/use-preview-actions";
@@ -82,6 +86,25 @@ export function Dashboard() {
     // /board?by=<github login> opens straight to one person's previews, so the link can be shared.
     const by = params.get("by")?.trim().toLowerCase().replace(/^@/, "");
     if (by && /^[a-z0-9-]{1,39}$/.test(by)) setBoardAuthor(by);
+    // Command palette "New preview" from another page lands here as /board?new=1.
+    if (params.get("new") === "1") {
+      setNewOpen(true);
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("new");
+        window.history.replaceState(null, "", url);
+      } catch {
+        // The dialog still opens.
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    function openNew() {
+      setNewOpen(true);
+    }
+    window.addEventListener(NEW_PREVIEW_EVENT, openNew);
+    return () => window.removeEventListener(NEW_PREVIEW_EVENT, openNew);
   }, []);
 
   function pickAuthor(login: string | null) {
@@ -245,6 +268,13 @@ export function Dashboard() {
         </div>
       </header>
 
+      {signedIn && config ? (
+        <SetupGuide
+          config={config}
+          previewCount={(overview?.environments ?? []).filter((env) => `${env.repository}#${env.prNumber}` !== demoKey).length}
+        />
+      ) : null}
+
       <PreviewStats overview={overview ?? null} current={current} now={now} />
 
       <PreviewTabs value={boardFilter} counts={tabCounts} onChange={setBoardFilter} />
@@ -261,7 +291,11 @@ export function Dashboard() {
       {error ? <p className="error" role="alert">{error}</p> : null}
 
       {overview && current.length === 0 ? (
-        <p className="pv-empty">No previews yet. Open a pull request on GitHub and its preview will appear here.</p>
+        <EmptyPreviews
+          signedIn={signedIn}
+          setupNeeded={Boolean(config && !setupComplete(buildSetupSteps({ config, previewCount: 0, origin: "" })))}
+          onNewPreview={signedIn ? () => setNewOpen(true) : undefined}
+        />
       ) : overview && visible.length === 0 ? (
         <p className="pv-empty">Nothing matches. Try another tab, filter or search.</p>
       ) : view === "table" && visible.length > 0 ? (

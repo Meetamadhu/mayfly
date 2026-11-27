@@ -9,10 +9,12 @@ import { eventsRouter } from "./routes/events";
 import { feedbackRouter } from "./routes/feedback";
 import { backRouter } from "./routes/back";
 import { healthRouter } from "./routes/health";
+import { opsRouter } from "./routes/ops";
 import { policyRouter } from "./routes/policy";
 import { previewRouter } from "./routes/preview";
 import { previewsRouter } from "./routes/previews";
 import { previewSettingsRouter } from "./routes/preview-settings";
+import { costControlRouter } from "./routes/cost-control";
 import { planRouter } from "./routes/plan";
 import { billingRouter } from "./routes/billing";
 import { previewAccessRouter } from "./routes/preview-access";
@@ -105,6 +107,7 @@ async function main() {
   // API + preview proxy live on Express. Mount before the Next.js catch-all.
   server.use(wellKnownRouter);
   server.use(healthRouter);
+  server.use(opsRouter);
   server.use(adminRouter);
   server.use(backupsRouter);
   server.use(environmentsRouter);
@@ -112,6 +115,7 @@ async function main() {
   server.use(eventsRouter);
   server.use(previewsRouter);
   server.use(previewSettingsRouter);
+  server.use(costControlRouter);
   server.use(planRouter);
   server.use(billingRouter);
   server.use(feedbackRouter);

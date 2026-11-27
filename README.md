@@ -34,13 +34,31 @@ Open port 3000 and go to `/board`. The first build takes a few minutes. Preview 
 
 ### Build real pull requests
 
-With `PREVIEW_RUNTIME=docker`, set `PREVIEW_REPOS` (comma-separated `owner/name`) in `.env.local`. For a pull request on a listed repository, Mayfly clones it, checks out the exact commit, builds the repo-root `Dockerfile` as `mayfly-pr-<owner>-<name>-<pr>:<sha8>` (10 minute limit, last 20 log lines in the error), and runs that image in the same locked-down container. The app must listen on `$PORT` (3000) and work as the unprivileged user `1000:1000` with a read-only filesystem where only `/tmp` is writable, so images on any base (Node, Python, nginx, Go) run as long as they do not need root. A new commit rebuilds and swaps the container; sleep and wake reuse the image; closing the pull request removes the container and the image. Other repositories fail with "Repository not allowed", a missing `Dockerfile` fails with "No Dockerfile at repo root", and fork pull requests are refused. `DEMO_PREVIEW` keeps the placeholder app. Process mode is unchanged.
+With `PREVIEW_RUNTIME=docker`, set `PREVIEW_REPOS` (comma-separated `owner/name`) in `.env.local`. For a pull request on a listed repository, Mayfly clones it, checks out the exact commit, builds the repo-root `Dockerfile` as `mayfly-pr-<owner>-<name>-<pr>:<sha8>` (10 minute limit, last 20 log lines in the error), and runs that image in the same locked-down container. The app must listen on `$PORT` (3000) and work as the unprivileged user `1000:1000` with a read-only filesystem where only `/tmp` is writable, so images on any base (Node, Python, nginx, Go) run as long as they do not need root. A new commit rebuilds and swaps the container; sleep and wake reuse the image; closing the pull request removes the container and the image. Other repositories fail with "Repository not allowed", and fork pull requests are refused. A repository with no `Dockerfile` gets one written for it (see below). `DEMO_PREVIEW` keeps the placeholder app. Process mode is unchanged.
+
+**No Dockerfile?** When there isn't one at the top of the repository, Mayfly looks at `package.json`, `requirements.txt` and the files at the top and writes one just for the build, without changing the repository. It recognises Next.js (`next start`), Vite, Create React App, Vue and Angular apps (built, then served as static files), Node.js servers with a `start` script or a `main` file, plain HTML sites, and Flask or FastAPI apps (or a `Procfile` `web:` line). The Node version comes from `engines.node` (18, 20, 22 or 24, default 22). The build log starts with a line saying the Dockerfile was written for a Next.js app, or whatever it found. If it can't tell what kind of app it is, the preview fails and says what to add. A repository's own Dockerfile is always used when it has one. Set `PREVIEW_AUTO_DOCKERFILE=false` to turn this off.
+
+**First run.** Until the steps that matter are done, the Previews page shows the admin a "Get your first preview" checklist: turn on Docker previews, list the repositories, set the public address, connect the GitHub webhook (it shows the address to paste), and open a pull request. Optional steps, like the GitHub token, don't keep it open. Each step is ticked from what the server reports, and the checklist hides itself when the steps that matter are done (or with Hide).
+
+**When something fails.** A failed preview shows a short "What to try" list under the error, written for the person who opened the pull request: the common causes (out of memory, a missing package, a base image that can't be pulled, an app that never listens on port 3000, a size limit) each get their own advice. Admins can also open a running preview's panel and press "Show what the app printed" to read its console output, which is where an app that starts and then crashes explains itself.
 
 ### Preview settings (variables and size)
 
 Admins set, for each repository, the size of previews opened from GitHub and the variables every preview gets (a test database URL, test API keys, `NEXT_PUBLIC_` values), on **Admin → Preview settings**. Values are encrypted with `MAYFLY_SECRETS_KEY` (AES-256-GCM) before they're saved, so `data/state.json`, MongoDB and backups never hold them in plain text, and they're never sent back to the browser. Without the key, variables can't be saved; `deploy/aws/setup.sh` creates one. Changing the key makes saved values unreadable: previews start without them and the page asks for them again.
 
 They're used in Docker mode only. The gate hands them to the container with `-e NAME` and the build with `--build-arg NAME` (only the ones marked "Needed while building"), with the value in Docker's environment, so no value is ever on a command line; values a Dockerfile prints are hidden in the build log. Names Mayfly or Docker rely on (`PORT`, `HOST`, `PATH`, `HOME`, `DOCKER_*`, `PREVIEW_*`, `MAYFLY_*`, `LD_*`, proxy settings and a few more) are refused. Changes apply to new previews and the next commit on open pull requests. **Every pull request's code can read its preview's variables**, so use test values only.
+
+On the same page you can also: give every preview its own empty or seeded Postgres or MongoDB database (needs `PREVIEW_DB_POSTGRES_URL` or `PREVIEW_DB_MONGO_URL`, plus `MAYFLY_SECRETS_KEY`); list smoke-check pages that must answer a given status (posted on the pull request as **Mayfly — Smoke test**); and set a production address so Mayfly screenshots the preview next to production (needs Chrome or Edge on the server, or `PREVIEW_CHROME_PATH`).
+
+### Cost and control
+
+On the **Cost** page (admins):
+
+- **Monthly budget.** Set a limit; Mayfly warns at 80% via `ALERT_WEBHOOK_URL`, and can pause previews at 100% (sleeping ones stay asleep, new ones aren't started). Resume for the rest of the month without raising the limit.
+- **Cost by repository or team.** A table for the chosen week or month, with a CSV download. Teams come from `PREVIEW_TEAMS` (`web=acme/site,acme/shop;platform=acme/infra-*`). A weekly email of hours saved needs `SMTP_URL`, `REPORT_EMAIL_FROM` and `REPORT_EMAIL_TO` (optional `REPORT_WEEKDAY` / `REPORT_HOUR_UTC`).
+- **Awake hours.** Keep a repository's previews awake on chosen days and times (for demos). On a preview's panel, schedule a one-off wake so it's warm before a review.
+
+Once a preview is ready, its panel also shows the smoke-check result, the production comparison (preview / production / differences), and the scheduled wake controls.
 
 ### Build limits and the Docker socket proxy
 
@@ -150,7 +168,7 @@ Each preview records the GitHub username of whoever opened the pull request, and
 
 ## Install as an app, and the Android APK
 
-Mayfly has a web app manifest (`/manifest.webmanifest`), so once its icons are in `public/icons` (see the README there), Chrome offers **Install app** on desktop and Android and Safari can add it to the iPhone home screen.
+Mayfly has a web app manifest (`/manifest.webmanifest`) and an apple-touch icon, so Chrome offers **Install app** on desktop and Android, and Safari on iPhone can use Share → **Add to Home Screen** (the account menu reminds you on iOS). Installed on a phone it opens full screen (`display: standalone`) with safe-area padding for the notch. The native APK is Android only; iOS uses the installed web app.
 
 The Android APK wraps the site in a Trusted Web Activity built with Bubblewrap. Its settings are in `android/twa-manifest.json` (package `com.meetamadhu.mayfly`, opening `https://mayfly-pkgs.onrender.com/board`). To build it:
 
@@ -178,6 +196,33 @@ node dist/restore.js restore <name> --yes
 ```
 
 `restore` refuses while Mayfly answers on `PORT`, and saves the current state as a `-before-restore` backup first, so a restore can be undone the same way. On the AWS setup, `deploy/aws/backup.sh` stops and starts Mayfly around it.
+
+### Move to a new server
+
+```bash
+# On the old server (Mayfly can stay up for this step):
+node dist/restore.js pack
+# Copy the printed data/migrate/… folder AND .env.local to the new server.
+
+# On the new server, with Mayfly STOPPED:
+node dist/restore.js apply /path/to/mayfly-migrate-… --yes
+# Then start Mayfly and open /api/health.
+```
+
+On the AWS compose setup, `deploy/aws/migrate.sh pack` and `deploy/aws/migrate.sh apply <folder>` stop and start Mayfly for you. Preview containers are not moved: after a restore onto a new Docker host, open pull requests rebuild on the next push.
+
+## Health & ops
+
+Signed-in admins get **Health & ops** (`/ops`): this host's name, health checks (storage, disk, Docker, clean-up loop), CPU and memory, and a CSV download of the audit log (every saved lifecycle event). Uptime monitors can hit `GET /api/health` (200 or 503). Set `MAYFLY_INSTANCE` so each host is easy to tell apart.
+
+## Several servers
+
+Each Mayfly process owns the Docker daemon on its machine. There is no shared pool that can run any preview on any host. To use more than one server, give each a **disjoint** `PREVIEW_REPOS` list, point each repository's GitHub webhook at the host that owns it, and optionally share one `MONGODB_URI` if you want one board. That is the supported way to scale out today.
+
+## Keyboard shortcuts
+
+- `Ctrl`/`⌘`+`K` or `?` — command palette (go to a page, toggle theme, New preview)
+- `/` — focus the search box on pages that have one
 
 ## Connect GitHub
 
@@ -211,7 +256,7 @@ Preview processes receive only `PATH`, `NODE_ENV` and `PREVIEW_*` variables (plu
 
 ## Known limitations
 
-Mayfly runs on one machine. Environment state is a JSON file by default, or MongoDB when `MONGODB_URI` is set. Local deployment records (`data/deployments.json`) stay on disk. On this machine each preview app can run in its own Docker container. Render has no Docker daemon, so it keeps the plain Node app. Mayfly does not save preview logs; the app's output is discarded. Process-mode and demo previews are still placeholder apps; Docker mode with `PREVIEW_REPOS` builds the pull request's own Dockerfile.
+Environment state is a JSON file by default, or MongoDB when `MONGODB_URI` is set. Local deployment records (`data/deployments.json`) stay on disk. Each preview container runs on the same machine as the Mayfly that built it; scale out by sharding repositories across hosts (see Several servers), not by a shared Docker pool. Render has no Docker daemon, so it keeps the plain Node app. Docker previews keep the last 300 lines each app printed, in the memory of that preview's gate, for admins to read in the preview's panel. They go when the preview is deleted or Mayfly restarts, values of the repository's preview variables are replaced with `[hidden]`, and nothing is written to disk. Process-mode apps' output is discarded. Process-mode and demo previews are still placeholder apps; Docker mode with `PREVIEW_REPOS` builds the pull request's own Dockerfile.
 
 ## Name
 

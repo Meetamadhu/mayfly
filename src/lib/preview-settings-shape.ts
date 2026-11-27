@@ -1,4 +1,7 @@
 import { isPreviewSize, type PreviewSize } from "./sizes";
+import { asStoredChecks, type SmokeCheck } from "./smoke";
+import { asStoredDb, type DbSettings } from "./sandbox-db";
+import { cleanProductionUrl } from "./visual-diff";
 
 /**
  * How preview settings are saved in Mayfly's state (JSON file or MongoDB). Values are encrypted (see
@@ -18,6 +21,12 @@ export interface RepoSettings {
   /** The size for this repository's previews opened from GitHub. Absent means Standard. */
   size?: PreviewSize;
   vars: StoredVar[];
+  /** The live site to compare each preview with (screenshots side by side). */
+  productionUrl?: string;
+  /** Pages to check once a preview is ready. Absent means the home page should answer 200. */
+  smoke?: SmokeCheck[];
+  /** A sandbox database for each preview. */
+  database?: DbSettings;
   updatedAt: string;
 }
 
@@ -47,9 +56,15 @@ export function asStoredSettings(value: unknown): PreviewSettings | undefined {
     if (!REPO_PATTERN.test(repository) || !entry || typeof entry !== "object") continue;
     const raw = entry as Record<string, unknown>;
     const vars = Array.isArray(raw.vars) ? raw.vars.map(asVar).filter((item): item is StoredVar => item !== null) : [];
+    const productionUrl = cleanProductionUrl(raw.productionUrl);
+    const smoke = asStoredChecks(raw.smoke);
+    const database = asStoredDb(raw.database);
     out[repository.toLowerCase()] = {
       ...(isPreviewSize(raw.size) && raw.size !== "standard" ? { size: raw.size } : {}),
       vars,
+      ...(productionUrl ? { productionUrl } : {}),
+      ...(smoke ? { smoke } : {}),
+      ...(database ? { database } : {}),
       updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : new Date(0).toISOString(),
     };
   }

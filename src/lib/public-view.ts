@@ -6,19 +6,20 @@ import type { DeploymentRecord, Environment, Overview } from "./types";
  * details (ports, pids, images) are left out. Signed-in admins get everything.
  */
 export function publicEnvironment(env: Environment): Environment {
-  const { githubCommentId: _comment, labels: _labels, feedback: _feedback, ...rest } = env;
+  // Check results and screenshots stay with the admins (they can name a production site).
+  const { githubCommentId: _comment, labels: _labels, feedback: _feedback, checks: _checks, visual: _visual, ...rest } = env;
   const firstLine = env.error?.split(/\r?\n/, 1)[0]?.trim() ?? "";
   return {
     ...rest,
     comments: [],
     // Reviewers' names stay with the admins.
-    ...(env.events ? { events: env.events.map((event) => (event.type === "feedback" ? { at: event.at, type: event.type } : event)) } : {}),
+    ...(env.events ? { events: env.events.map((event) => (event.type === "feedback" || event.type === "checks" ? { at: event.at, type: event.type } : event)) } : {}),
     error: env.error ? (firstLine.length > 200 ? `${firstLine.slice(0, 199)}…` : firstLine || "Failed.") : null,
   };
 }
 
 function publicDeployment(record: DeploymentRecord): DeploymentRecord {
-  const { pid: _pid, port: _port, image: _image, ...rest } = record;
+  const { pid: _pid, port: _port, image: _image, sandbox: _sandbox, ...rest } = record;
   return rest;
 }
 

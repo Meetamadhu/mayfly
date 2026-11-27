@@ -79,6 +79,12 @@ export function timelineLabel(event: EnvironmentEvent): string {
       return "Expiry warning posted on the PR";
     case "feedback":
       return event.detail ? `Feedback from ${event.detail}` : "Feedback left on the preview";
+    case "checks":
+      return event.detail ? `Smoke check ${event.detail}` : "Smoke check finished";
+    case "visual":
+      return event.detail ? `Compared with production: ${event.detail}` : "Compared with production";
+    case "scheduled_wake":
+      return event.detail ? `Woke for a scheduled review (until ${formatClock(event.detail)})` : "Woke for a scheduled review";
     case "failed": {
       const first = event.detail?.split("\n")[0]?.trim();
       return first ? `Couldn’t build: ${first}` : "Couldn’t build";
@@ -111,6 +117,9 @@ export function timelineTone(type: string): TimelineTone {
     case "extended":
     case "keep_awake":
     case "keep_awake_off":
+    case "scheduled_wake":
+    case "checks":
+    case "visual":
       return "time";
     case "failed":
       return "failed";

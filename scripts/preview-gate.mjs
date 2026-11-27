@@ -1,3 +1,4 @@
+
 import { execFile, spawn } from "node:child_process";
 import { createServer, request as forward } from "node:http";
 
@@ -11,6 +12,47 @@ for (const [name, value] of Object.entries(process.env)) {
   const appName = name.slice(APP_ENV_PREFIX.length);
   if (/^[A-Za-z_][A-Za-z0-9_]{0,99}$/.test(appName) && value !== undefined) appVars[appName] = value;
   delete process.env[name];
+}
+
+// What the app printed, kept in memory for admins (GET /__preview_logs, reachable only from this machine). Values
+// of the repository's preview variables are hidden before a line is kept, and short ones (under 4 characters) stay
+// so ordinary words aren't blanked. The log lives as long as this gate, so it survives sleep and wake.
+const LOG_LINES = 300;
+const LOG_LINE_CHARS = 1000;
+const appLog = [];
+const appSecrets = Object.values(appVars)
+  .flatMap((value) => [value, ...String(value).split(/\r?\n/)])
+  .map((value) => value.trim())
+  .filter((value) => value.length >= 4)
+  .sort((a, b) => b.length - a.length);
+
+function hideSecrets(text) {
+  let out = text;
+  for (const secret of appSecrets) out = out.split(secret).join("[hidden]");
+  return out;
+}
+
+function pushLog(line) {
+  const clean = hideSecrets(String(line).replace(/\s+$/, ""));
+  if (!clean.trim()) return;
+  appLog.push(clean.length > LOG_LINE_CHARS ? `${clean.slice(0, LOG_LINE_CHARS)}…` : clean);
+  if (appLog.length > LOG_LINES) appLog.splice(0, appLog.length - LOG_LINES);
+}
+
+/** A stream's output, cut into lines as it arrives. */
+function lineSplitter() {
+  let partial = "";
+  return {
+    write(chunk) {
+      const lines = (partial + chunk.toString()).split(/\r?\n/);
+      partial = lines.pop() ?? "";
+      for (const line of lines) pushLog(line);
+    },
+    flush() {
+      if (partial) pushLog(partial);
+      partial = "";
+    },
+  };
 }
 
 const port = Number(process.env.PORT);
@@ -255,16 +297,22 @@ function boot() {
           });
       child = spawned;
       let dockerLog = "";
+      const lines = lineSplitter();
       if (useDocker) {
-        spawned.stdout?.on("data", (chunk) => {
-          dockerLog += chunk.toString();
-        });
-        spawned.stderr?.on("data", (chunk) => {
-          dockerLog += chunk.toString();
-        });
+        pushLog(`--- starting ${new Date().toISOString()} ---`);
+        for (const stream of [spawned.stdout, spawned.stderr]) {
+          stream?.on("data", (chunk) => {
+            dockerLog = (dockerLog + chunk.toString()).slice(-20_000);
+            lines.write(chunk);
+          });
+        }
       }
       spawned.on("exit", (code) => {
-        if (useDocker && code) console.error(dockerLog.trim());
+        lines.flush();
+        // stopApp forgets the child before it stops it, so a child that is still current ended on its own.
+        const onItsOwn = child === spawned;
+        if (useDocker) pushLog(onItsOwn ? `--- the app stopped${code ? ` with exit code ${code}` : ""} ---` : "--- the app went to sleep ---");
+        if (useDocker && code && onItsOwn) console.error(hideSecrets(dockerLog.trim()));
         if (child === spawned) {
           child = null;
           listening = false;
@@ -525,6 +573,12 @@ const server = createServer((req, res) => {
         wokeAt,
       }),
     );
+    return;
+  }
+  // The app's recent output. Read-only, never boots the app, and not counted as activity.
+  if (req.method === "GET" && pathOnly === "/__preview_logs") {
+    res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+    res.end(JSON.stringify({ state: gateState(), lines: appLog }));
     return;
   }
   if (req.method === "POST" && pathOnly === "/__preview_sleep") {

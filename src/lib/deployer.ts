@@ -1,10 +1,12 @@
 import { sizeLimits, type PreviewSize } from "./sizes";
-import { repoEnv, type RepoEnv } from "./preview-settings";
+import { repoDatabase, repoEnv, type RepoEnv } from "./preview-settings";
+import { dropSandbox, provisionSandbox } from "./sandbox-db";
 import { execFile, spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { buildImage, imageExists, imageTag, removeImage } from "./builder";
+import { appStartError, readGateLog } from "./gate-logs";
 import { buildsPullRequests, getConfig, previewRuntime, repositoryAllowed, sleepSecondsForRepo } from "./config";
 import { createExclusive, dataDir, readJson, writeJson } from "./store";
 import type { DeploymentRecord } from "./types";
@@ -425,6 +427,8 @@ async function launch(
   try {
     await waitUntilListening(listenUrl);
   } catch (error) {
+    // The gate still has what the app printed until it is stopped, so read it first: it usually says why.
+    const printed = docker ? await readGateLog(port) : null;
     await killProcess(pid);
     if (docker) {
       await removeContainer(port + 1000);
@@ -433,6 +437,10 @@ async function launch(
         const file = await loadDeployments();
         if (!imageUsedElsewhere(file.deployments, built, deploymentId)) await removeImage(built);
       }
+    }
+    if (docker) {
+      const reason = error instanceof Error ? error.message : "no answer";
+      throw new Error(appStartError(reason, printed?.lines ?? []));
     }
     throw error;
   }
@@ -449,6 +457,7 @@ async function launch(
     pid,
     port,
     image: docker ? builtImage(image) : undefined,
+    ...((env.sandbox ?? previous?.sandbox) ? { sandbox: env.sandbox ?? previous?.sandbox } : {}),
   });
   return { deploymentId, url };
 }
@@ -464,6 +473,11 @@ async function removeDeployment(deploymentId: string) {
   if (image && !imageUsedElsewhere(file.deployments, image, deploymentId)) await removeImage(image);
   file.deployments = file.deployments.filter((item) => item.deploymentId !== deploymentId);
   await writeJson(deployFile(), file);
+  if (existing?.sandbox) {
+    await dropSandbox(existing.sandbox, existing.repository, existing.prNumber).catch((error) => {
+      console.error("A sandbox database couldn't be removed", error instanceof Error ? error.message : error);
+    });
+  }
 }
 
 /** Build or find the image; if that fails, nothing of an earlier version is left running. */
@@ -481,7 +495,16 @@ const NO_ENV: RepoEnv = { runtime: {}, build: {}, unreadable: [] };
 /** The repository's preview variables. Only Docker previews run the repository's own app; the demo gets none. */
 async function settingsEnv(input: DeployRequest): Promise<RepoEnv> {
   if (previewRuntime() !== "docker" || isDemoRequest(input)) return NO_ENV;
-  return repoEnv(input.repository);
+  const env = await repoEnv(input.repository);
+  const database = await repoDatabase(input.repository);
+  if (!database) return env;
+  // Each preview gets its own database and login; the address goes to the app like any other variable.
+  try {
+    const made = await provisionSandbox(database, input.repository, input.prNumber);
+    return { ...env, runtime: { ...env.runtime, [made.envName]: made.url }, sandbox: database.kind };
+  } catch (error) {
+    throw new Error(`The preview's database couldn't be set up: ${error instanceof Error ? error.message : "unknown problem"}`);
+  }
 }
 
 const processDeployer: Deployer = {

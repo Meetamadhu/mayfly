@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { MayflyMark } from "@/components/admin-header";
 import { AppOnboarding, SHOW_INTRO_EVENT } from "@/components/app-onboarding";
+import { CommandPalette, defaultPaletteCommands } from "@/components/command-palette";
 import { ThemeToggle } from "@/components/theme-toggle";
 
-export type AppPage = "dashboard" | "activity" | "cost" | "pricing" | "policies" | "settings" | "comments" | "admin";
+/** Dispatched when the command palette asks to open New preview (the Previews page listens). */
+export const NEW_PREVIEW_EVENT = "mayfly-new-preview";
+
+export type AppPage = "dashboard" | "activity" | "cost" | "pricing" | "policies" | "settings" | "comments" | "admin" | "ops";
 
 const NAV: { id: AppPage; href: string; label: string; group: "workspace" | "admin" }[] = [
   { id: "dashboard", href: "/board", label: "Previews", group: "workspace" },
@@ -13,6 +17,7 @@ const NAV: { id: AppPage; href: string; label: string; group: "workspace" | "adm
   { id: "cost", href: "/cost", label: "Cost", group: "workspace" },
   { id: "pricing", href: "/pricing", label: "Pricing", group: "workspace" },
   { id: "admin", href: "/admin", label: "Admin", group: "admin" },
+  { id: "ops", href: "/ops", label: "Health & ops", group: "admin" },
   { id: "policies", href: "/policies", label: "Lifetime rules", group: "admin" },
   { id: "settings", href: "/preview-settings", label: "Preview settings", group: "admin" },
   { id: "comments", href: "/pr-comments", label: "PR comments", group: "admin" },
@@ -24,7 +29,7 @@ const TABS: { id: AppPage; href: string; label: string }[] = [
   { id: "activity", href: "/activity", label: "Activity" },
   { id: "cost", href: "/cost", label: "Cost" },
 ];
-const MORE: AppPage[] = ["pricing", "admin", "policies", "settings", "comments"];
+const MORE: AppPage[] = ["pricing", "admin", "ops", "policies", "settings", "comments"];
 
 const TITLES: Record<AppPage, string> = {
   dashboard: "Previews",
@@ -35,6 +40,7 @@ const TITLES: Record<AppPage, string> = {
   settings: "Preview settings",
   comments: "PR comments",
   admin: "Admin",
+  ops: "Health & ops",
 };
 
 function NavIcon({ page }: { page: AppPage }) {
@@ -110,6 +116,13 @@ function NavIcon({ page }: { page: AppPage }) {
           <path d="M9 12l2 2 4-4" />
         </svg>
       );
+    case "ops":
+      return (
+        <svg {...common}>
+          <path d="M12 3v3M12 18v3M4.9 6.3l2.1 2.1M17 15.6l2.1 2.1M3 12h3M18 12h3M4.9 17.7l2.1-2.1M17 8.4l2.1-2.1" />
+          <circle cx="12" cy="12" r="3.5" />
+        </svg>
+      );
   }
 }
 
@@ -123,9 +136,27 @@ function PersonIcon() {
 }
 
 /** Top bar, right: who you are and signing in or out, behind the avatar. The intro and light/dark sit beside it. */
+function iosInstallHint() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  const ios = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  if (!ios) return false;
+  try {
+    if (window.matchMedia("(display-mode: standalone)").matches) return false;
+  } catch {
+    // Still show the tip.
+  }
+  return true;
+}
+
 function AccountMenu({ signedIn, onSignOut }: { signedIn: boolean; onSignOut: () => void }) {
   const [open, setOpen] = useState(false);
+  const [showIosTip, setShowIosTip] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    setShowIosTip(iosInstallHint());
+  }, []);
+
   useEffect(() => {
     if (!open) return;
     function onDown(event: MouseEvent) {
@@ -166,6 +197,11 @@ function AccountMenu({ signedIn, onSignOut }: { signedIn: boolean; onSignOut: ()
               <span>{signedIn ? "Signed in" : "Viewing only"}</span>
             </span>
           </div>
+          {showIosTip ? (
+            <p className="board-account-tip">
+              Add Mayfly to your iPhone home screen: tap Share, then <strong>Add to Home Screen</strong>. It opens full screen like an app.
+            </p>
+          ) : null}
           {signedIn ? (
             <button
               type="button"
@@ -217,7 +253,36 @@ export function AppShell({
   const [signedIn, setSignedIn] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  const paletteCommands = useMemo(
+    () =>
+      defaultPaletteCommands({
+        signedIn,
+        theme,
+        onTheme: chooseTheme,
+        onNewPreview: signedIn
+          ? () => {
+              if (active === "dashboard") window.dispatchEvent(new Event(NEW_PREVIEW_EVENT));
+              else window.location.assign("/board?new=1");
+            }
+          : undefined,
+      }),
+    // chooseTheme is stable enough for this render; theme/signedIn/active drive the list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [signedIn, theme, active],
+  );
+
+  function chooseTheme(next: "light" | "dark") {
+    document.documentElement.dataset.theme = next;
+    try {
+      localStorage.setItem("mayfly-theme", next);
+    } catch {
+      // Storage can be blocked; the choice still applies to this page.
+    }
+    setTheme(next);
+  }
 
   useEffect(() => {
     setTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light");
@@ -239,10 +304,24 @@ export function AppShell({
   }, []);
 
   useEffect(() => {
+    function typingInField(target: EventTarget | null) {
+      if (!(target instanceof HTMLElement)) return false;
+      const tag = target.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable;
+    }
     function onKey(event: KeyboardEvent) {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
+        setPaletteOpen((open) => !open);
+        return;
+      }
+      if (event.key === "/" && !event.ctrlKey && !event.metaKey && !event.altKey && !typingInField(event.target)) {
+        event.preventDefault();
         searchRef.current?.focus();
+      }
+      if (event.key === "?" && !event.ctrlKey && !event.metaKey && !typingInField(event.target)) {
+        event.preventDefault();
+        setPaletteOpen(true);
       }
     }
     window.addEventListener("keydown", onKey);
@@ -257,16 +336,6 @@ export function AppShell({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [moreOpen]);
-
-  function chooseTheme(next: "light" | "dark") {
-    document.documentElement.dataset.theme = next;
-    try {
-      localStorage.setItem("mayfly-theme", next);
-    } catch {
-      // Storage can be blocked; the choice still applies to this page.
-    }
-    setTheme(next);
-  }
 
   async function signOut() {
     if (onSignOut) {
@@ -477,6 +546,7 @@ export function AppShell({
       ) : null}
 
       <AppOnboarding />
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} commands={paletteCommands} />
     </div>
   );
 }

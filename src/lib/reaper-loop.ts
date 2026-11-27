@@ -2,6 +2,7 @@ import { maybeBackup } from "./backup";
 import { getConfig } from "./config";
 import { markReaperOk, reaperFailed, reaperRecovered, watchHealth } from "./health";
 import { reap } from "./lifecycle";
+import { runAutomation } from "./automation";
 
 const marker = globalThis as unknown as { __previewReaper?: boolean };
 
@@ -29,6 +30,8 @@ export function startReaperLoop() {
     } catch (error) {
       console.error("Health check failed", error);
     }
+    // Awake hours, pre-wakes and the weekly summary. Catches its own errors.
+    await runAutomation();
     // Once a day; it checks the age of the newest backup itself and never throws.
     await maybeBackup();
   };
